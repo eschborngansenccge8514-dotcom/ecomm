@@ -1,0 +1,9 @@
+{
+  "name": "@project1/domain",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "dependencies": {
+    "zod": "^3.22.4"
+  }
+}

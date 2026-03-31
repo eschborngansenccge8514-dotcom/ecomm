@@ -1,0 +1,11 @@
+{
+  "name": "project1-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "supabase": "^2.84.4"
+  }
+}

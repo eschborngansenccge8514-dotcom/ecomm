@@ -1,0 +1,11 @@
+{
+  "name": "@project1/integrations",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "dependencies": {
+    "@project1/domain": "workspace:*",
+    "@project1/db": "workspace:*",
+    "zod": "^3.22.4"
+  }
+}

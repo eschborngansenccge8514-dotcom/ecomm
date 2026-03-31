@@ -1,0 +1,9 @@
+{
+  "imports": {
+    "shopee/": "../../../packages/integrations/shopee/",
+    "tiktok/": "../../../packages/integrations/tiktok/",
+    "google-merchant/": "../../../packages/integrations/google-merchant/",
+    "crypto": "../../../packages/integrations/crypto.ts",
+    "shared/": "../_shared/"
+  }
+}
