@@ -14,14 +14,14 @@ async function getMerchantMetrics(merchantId, { year, month } = {}) {
     // Count by status (all time)
     pool.query(`
       SELECT status, COUNT(*) AS count
-      FROM einvoices WHERE merchant_id = $1
+      FROM einvoicing.einvoices WHERE merchant_id = $1
       GROUP BY status ORDER BY count DESC
     `, [merchantId]),
 
     // Count by type (this month)
     pool.query(`
       SELECT invoice_type, COUNT(*) AS count
-      FROM einvoices
+      FROM einvoicing.einvoices
       WHERE merchant_id = $1
         AND EXTRACT(YEAR  FROM created_at) = $2
         AND EXTRACT(MONTH FROM created_at) = $3
@@ -37,7 +37,7 @@ async function getMerchantMetrics(merchantId, { year, month } = {}) {
         COUNT(*) FILTER (WHERE status = 'valid')     AS valid,
         COUNT(*) FILTER (WHERE status = 'invalid')   AS invalid,
         COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled
-      FROM einvoices
+      FROM einvoicing.einvoices
       WHERE merchant_id = $1
         AND created_at >= NOW() - INTERVAL '6 months'
       GROUP BY year, month
@@ -47,7 +47,7 @@ async function getMerchantMetrics(merchantId, { year, month } = {}) {
     // Recent failed jobs
     pool.query(`
       SELECT job_type, order_number, error, failed_at
-      FROM failed_invoice_jobs
+      FROM einvoicing.failed_invoice_jobs
       WHERE merchant_id = $1 AND resolved = FALSE
       ORDER BY failed_at DESC LIMIT 5
     `, [merchantId]),
@@ -57,7 +57,7 @@ async function getMerchantMetrics(merchantId, { year, month } = {}) {
       SELECT
         COUNT(*) AS total,
         COUNT(*) FILTER (WHERE status = 'valid') AS valid
-      FROM einvoices
+      FROM einvoicing.einvoices
       WHERE merchant_id = $1
         AND created_at >= NOW() - INTERVAL '30 days'
     `, [merchantId]),
@@ -103,7 +103,7 @@ async function getPlatformMetrics() {
         WHERE EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM NOW())
           AND EXTRACT(YEAR  FROM created_at) = EXTRACT(YEAR  FROM NOW())
       ) AS invoices_this_month
-    FROM einvoices
+    FROM einvoicing.einvoices
   `);
 
   return rows[0];

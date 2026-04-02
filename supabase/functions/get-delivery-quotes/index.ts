@@ -198,7 +198,7 @@ serve(async (req) => {
                   address: `${deliveryAddress.line1 ?? ''}, ${deliveryAddress.city ?? ''}, ${deliveryAddress.state} ${deliveryAddress.postcode}, Malaysia`,
                 },
               ],
-              item: { quantity: '1', weight: 'LESS_THAN_3_KG', categories: ['OTHER'] }
+              // Note: 'item' block is REMOVED to avoid 502 errors in Malaysia sandbox
             },
           })
           const hdrs = await lalamoveHeaders(lalaKey, lalaSec, 'POST', lalaPath, reqBody)
@@ -268,14 +268,21 @@ serve(async (req) => {
       const weightKgStr = Math.max(Number(weightKg || 0.5), 0.1).toFixed(1)
       
       const rateData = await callEasyParcel(supabase, null, 'MPRateCheckingBulk', {
-        'bulk[0][pick_code]':    epConfig?.sender_postcode || merchant.postcode,
-        'bulk[0][pick_state]':   epConfig?.sender_state || stateCode(merchant.state),
-        'bulk[0][pick_country]': epConfig?.sender_country || 'MY',
-        'bulk[0][send_code]':    deliveryAddress.postcode,
-        'bulk[0][send_state]':   stateCode(deliveryAddress.state),
-        'bulk[0][send_country]': 'MY',
-        'bulk[0][weight]':       weightKgStr,
-        'bulk[0][parcel_value]': String(parcelValue ?? 10)
+        bulk: [{
+          pick_code:    epConfig?.sender_postcode || merchant.postcode,
+          pick_state:   epConfig?.sender_state || stateCode(merchant.state),
+          pick_country: epConfig?.sender_country || 'MY',
+          send_code:    deliveryAddress.postcode,
+          send_state:   stateCode(deliveryAddress.state),
+          send_country: 'MY',
+          weight:       weightKgStr,
+          parcel_value: String(parcelValue ?? 10)
+        }],
+        exclude_fields: [
+          'rates.*.dropoff_point',
+          'rates.*.pickup_point',
+          'pgeon_point'
+        ]
       }, epCallConfig)
 
       _epDebug = { 

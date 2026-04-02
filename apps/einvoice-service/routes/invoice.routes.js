@@ -44,4 +44,49 @@ router.get('/stats', resolveMerchant, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// ── Phase 2 — Staging & Consolidation ───────────────────────────────────
+
+router.post('/receipts', resolveMerchant, async (req, res, next) => {
+  try {
+    const result = await einvoice.processIncomingOrder(req.merchantId, req.body);
+    res.json(result);
+  } catch (e) { next(e); }
+});
+
+router.post('/receipts/:orderNumber/request-individual', resolveMerchant, async (req, res, next) => {
+  try {
+    const result = await einvoice.requestIndividualInvoice(req.merchantId, req.params.orderNumber);
+    res.json(result);
+  } catch (e) { next(e); }
+});
+
+router.get('/consolidated/preview/:year/:month', resolveMerchant, async (req, res, next) => {
+  try {
+    const { year, month } = req.params;
+    const db = require('../db/invoice.db'); // Temporary import or move to service
+    const orders = await db.getStagedConsolidatedOrders(req.merchantId, parseInt(year), parseInt(month));
+    res.json({ success: true, count: orders.length, orders });
+  } catch (e) { next(e); }
+});
+
+router.post('/consolidated/submit/:year/:month', resolveMerchant, async (req, res, next) => {
+  try {
+    const { year, month } = req.params;
+    const result = await einvoice.issueConsolidatedInvoice(req.merchantId, { 
+      year: parseInt(year), 
+      month: parseInt(month) 
+    });
+    res.json({ success: true, data: result });
+  } catch (e) { next(e); }
+});
+
+router.post('/consolidated/sweep', resolveMerchant, async (req, res, next) => {
+  try {
+    const { runSweep } = require('../scripts/sweep');
+    // includeCurrentMonth=true so the manual dashboard trigger picks up all pending orders
+    const result = await runSweep(req.merchantId, true);
+    res.json(result);
+  } catch (e) { next(e); }
+});
+
 module.exports = router;

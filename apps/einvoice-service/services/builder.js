@@ -145,4 +145,33 @@ function baseDocument(merchant, typeCode, invoiceNumber, buyer, items, opts = {}
 
 module.exports = {
   buildInvoice: (m, d, type = '01') => baseDocument(m, type, d.invoiceNumber, d.buyer, d.items, d),
+
+  buildConsolidatedInvoice: (merchant, year, month, orders) => {
+    const invoiceNumber = `CON-MS-${merchant.id}-${year}${String(month).padStart(2, '0')}`;
+    
+    // Aggregate items from all orders
+    // In a real scenario, we might group by tax category, but for now we list them as lines
+    const items = orders.map(o => ({
+      description: `Receipt ${o.orderNumber}`,
+      quantity: 1,
+      unitPrice: o.subtotal,
+      subtotal: o.subtotal,
+      tax: o.tax,
+      unitCode: 'C62',
+      taxCategory: 'E',
+      taxRate: 0
+    }));
+
+    const buyer = {
+      tin: 'EI00000000010',
+      name: 'General Public',
+      address: 'N/A',
+      postcode: '00000',
+      city: 'N/A',
+      state: '14',
+      country: 'MYS'
+    };
+
+    return baseDocument(merchant, '01', invoiceNumber, buyer, items);
+  }
 };

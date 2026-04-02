@@ -1,15 +1,24 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { getSupabaseClient } from "../_shared/marketplace.ts";
 import { encryptJson } from "../../packages/integrations/crypto.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const shopId = url.searchParams.get("shop_id");
   const state = url.searchParams.get("state");
 
   if (!code || !shopId || !state) {
-    return new Response("Missing required parameters", { status: 400 });
+    return new Response("Missing required parameters", { 
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
   }
 
   const supabase = getSupabaseClient();
@@ -23,16 +32,33 @@ serve(async (req) => {
     .single();
 
   if (stateError || !stateRow) {
-    return new Response("Invalid or expired state", { status: 400 });
+    return new Response("Invalid or expired state", { 
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
   }
 
-  // 2. Exchange code for access token (v2)
-  const partnerId = Deno.env.get("SHOPEE_PARTNER_ID")!;
-  const partnerKey = Deno.env.get("SHOPEE_PARTNER_KEY")!;
+  // 2. Fetch Merchant Shopee Config
+  const { data: config, error: configError } = await supabase
+    .from("merchant_shopee_config")
+    .select("partner_id, partner_key")
+    .eq("merchant_id", stateRow.tenant_id)
+    .single();
+
+  if (configError || !config) {
+    return new Response("Shopee configuration not found for this merchant.", { 
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
+  }
+
+  // 3. Exchange code for access token (v2)
+  const partnerId = config.partner_id;
+  const partnerKey = config.partner_key;
   const path = "/api/v2/auth/token/get";
   const timestamp = Math.floor(Date.now() / 1000);
 
-  // HMAC signing for token exchange
+  // HMAC signing for token exchange (partner_id + path + timestamp)
   const baseString = `${partnerId}${path}${timestamp}`;
   const keyBuf = new TextEncoder().encode(partnerKey);
   const dataBuf = new TextEncoder().encode(baseString);
@@ -57,16 +83,19 @@ serve(async (req) => {
 
   if (!tokenRes.ok) {
     const errText = await tokenRes.text();
-    return new Response(`Token exchange failed: ${errText}`, { status: 500 });
+    return new Response(`Token exchange failed: ${errText}`, { 
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
   }
 
   const tokenData = await tokenRes.json();
 
-  // 3. Encrypt and store credentials
+  // 4. Encrypt and store credentials
   const encryptionKey = Deno.env.get("APP_ENCRYPTION_KEY_BASE64")!;
   const encryptedPayload = encryptJson(tokenData, encryptionKey);
 
-  // 4. Create or update marketplace account
+  // 5. Create or update marketplace account
   const { data: account, error: accountError } = await supabase
     .from("marketplace_accounts")
     .upsert({
@@ -80,10 +109,13 @@ serve(async (req) => {
     .single();
 
   if (accountError) {
-    return new Response(`Failed to save account: ${accountError.message}`, { status: 500 });
+    return new Response(`Failed to save account: ${accountError.message}`, { 
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
   }
 
-  // 5. Store specific Shopee credentials
+  // 6. Store specific Shopee credentials
   await supabase
     .from("marketplace_credentials")
     .upsert({
@@ -94,7 +126,8 @@ serve(async (req) => {
       expires_at: new Date(Date.now() + (tokenData.expire_in || 3600) * 1000).toISOString()
     });
 
-  // 6. Redirect back to dashboard
-  const dashboardUrl = `${Deno.env.get("APP_URL")}/integrations/shopee?success=true`;
+  // 7. Redirect back to dashboard
+  const appUrl = Deno.env.get("APP_URL") || "http://localhost:3000";
+  const dashboardUrl = `${appUrl}/marketplace/shopee?success=true`;
   return Response.redirect(dashboardUrl, 302);
 });

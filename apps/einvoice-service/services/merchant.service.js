@@ -14,16 +14,35 @@ async function getMerchant(merchantUid) {
     return cached.merchant;
   }
 
+  // 1. Fetch base merchant data from einvoicing schema
   const { rows } = await pool.query(
-    `SELECT * FROM merchants WHERE merchant_uid = $1 LIMIT 1`,
+    `SELECT * FROM einvoicing.merchants WHERE merchant_uid = $1 LIMIT 1`,
     [merchantUid]
   );
 
   if (rows.length === 0) {
-    throw new Error(`[Merchant] Merchant not found: ${merchantUid}`);
+    throw new Error(`[Merchant] Merchant not found in einvoicing: ${merchantUid}`);
   }
 
   const merchant = rows[0];
+
+  // 2. Fetch LHDN config from public schema (used by working Edge Functions)
+  const { rows: configRows } = await pool.query(
+    `SELECT * FROM public.merchant_einvoice_config WHERE merchant_id = $1 LIMIT 1`,
+    [merchantUid]
+  );
+
+  if (configRows.length > 0) {
+    const c = configRows[0];
+    // Override with verified config
+    merchant.lhdn_client_id     = c.client_id;
+    merchant.lhdn_client_secret = c.client_secret;
+    merchant.tin                = c.tin;
+    merchant.brn                = c.brn;
+    merchant.msic               = c.msic_code;
+    merchant.env                = c.env || 'sandbox';
+  }
+
   _cache.set(merchantUid, {
     merchant,
     expiresAt: Date.now() + CACHE_TTL_MS,
@@ -41,7 +60,7 @@ async function createMerchant(data) {
   } = data;
 
   const { rows } = await pool.query(`
-    INSERT INTO merchants (
+    INSERT INTO einvoicing.merchants (
       merchant_uid, name, tin, brn, phone, email, address, postcode, city, state, msic, lhdn_client_id, lhdn_client_secret
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     RETURNING id
@@ -66,7 +85,7 @@ async function updateMerchant(merchantUid, updates) {
     .join(', ');
 
   await pool.query(
-    `UPDATE merchants SET ${setClause} WHERE merchant_uid = $1`,
+    `UPDATE einvoicing.merchants SET ${setClause} WHERE merchant_uid = $1`,
     [merchantUid, ...values]
   );
 

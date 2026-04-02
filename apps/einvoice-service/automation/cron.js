@@ -7,7 +7,7 @@ const { sendDLQHealthReport } = require('./alerts');
 // ─── Helper: get all active merchants ────────────────────────────────────
 async function getAllActiveMerchants() {
   const { rows } = await pool.query(
-    `SELECT id, merchant_uid, name FROM merchants WHERE status = 'active' ORDER BY id`
+    `SELECT id, merchant_uid, name FROM einvoicing.merchants WHERE status = 'active' ORDER BY id`
   );
   return rows;
 }
@@ -46,6 +46,29 @@ cron.schedule('0 9 1 * *', async () => {
   }
 
   console.log(`[Cron] Monthly run done — submitted: ${submitted}, skipped: ${skipped}, errored: ${errored}\n`);
+});
+
+// ─── 1st to 7th of every month at 10:00 AM — Retail Phase 2 Sweep ──────────
+cron.schedule('0 10 1-7 * *', async () => {
+  console.log('\n[Cron] 🛒 Starting Retail Phase 2 E-Invoice Sweep...');
+  try {
+    const { runSweep } = require('../scripts/sweep');
+    const result = await runSweep();
+    console.log(`[Cron] Retail sweep done — processed ${result.processed} merchant(s).\n`);
+  } catch (err) {
+    console.error('[Cron] Retail sweep failed:', err.message);
+  }
+});
+
+// ─── Every 10 minutes — Individual E-Invoice Requests ──────────────────────
+cron.schedule('*/10 * * * *', async () => {
+  console.log('[Cron] ⚡ Checking for individual e-invoice requests...');
+  try {
+    const { processIndividualRequests } = require('../scripts/process-individuals');
+    await processIndividualRequests();
+  } catch (err) {
+    console.error('[Cron] Individual processing failed:', err.message);
+  }
 });
 
 // ─── Every Monday at 8:00 AM — DLQ health check ──────────────────────────
@@ -91,8 +114,8 @@ cron.schedule('0 6 * * *', async () => {
       cs.year,
       cs.month,
       COUNT(*) AS overdue_count
-    FROM consolidated_staging cs
-    JOIN merchants m ON m.id = cs.merchant_id
+    FROM einvoicing.consolidated_staging cs
+    JOIN einvoicing.merchants m ON m.id = cs.merchant_id
     WHERE cs.consolidated_einvoice_id IS NULL
       AND make_date(cs.year, cs.month, 1) < $1
     GROUP BY m.merchant_uid, m.name, cs.year, cs.month

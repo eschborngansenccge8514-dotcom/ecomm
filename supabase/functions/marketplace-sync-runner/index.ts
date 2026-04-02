@@ -76,7 +76,7 @@ serve(async (req) => {
 })
 
 async function handleShopeeJob(supabase: any, job: any) {
-  // 1. Get credentials
+  // 1. Get credentials (tokens)
   const { data: creds } = await supabase
     .from("marketplace_credentials")
     .select("*")
@@ -89,15 +89,27 @@ async function handleShopeeJob(supabase: any, job: any) {
   const encryptionKey = Deno.env.get("APP_ENCRYPTION_KEY_BASE64")!;
   const tokens = decryptJson<any>(creds.encrypted_payload, encryptionKey);
 
+  // 2. Get Merchant Config (Partner ID/Key)
+  const { data: config } = await supabase
+    .from("merchant_shopee_config")
+    .select("partner_id, partner_key")
+    .eq("merchant_id", job.account.tenant_id)
+    .single();
+
+  const partnerId = config?.partner_id || Deno.env.get("SHOPEE_PARTNER_ID");
+  const partnerKey = config?.partner_key || Deno.env.get("SHOPEE_PARTNER_KEY");
+
+  if (!partnerId || !partnerKey) throw new Error("Shopee partner configuration missing for this merchant");
+
   const client = new ShopeeClient({
-    partnerId: Deno.env.get("SHOPEE_PARTNER_ID")!,
-    partnerKey: Deno.env.get("SHOPEE_PARTNER_KEY")!,
+    partnerId: partnerId,
+    partnerKey: partnerKey,
     baseUrl: Deno.env.get("SHOPEE_BASE_URL") || "https://partner.shopeemobile.com",
     accessToken: tokens.access_token,
     shopId: job.account.shop_id,
   });
 
-  // 2. Dispatch based on job type
+  // 3. Dispatch based on job type
   switch (job.job_type) {
     case 'sync_orders':
       return await syncShopeeOrders(supabase, client, job);

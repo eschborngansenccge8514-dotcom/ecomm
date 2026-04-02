@@ -1,11 +1,11 @@
-import { signLazadaRequest } from "./signature";
+import { signLazadaRequest } from "./signature.ts";
 import { 
   LazadaConfig, 
   LazadaBaseResponse, 
   LazadaSeller, 
   LazadaOrder, 
   LazadaOrderItem 
-} from "./types";
+} from "./types.ts";
 
 export class LazadaClient {
   private config: LazadaConfig;

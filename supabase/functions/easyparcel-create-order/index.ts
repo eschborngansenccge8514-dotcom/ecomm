@@ -57,66 +57,61 @@ serve(async (req) => {
       serviceId = order.delivery_service_id || epConfig?.preferred_courier
     }
 
-    // Always check rates if we don't have a confirmed serviceId or if we need to validate it
-    console.log(`[easyparcel-create-order] Checking available rates for route...`)
-    const rateData = await callEasyParcel(supabase, orderId, 'MPRateCheckingBulk', {
-      'bulk[0][pick_code]':    epConfig?.sender_postcode || order.merchant?.postcode,
-      'bulk[0][pick_state]':   epConfig?.sender_state || getStateCode(order.merchant?.state),
-      'bulk[0][pick_country]': epConfig?.sender_country || 'MY',
-      'bulk[0][send_code]':    deliveryAddr.postcode,
-      'bulk[0][send_state]':   getStateCode(deliveryAddr.state),
-      'bulk[0][send_country]': 'MY',
-      'bulk[0][weight]':       String(Math.max(Number(weightKg || 0.5), 0.1).toFixed(1)),
-    }, epCallConfig)
-
-    const rates = rateData?.result?.[0]?.rates || []
-    
-    // If we have no rates, we can't book via API, but let's check if it's a standard-delivery request
-    if (rates.length === 0 && serviceId !== 'standard-delivery') {
-      throw new Error('EasyParcel: No available couriers found for this route/weight. You may need to book this parcel manually.')
-    }
-
-    const collectionType = epConfig?.collection_type || 'pickup'
-    console.log(`[easyparcel-create-order] Merchant collection type is ${collectionType}. Filtering rates...`)
-
-    // Filter rates to only show compatible services
-    let filteredRates = rates.filter((r: any) => 
-      r.service_detail === collectionType || 
-      (collectionType === 'pickup' && r.service_detail === 'pickup') ||
-      (collectionType === 'dropoff' && r.service_detail === 'dropoff')
-    )
-
-    // Fallback if no matching rates found (e.g. only dropoff available but merchant wants pickup)
-    if (filteredRates.length === 0) {
-      console.warn(`[easyparcel-create-order] No rates matching ${collectionType}. Showing all available as fallback.`)
-      filteredRates = rates
-    }
-
     let selectedCourier: any = null
     const isStandardDelivery = serviceId === 'standard-delivery' || !serviceId
 
-    if (rates.length === 0 && isStandardDelivery) {
-      throw new Error('EasyParcel: Failed to find a compatible service even for Standard Delivery. Please check if the destination postcode is valid.')
-    }
+    // Always check rates ONLY if we don't have a confirmed serviceId or if we need to auto-select
+    if (isStandardDelivery || !serviceId || serviceId === 'auto') {
+      console.log(`[easyparcel-create-order] No specific serviceId provided or standard-delivery requested. Checking available rates...`)
+      const rateData = await callEasyParcel(supabase, orderId, 'MPRateCheckingBulk', {
+        bulk: [{
+          pick_code:    epConfig?.sender_postcode || order.merchant?.postcode,
+          pick_state:   epConfig?.sender_state || getStateCode(order.merchant?.state),
+          pick_country: epConfig?.sender_country || 'MY',
+          send_code:    deliveryAddr.postcode,
+          send_state:   getStateCode(deliveryAddr.state),
+          send_country: 'MY',
+          weight:       String(Math.max(Number(weightKg || 0.5), 0.1).toFixed(1)),
+        }],
+        exclude_fields: [
+          'rates.*.dropoff_point',
+          'rates.*.pickup_point',
+          'pgeon_point'
+        ]
+      }, epCallConfig)
 
-    if (serviceId && !isStandardDelivery) {
-      // Try to find the specific courier requested among compatible ones first
-      selectedCourier = filteredRates.find((r: any) => 
-        r.service_id === serviceId || 
-        r.sid?.toString() === serviceId?.toString() ||
-        r.courier_id === serviceId
+      const rates = rateData?.result?.[0]?.rates || []
+      
+      // If we have no rates, we can't book via API
+      if (rates.length === 0) {
+        throw new Error('EasyParcel: No available couriers found for this route/weight. You may need to book this parcel manually.')
+      }
+
+      const collectionType = epConfig?.collection_type || 'pickup'
+      console.log(`[easyparcel-create-order] Merchant collection type is ${collectionType}. Filtering rates...`)
+
+      // Filter rates to only show compatible services
+      let filteredRates = rates.filter((r: any) => 
+        r.service_detail === collectionType || 
+        (collectionType === 'pickup' && r.service_detail === 'pickup') ||
+        (collectionType === 'dropoff' && r.service_detail === 'dropoff')
       )
-    }
 
-    if (!selectedCourier) {
-      // Fallback to cheapest available in the compatible set (or used if standard-delivery)
+      // Fallback if no matching rates found
+      if (filteredRates.length === 0) {
+        console.warn(`[easyparcel-create-order] No rates matching ${collectionType}. Showing all available as fallback.`)
+        filteredRates = rates
+      }
+
+      // Auto-selecting cheapest:
       selectedCourier = filteredRates.sort((a: any, b: any) => parseFloat(a.price) - parseFloat(b.price))[0]
-      const reason = isStandardDelivery ? "Standard Delivery requested" : `Requested service ${serviceId} not available or incompatible`;
-      console.log(`[easyparcel-create-order] ${reason}. Auto-selecting cheapest: ${selectedCourier.courier_name}`)
+      serviceId = selectedCourier.service_id || selectedCourier.sid?.toString() || selectedCourier.courier_id
+      console.log(`[easyparcel-create-order] Auto-selected cheapest: ${selectedCourier.courier_name} (${serviceId}) at RM${selectedCourier.price}`)
+    } else {
+      console.log(`[easyparcel-create-order] Specific serviceId provided: ${serviceId}. Skipping rate-check to save time.`)
+      // Note: We don't have the courier name here yet, but we'll get it from the shipment record query if needed
+      // or just use the serviceId as a proxy for now.
     }
-
-    serviceId = selectedCourier.service_id || selectedCourier.sid?.toString() || selectedCourier.courier_id
-    console.log(`[easyparcel-create-order] Selected courier: ${selectedCourier.courier_name} (${serviceId}) at RM${selectedCourier.price} [${selectedCourier.service_detail}]`)
 
     if (!weightKg || isNaN(Number(weightKg)) || Number(weightKg) <= 0) {
       const { data: items } = await supabase
@@ -137,34 +132,36 @@ serve(async (req) => {
 
     // Step 1: Make Order (MPSubmitOrderBulk)
     const submitData = await callEasyParcel(supabase, orderId, 'MPSubmitOrderBulk', {
-      'bulk[0][weight]':       String(Math.max(Number(weightKg), 0.1).toFixed(1)),
-      'bulk[0][width]':        String(epConfig?.default_width_cm || 15),
-      'bulk[0][height]':       String(epConfig?.default_height_cm || 10),
-      'bulk[0][length]':       String(epConfig?.default_length_cm || 20),
-      'bulk[0][content]':      order.items?.map((i: any) => i.product_name).join(', ').slice(0, 100) || `Order ${order.order_number}`,
-      'bulk[0][value]':        String(order.total_amount),
-      'bulk[0][service_id]':   serviceId,
-      'bulk[0][pick_name]':    epConfig?.sender_name     || order.merchant?.store_name,
-      'bulk[0][pick_contact]': epConfig?.sender_phone    || order.merchant?.phone?.replace(/\D/g, ''),
-      'bulk[0][pick_addr1]':   epConfig?.sender_address1 || order.merchant?.address_line1,
-      'bulk[0][pick_addr2]':   epConfig?.sender_address2 || '',
-      'bulk[0][pick_city]':    epConfig?.sender_city     || order.merchant?.city,
-      'bulk[0][pick_state]':   epConfig?.sender_state    || getStateCode(order.merchant?.state), 
-      'bulk[0][pick_code]':    epConfig?.sender_postcode || order.merchant?.postcode,
-      'bulk[0][pick_country]': epConfig?.sender_country  || 'MY',
-      'bulk[0][send_name]':    deliveryAddr.name,
-      'bulk[0][send_contact]': deliveryAddr.phone?.replace(/\D/g, ''),
-      'bulk[0][send_addr1]':   deliveryAddr.line1,
-      'bulk[0][send_addr2]':   deliveryAddr.line2 || '',
-      'bulk[0][send_city]':    deliveryAddr.city,
-      'bulk[0][send_state]':   getStateCode(deliveryAddr.state),
-      'bulk[0][send_code]':    deliveryAddr.postcode,
-      'bulk[0][send_country]': 'MY',
-      'bulk[0][collect_date]': getCollectionDate(),
-      'bulk[0][collect_by]':   epConfig?.collection_type || 'pickup',
-      'bulk[0][sms]':          '0',
-      'bulk[0][send_email]':   epConfig?.sender_email || 'noreply@hyperlocal.app',
-      'bulk[0][reference]':    order.order_number,
+      bulk: [{
+        weight:       String(Math.max(Number(weightKg), 0.1).toFixed(1)),
+        width:        String(epConfig?.default_width_cm || 15),
+        height:       String(epConfig?.default_height_cm || 10),
+        length:       String(epConfig?.default_length_cm || 20),
+        content:      order.items?.map((i: any) => i.product_name).join(', ').slice(0, 100) || `Order ${order.order_number}`,
+        value:        String(order.total_amount),
+        service_id:   serviceId,
+        pick_name:    epConfig?.sender_name     || order.merchant?.store_name,
+        pick_contact: epConfig?.sender_phone    || order.merchant?.phone?.replace(/\D/g, ''),
+        pick_addr1:   epConfig?.sender_address1 || order.merchant?.address_line1,
+        pick_addr2:   epConfig?.sender_address2 || '',
+        pick_city:    epConfig?.sender_city     || order.merchant?.city,
+        pick_state:   epConfig?.sender_state    || getStateCode(order.merchant?.state), 
+        pick_code:    epConfig?.sender_postcode || order.merchant?.postcode,
+        pick_country: epConfig?.sender_country  || 'MY',
+        send_name:    deliveryAddr.name,
+        send_contact: deliveryAddr.phone?.replace(/\D/g, ''),
+        send_addr1:   deliveryAddr.line1,
+        send_addr2:   deliveryAddr.line2 || '',
+        send_city:    deliveryAddr.city,
+        send_state:   getStateCode(deliveryAddr.state),
+        send_code:    deliveryAddr.postcode,
+        send_country: 'MY',
+        collect_date: getCollectionDate(),
+        collect_by:   epConfig?.collection_type || 'pickup',
+        sms:          '0',
+        send_email:   epConfig?.sender_email || 'noreply@hyperlocal.app',
+        reference:    order.order_number,
+      }]
     }, epCallConfig)
 
     const orderNo = submitData.result?.[0]?.order_number
@@ -175,19 +172,25 @@ serve(async (req) => {
 
     // Step 2: Pay Order (MPPayOrderBulk)
     const payData = await callEasyParcel(supabase, orderId, 'MPPayOrderBulk', {
-      'bulk[0][order_no]': orderNo
+      bulk: [{ order_no: orderNo }]
     }, epCallConfig)
 
     const result      = payData.result?.[0]
-    const messagenow  = result?.messagenow
+    const messagenow  = result?.messagenow ?? ''
     const parcel      = result?.parcel?.[0]
     const awb         = parcel?.awb ?? ''
-    const trackingUrl = parcel?.tracking_url ?? ''
+    const awbIdLink   = parcel?.awb_id_link ?? ''
+    const parcelNo    = parcel?.parcelno ?? ''
+    const finalCourierName = selectedCourier?.courier_name || 'Courier'
 
-    // Phase 3 — Order Payment validation
-    const successStatuses = ['Fully Paid', 'Payment Done', 'Already Paid']
-    if (!successStatuses.includes(messagenow)) {
-      const errorMsg = messagenow === 'Insufficient Credit' 
+    console.log(`[easyparcel-create-order] Payment status: "${messagenow}", AWB: ${awb}, Parcel: ${parcelNo}`)
+
+    // Phase 3 — Order Payment validation (case-insensitive comparison per API docs)
+    const msgLower = messagenow.toLowerCase()
+    const isSuccess = ['fully paid', 'payment done', 'already paid'].includes(msgLower)
+    if (!isSuccess) {
+      const isInsufficientCredit = msgLower.includes('insufficient')
+      const errorMsg = isInsufficientCredit
         ? 'Seller EasyParcel wallet balance is insufficient. Please top up your EasyParcel wallet.' 
         : `EasyParcel Payment Status: ${messagenow}`
       
@@ -210,10 +213,42 @@ serve(async (req) => {
       throw new Error(errorMsg)
     }
 
-    // Step 3: Check AWB
-    if (!awb) {
-      console.warn(`AWB not ready for order ${orderNo}`)
-    }
+    // Step 4: Create shipment record for dashboard tracking
+    await supabase.from('easyparcel_shipments').upsert({
+      merchant_id:      order.merchant_id,
+      order_id:         orderId,
+      ep_order_number:  orderNo,
+      ep_parcel_number: parcel?.parcelno || null,
+      awb:              awb || null,
+      awb_id_link:      parcel?.awb_id_link || null,
+      tracking_url:     awbIdLink || null,
+      courier_name:     finalCourierName,
+      service_id:       serviceId,
+      order_status:     messagenow,
+      ship_status:      awb ? 'Pending' : 'Undefined Status',
+      weight:           Number(weightKg),
+      content:          order.items?.map((i: any) => i.product_name).join(', ').slice(0, 100) || `Order ${order.order_number}`,
+      reference:        order.order_number,
+      
+      // Detailed address troubleshooting fields
+      pick_name:        epConfig?.sender_name     || order.merchant?.store_name,
+      pick_contact:     epConfig?.sender_phone    || order.merchant?.phone?.replace(/\D/g, ''),
+      pick_addr1:       epConfig?.sender_address1 || order.merchant?.address_line1,
+      pick_city:        epConfig?.sender_city     || order.merchant?.city,
+      pick_state:       epConfig?.sender_state    || getStateCode(order.merchant?.state),
+      pick_postcode:    epConfig?.sender_postcode || order.merchant?.postcode,
+      
+      send_name:        deliveryAddr.name,
+      send_contact:     deliveryAddr.phone?.replace(/\D/g, ''),
+      send_email:       epConfig?.sender_email || 'noreply@hyperlocal.app',
+      send_addr1:       deliveryAddr.line1,
+      send_city:        deliveryAddr.city,
+      send_state:       getStateCode(deliveryAddr.state),
+      send_postcode:    deliveryAddr.postcode,
+
+      is_demo:          epCallConfig.environment === 'sandbox',
+      updated_at:       new Date().toISOString()
+    }, { onConflict: 'ep_order_number' })
 
     // Update our order with success details
     await supabase.from('orders').update({
@@ -223,7 +258,7 @@ serve(async (req) => {
       delivery_service_id:  serviceId,
       easyparcel_order_no:  orderNo,
       tracking_number:      awb,
-      tracking_url:         trackingUrl,
+      tracking_url:         awbIdLink,
       delivery_status:      awb ? 'pending' : 'not_requested'
     }).eq('id', orderId)
 
@@ -235,7 +270,15 @@ serve(async (req) => {
     })
 
     return new Response(
-      JSON.stringify({ success: true, orderNo, awb, trackingUrl, message: 'EasyParcel order created and paid successfully.' }),
+      JSON.stringify({ 
+        success: true, 
+        orderNo,
+        parcelNo,
+        trackingNumber: awb, 
+        trackingUrl: awbIdLink, 
+        courierName: finalCourierName,
+        message: 'EasyParcel order created and paid successfully.' 
+      }),
       { headers: { ...CORS, 'Content-Type': 'application/json' } }
     )
   } catch (err: any) {

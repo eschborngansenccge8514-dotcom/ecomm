@@ -184,6 +184,17 @@ const migrations = [
   `CREATE INDEX IF NOT EXISTS idx_prod_log_merchant_period
      ON einvoice_production_log(merchant_id, tax_period_year, tax_period_month)`,
 
+  // ─── Phase 2 — Consolidation Rules ───────────────────────────────────
+
+  `ALTER TABLE consolidated_staging
+     ADD COLUMN IF NOT EXISTS requested_individual BOOLEAN DEFAULT FALSE`,
+
+  `ALTER TABLE consolidated_staging
+     ADD COLUMN IF NOT EXISTS is_restricted BOOLEAN DEFAULT FALSE`,
+
+  `ALTER TABLE consolidated_staging
+     ADD COLUMN IF NOT EXISTS exclusion_reason TEXT`,
+
 ];
 
 async function runMigrations() {

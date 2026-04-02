@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildLalamoveHeaders, getLalamoveBaseUrl } from '../_shared/lalamove-auth.ts'
-import { retryWithBackoff, logLalamoveApi, mapLalamoveStatus } from '../_shared/utils.ts'
+import { retryWithBackoff, logLalamoveApi, mapLalamoveStatus, mapLalamoveDriverInfo } from '../_shared/utils.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -62,6 +62,31 @@ serve(async (req) => {
       
       const { updates, callLoyalty } = mapLalamoveStatus(lalamoveStatus, lalamoveData)
       
+      // If driver is assigned, fetch extended driver details (photo, live GPS)
+      const driverId = lalamoveData.driverId
+      if (driverId) {
+        // Mark as assigned if not already
+        if (!order.driver_assigned_at) {
+          updates.driver_assigned_at = new Date().toISOString()
+        }
+
+        try {
+          const driverPath = `/v3/orders/${order.lalamove_order_id}/drivers/${driverId}`
+          const driverHeaders = await buildLalamoveHeaders(apiKey, apiSecret, 'GET', driverPath)
+          const drvRes = await fetch(`${baseUrl}${driverPath}`, { method: 'GET', headers: driverHeaders })
+          
+          if (drvRes.ok) {
+            const drvData = await drvRes.json()
+            const driverUpdates = mapLalamoveDriverInfo(drvData.data)
+            Object.assign(updates, driverUpdates)
+          } else {
+            console.error(`Failed to fetch driver details: ${drvRes.status}`)
+          }
+        } catch (drvErr) {
+          console.error('Error fetching driver details:', drvErr)
+        }
+      }
+      
       let changed = false
       // Check if status changed
       if (updates.status && updates.status !== order.status) changed = true
@@ -96,7 +121,8 @@ serve(async (req) => {
         status: updates.status || order.status,
         deliveryStatus: updates.delivery_status || order.delivery_status,
         changed,
-        driverInfo: lalamoveData.driverInfo
+        driverInfo: lalamoveData.driverInfo,
+        lalamoveDetails: lalamoveData // Return full details
       }), {
         headers: { ...CORS, 'Content-Type': 'application/json' }
       })

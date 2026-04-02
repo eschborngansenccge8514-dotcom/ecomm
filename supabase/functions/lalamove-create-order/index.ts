@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildLalamoveHeaders, getLalamoveBaseUrl } from '../_shared/lalamove-auth.ts'
-import { logLalamoveApi } from '../_shared/utils.ts'
+import { fetchWithRetry, logLalamoveApi, getLalamoveErrorMessage } from '../_shared/utils.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -9,31 +9,25 @@ const CORS = {
 }
 
 const ok  = (d: unknown) => new Response(JSON.stringify(d), { headers: { ...CORS, 'Content-Type': 'application/json' } })
-const err = (m: string, status = 200) => new Response(JSON.stringify({ error: m }), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
+const err = (m: string, status = 400) => new Response(JSON.stringify({ error: m }), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
 
-// Retry wrapper for transient Lalamove sandbox 502/503/504 errors
-async function fetchWithRetry(url: string, init: RequestInit, maxAttempts = 3): Promise<Response> {
-  const delays = [0, 1000, 2000]
-  let lastRes: Response | null = null
-  for (let i = 0; i < maxAttempts; i++) {
-    if (delays[i] > 0) await new Promise(r => setTimeout(r, delays[i]))
-    const res = await fetch(url, init)
-    // Retry on transient gateway errors only
-    if (res.status === 502 || res.status === 503 || res.status === 504) {
-      lastRes = res
-      console.warn(`[lalamove-create-order] Attempt ${i + 1} got ${res.status}, retrying...`)
-      continue
-    }
-    return res
-  }
-  return lastRes!
+// Normalise Malaysian phone numbers to E.164 (+60XXXXXXXXX)
+function normPhone(phone: string | null | undefined): string | null {
+  if (!phone) return null
+  const trimmed = phone.trim()
+  if (trimmed.startsWith('+')) return trimmed          // already E.164
+  if (trimmed.startsWith('60')) return '+' + trimmed   // 60X... -> +60X...
+  if (trimmed.startsWith('0')) return '+60' + trimmed.slice(1) // 01X... -> +601X...
+  return null
 }
+
+
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   try {
-    const { orderId, serviceType: overrideService } = await req.json()
+    const { orderId, serviceType: overrideService, quotationId: overrideQuoteId } = await req.json()
     if (!orderId) return err('orderId is required')
 
     const supabase = createClient(
@@ -54,13 +48,17 @@ serve(async (req) => {
       .from('merchant_lalamove_config')
       .select('*')
       .eq('merchant_id', order.merchant_id)
-      .single()
+      .maybeSingle()
+
+    if (!llConfig) {
+      console.warn(`[lalamove-create-order] No Lalamove config found for merchant ${order.merchant_id}. Using merchant defaults.`)
+    }
 
     // ── SECRETS ──────────────────────────────────────────────────────────
     // Reverted to global secrets as requested
     const apiKey    = Deno.env.get('LALAMOVE_API_KEY')
     const apiSecret = Deno.env.get('LALAMOVE_API_SECRET')
-    const market    = Deno.env.get('LALAMOVE_MARKET') || 'MY_KUL'
+    const market    = Deno.env.get('LALAMOVE_MARKET') || 'MY'
     const env       = Deno.env.get('DELIVERY_ENV')   || 'sandbox'
     const baseUrl   = getLalamoveBaseUrl(env)
 
@@ -71,74 +69,100 @@ serve(async (req) => {
 
     const deliveryAddr = order.delivery_address as any
     const merchant     = order.merchant as any
-    const serviceType  = overrideService || order.delivery_service_id || llConfig?.default_service_type || 'MOTORCYCLE'
+    const rawDeliveryService = order.delivery_service_id || ''
+    const isInvalidServiceString = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawDeliveryService) || /^\d+$/.test(rawDeliveryService)
+    const serviceType  = overrideService || (isInvalidServiceString ? null : order.delivery_service_id) || llConfig?.default_service_type || 'MOTORCYCLE'
 
 
-    // 2. Resolve customer coordinates
-    let custLat = deliveryAddr?.lat
-    let custLng = deliveryAddr?.lng
+    // 2. Resolve existing quotation or create a new one
+    let freshQuotationId = overrideQuoteId || order.delivery_quote_id
+    let senderStopId     = ''
+    let recipientStopId  = ''
 
-    if (!custLat || !custLng) {
-      const { data: addrRow } = await supabase
-        .from('addresses')
-        .select('lat, lng')
-        .eq('user_id', order.customer_id)
-        .eq('postcode', deliveryAddr?.postcode)
-        .maybeSingle()
-      custLat = addrRow?.lat
-      custLng = addrRow?.lng
+    // Address sanitization to avoid 502 map crashes
+    const buildAddr = (obj: any) => [obj.line1, obj.line2, obj.city, obj.state, obj.postcode, 'Malaysia']
+      .filter(Boolean).map(s => String(s).trim()).filter(s => s !== '').join(', ')
+
+    const pickupAddress  = llConfig?.pickup_address_text || buildAddr({
+      line1:    merchant.address_line1,
+      line2:    merchant.line2,
+      city:     merchant.city,
+      state:    merchant.state,
+      postcode: merchant.postcode
+    })
+    const deliveryAddressStr = buildAddr(deliveryAddr)
+
+    const merchLat = String(llConfig?.pickup_lat || merchant.lat || '5.4141')
+    const merchLng = String(llConfig?.pickup_lng || merchant.lng || '100.3288')
+    const custLatS = String(deliveryAddr?.lat || '5.4141')
+    const custLngS = String(deliveryAddr?.lng || '100.3288')
+
+    let quoteData: any = null
+    if (!freshQuotationId) {
+      console.log(`[lalamove-create-order] No quotation ID found for order ${orderId}. Creating new quotation...`)
+      const quotePath = '/v3/quotations'
+      const quoteBody = JSON.stringify({
+        data: {
+          serviceType,
+          language: 'en_MY',
+          stops: [
+            { coordinates: { lat: merchLat, lng: merchLng }, address: pickupAddress },
+            { coordinates: { lat: custLatS, lng: custLngS }, address: deliveryAddressStr },
+          ],
+          // Note: 'item' block is REMOVED to avoid 502 errors in Malaysia sandbox
+        },
+      })
+      const quoteHeaders = await buildLalamoveHeaders(apiKey, apiSecret, 'POST', quotePath, quoteBody, market)
+      const { res: qRes1, attempts: qAttempts1 } = await fetchWithRetry(`${baseUrl}${quotePath}`, { method: 'POST', headers: quoteHeaders, body: quoteBody })
+      quoteData = await qRes1.json()
+
+      await logLalamoveApi(supabase, orderId, {
+        endpoint: quotePath, method: 'POST',
+        statusCode: qRes1.status,
+        requestBody: quoteBody,
+        responseBody: quoteData,
+        attempt: qAttempts1,
+      })
+
+      if (!qRes1.ok) {
+        const msg = quoteData?.message ?? quoteData?.error?.message ?? `Quotation creation failed (${qRes1.status})`
+        return err(`Lalamove quotation error: ${msg}`)
+      }
+      freshQuotationId = quoteData.data.quotationId
+      senderStopId     = quoteData.data.stops[0].stopId
+      recipientStopId  = quoteData.data.stops[1].stopId
+    } else {
+      // 3. Fetch existing quotation details to get stop IDs
+      const quotePath = `/v3/quotations/${freshQuotationId}`
+      const quoteHeaders = await buildLalamoveHeaders(apiKey, apiSecret, 'GET', quotePath, '', market)
+      const { res: qRes2, attempts: qAttempts2 } = await fetchWithRetry(`${baseUrl}${quotePath}`, { method: 'GET', headers: quoteHeaders })
+      quoteData = await qRes2.json()
+
+      await logLalamoveApi(supabase, orderId, {
+        endpoint: quotePath, method: 'GET',
+        statusCode: qRes2.status,
+        requestBody: '',
+        responseBody: quoteData,
+        attempt: qAttempts2,
+      })
+
+      if (!qRes2.ok) {
+        const msg = getLalamoveErrorMessage(quoteData, `Quotation fetch failed (${qRes2.status})`)
+        return err(`Lalamove quotation error: ${msg}`)
+      }
+
+      senderStopId    = quoteData.data.stops[0].stopId
+      recipientStopId = quoteData.data.stops[1].stopId
     }
 
-    // Pickup details from config
-    const merchLat = String(llConfig.pickup_lat || merchant.lat || '3.1486')
-    const merchLng = String(llConfig.pickup_lng || merchant.lng || '101.6942')
-    const custLatS = String(custLat || '3.1500')
-    const custLngS = String(custLng || '101.7000')
-
-    const pickupAddress = llConfig.pickup_address_text || 
-      `${merchant.address_line1 ?? ''}, ${merchant.city ?? ''}, ${merchant.state} ${merchant.postcode}, Malaysia`
-
-    const pickupContactName  = llConfig.pickup_contact_name || merchant.store_name || 'Merchant'
-    const pickupContactPhone = llConfig.pickup_contact_phone || merchant.phone || '+60123456789'
-
-    // 3. Get fresh quotation
-    const quotePath = '/v3/quotations'
-    const quoteBody = JSON.stringify({
-      data: {
-        serviceType,
-        language: 'en_MY',
-        stops: [
-          {
-            coordinates: { lat: merchLat, lng: merchLng },
-            address:     pickupAddress,
-          },
-          {
-            coordinates: { lat: custLatS, lng: custLngS },
-            address:     `${deliveryAddr.line1 ?? ''}, ${deliveryAddr.city ?? ''}, ${deliveryAddr.state} ${deliveryAddr.postcode}, Malaysia`,
-          },
-        ],
-        item: { quantity: '1', weight: 'LESS_THAN_3_KG', categories: ['OTHER'] }
-      },
-    })
-
-    const quoteHeaders = await buildLalamoveHeaders(apiKey, apiSecret, 'POST', quotePath, quoteBody, market)
-    const quoteRes    = await fetchWithRetry(`${baseUrl}${quotePath}`, { method: 'POST', headers: quoteHeaders, body: quoteBody })
-    const quoteData   = await quoteRes.json()
-
-    await logLalamoveApi(supabase, orderId, {
-      endpoint: quotePath, method: 'POST',
-      statusCode: quoteRes.status,
-      requestBody: quoteBody,
-      responseBody: quoteData,
-      attempt: 1,
-    })
-
-    if (!quoteRes.ok) {
-      const msg = quoteData?.message ?? quoteData?.error?.message ?? `Quote failed (${quoteRes.status})`
-      return err(`Lalamove quote error: ${msg}`)
+    const validatedDeliveryPhone = normPhone(deliveryAddr?.phone)
+    if (!validatedDeliveryPhone) {
+      return err('Customer phone number is missing or invalid')
     }
 
-    const freshQuotationId = quoteData.data.quotationId
+    const pickupContactName  = llConfig?.pickup_contact_name || merchant?.store_name || 'Merchant'
+    const pickupContactPhone = normPhone(llConfig?.pickup_contact_phone || merchant?.phone) || '+60123456789'
+
 
     // 4. Create Lalamove order
     const sanitize = (s: string) => (s ?? '').replace(/[^\x00-\x7F]/g, '').substring(0, 50)
@@ -147,25 +171,29 @@ serve(async (req) => {
       data: {
         quotationId: freshQuotationId,
         sender: {
-          stopId: '0',
+          stopId: senderStopId,
           name:   sanitize(pickupContactName),
           phone:  pickupContactPhone,
         },
         recipients: [
           {
-            stopId:  '1',
+            stopId:  recipientStopId,
             name:    sanitize(deliveryAddr.name || 'Customer'),
-            phone:   deliveryAddr.phone,
+            phone:   validatedDeliveryPhone,
             remarks: `Order ${order.order_number}`.substring(0, 100),
           },
         ],
-        isPODEnabled: false,
-        isRecipientSMSEnabled: true,
+        isPODEnabled: llConfig?.is_pod_enabled ?? false,
+        metadata: {
+          orderNumber: order.order_number,
+          merchantId:  order.merchant_id,
+          source:      'hyperlocal-dashboard'
+        }
       },
     })
 
     const createHeaders = await buildLalamoveHeaders(apiKey, apiSecret, 'POST', createPath, createBody, market)
-    const createRes    = await fetchWithRetry(`${baseUrl}${createPath}`, { method: 'POST', headers: createHeaders, body: createBody })
+    const { res: createRes, attempts: createAttempts }    = await fetchWithRetry(`${baseUrl}${createPath}`, { method: 'POST', headers: createHeaders, body: createBody })
     const createData   = await createRes.json()
 
     await logLalamoveApi(supabase, orderId, {
@@ -173,38 +201,54 @@ serve(async (req) => {
       statusCode: createRes.status,
       requestBody: createBody,
       responseBody: createData,
-      attempt: 1,
-    })
+      attempt: createAttempts,
+    }) 
 
-    if (!createRes.ok) {
-      const msg = createData?.message ?? createData?.error?.message ?? `Booking failed (${createRes.status})`
+     if (!createRes.ok) {
+      const msg = getLalamoveErrorMessage(createData, `Booking failed (${createRes.status})`)
       return err(`Lalamove booking error: ${msg}`)
     }
 
     const lalamoveOrderId = createData.data?.orderId
+    const lalamoveData = createData.data
 
     // 5. Update order record
-    await supabase.from('orders').update({
-      status:            'out_for_delivery',
+    const { error: updateError } = await supabase.from('orders').update({
+      status:            'confirmed',
       delivery_status:   'finding_driver',
       delivery_provider: 'lalamove',
       delivery_type:     'instant',
       lalamove_order_id: lalamoveOrderId,
       delivery_quote_id: freshQuotationId,
+      delivery_metadata: {
+        lalamove: {
+          distance: lalamoveData?.distance,
+          priceBreakdown: lalamoveData?.priceBreakdown,
+          stops: lalamoveData?.stops
+        }
+      }
     }).eq('id', orderId)
 
-    await supabase.from('delivery_events').insert({
+    if (updateError) {
+      console.error('[lalamove-create-order] DB update orders failed:', updateError)
+    }
+
+    const { error: insertError } = await supabase.from('delivery_events').insert({
       order_id:    orderId,
       provider:    'lalamove',
       event_type:  'order_created',
       raw_payload: createData.data,
     })
 
+    if (insertError) {
+      console.error('[lalamove-create-order] DB insert delivery_events failed:', insertError)
+    }
+
     return ok({ success: true, lalamoveOrderId })
 
   } catch (e: any) {
-    console.error('[lalamove-create-order] Unhandled error:', e.message)
-    return err(e.message)
+    console.error('[lalamove-create-order] Unhandled error:', e.message, e.stack)
+    return err(e.message, 500)
   }
 })
 

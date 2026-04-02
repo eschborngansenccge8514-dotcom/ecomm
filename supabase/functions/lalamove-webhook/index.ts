@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { mapLalamoveStatus } from '../_shared/utils.ts'
+import { buildLalamoveHeaders, getLalamoveBaseUrl } from '../_shared/lalamove-auth.ts'
+import { mapLalamoveStatus, mapLalamoveDriverInfo } from '../_shared/utils.ts'
 
 // Deploy: supabase functions deploy lalamove-webhook --no-verify-jwt
 serve(async (req) => {
@@ -9,104 +10,126 @@ serve(async (req) => {
     const body = JSON.parse(rawBody)
     const event = body.data ?? body
     
-    // Extract eventId for idempotency
-    // Lalamove webhooks usually provide a unique ID or timestamp
-    const eventId = req.headers.get('x-lalamove-request-id') ?? event.eventId ?? body.eventId ?? `evt_${Date.now()}`
-    
+    // 1. Extract IDs and Status
+    const lalamoveOrderId = event.orderId ?? event.order?.id ?? body.orderId
+    const lalamoveStatus  = event.status  ?? event.order?.status ?? body.status
+    const eventType       = body.eventType ?? event.eventType ?? 'status_update'
+
+    if (!lalamoveOrderId) {
+      console.error('[lalamove-webhook] No Lalamove Order ID found in payload')
+      return new Response(JSON.stringify({ error: 'No orderId' }), { status: 200 })
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // 1. Idempotency Check
+    // 2. Find the local order
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('id, merchant_id, status, delivery_status, customer_id, driver_assigned_at')
+      .eq('lalamove_order_id', lalamoveOrderId)
+      .maybeSingle()
+
+    if (orderError || !order) {
+      console.error('[lalamove-webhook] Order not found for Lalamove ID:', lalamoveOrderId)
+      return new Response(JSON.stringify({ error: 'Order not found' }), { status: 200 })
+    }
+
+    // 3. Idempotency Check
+    const eventId = req.headers.get('x-lalamove-request-id') ?? event.eventId ?? body.eventId ?? `${lalamoveOrderId}_${lalamoveStatus}_${Date.now()}`
     const { data: existingEvent } = await supabase
       .from('webhook_events')
       .select('id')
       .eq('provider', 'lalamove')
       .eq('event_id', eventId)
-      .single()
+      .maybeSingle()
 
     if (existingEvent) {
-      return new Response(JSON.stringify({ received: true, duplicate: true }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return new Response(JSON.stringify({ message: 'Duplicate event' }), { status: 200 })
     }
 
-    const lalamoveOrderId = event.orderId ?? event.order?.id
-
-    // 2. Find our order
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .select('id, status, driver_assigned_at, merchant_id, customer_id, total_amount')
-      .eq('lalamove_order_id', lalamoveOrderId)
-      .single()
-
-    if (orderError || !order) {
-      console.error('Order not found for Lalamove ID:', lalamoveOrderId)
-      return new Response(JSON.stringify({ error: 'Order not found' }), {
-        status: 200, // Still return 200 to acknowledge receipt
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }
-
-    // 3. Mark event as processed
+    // 4. Record the event
     await supabase.from('webhook_events').insert({
       provider: 'lalamove',
       event_id: eventId,
-      order_id: order.id
+      order_id: order.id,
     })
 
-    // 4. Log the event
     await supabase.from('delivery_events').insert({
       order_id:    order.id,
       provider:    'lalamove',
-      event_type:  body.eventType ?? 'status_update',
+      event_type:  eventType,
       raw_payload: body,
     })
 
-    // 5. Processing logic
-    const lalamoveStatus = event.status ?? body.status
-    const { updates: mappedUpdates, callLoyalty } = mapLalamoveStatus(lalamoveStatus, event)
+    // 5. Map Status and Drivers
+    const { updates, callLoyalty } = mapLalamoveStatus(lalamoveStatus, event)
+    updates.updated_at = new Date().toISOString()
     
-    // Merge updates
-    const updates = { ...mappedUpdates, updated_at: new Date().toISOString() }
+    // Driver info extraction
+    const driverId    = event.driverId    ?? event.order?.driverId ?? body.driverId
+    const driverName  = event.driver?.name  ?? event.order?.driver?.name
+    const driverPhone = event.driver?.phone ?? event.order?.driver?.phone
+    const driverPlate = event.driver?.plateNumber ?? event.order?.driver?.plateNumber
+    const driverPhoto = event.driver?.photoUrl    ?? event.order?.driver?.photoUrl
 
-    // Special handling for CANCELLED (as per plan's specific requirements)
-    if (lalamoveStatus === 'CANCELLED') {
-      updates.lalamove_cancel_reason = event.reason ?? 'Cancelled by provider'
-    }
+    if (driverName)  updates.driver_name  = driverName
+    if (driverPhone) updates.driver_phone = driverPhone
+    if (driverPlate) updates.driver_plate = driverPlate
+    if (driverPhoto) updates.driver_photo_url = driverPhoto
 
-    // Special handling for ASSIGNING_DRIVER (plan: set if not set)
-    if (lalamoveStatus === 'ASSIGNING_DRIVER' && !order.driver_assigned_at) {
+    // Special handling for ASSIGNING_DRIVER / ON_GOING
+    if ((lalamoveStatus === 'ASSIGNING_DRIVER' || lalamoveStatus === 'ON_GOING') && !order.driver_assigned_at) {
       updates.driver_assigned_at = new Date().toISOString()
     }
-    if (event.driverInfo && !updates.driver_assigned_at && !order.driver_assigned_at) {
-      updates.driver_assigned_at = new Date().toISOString()
-    }
 
-    // Apply updates
-    if (Object.keys(updates).length > 1) { // More than just updated_at
-      await supabase.from('orders').update(updates).eq('id', order.id)
-    }
-
-    // 6. Handle side effects (Async if possible, but simpler to just await here for now)
-    if (callLoyalty) {
+    // 6. Extended Driver Details Fetch (if we have ID but missing name/photo)
+    if (driverId && (!driverName || !driverPhoto)) {
       try {
-        await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/award-loyalty-points`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-          },
-          body: JSON.stringify({ orderId: order.id })
-        })
-      } catch (e) {
-        console.error('Failed to award loyalty points:', e)
+        console.log(`[lalamove-webhook] Fetching extended details for driver ${driverId}...`)
+        const apiKey    = Deno.env.get('LALAMOVE_API_KEY')!
+        const apiSecret = Deno.env.get('LALAMOVE_API_SECRET')!
+        const market    = Deno.env.get('LALAMOVE_MARKET') || 'MY'
+        const env       = Deno.env.get('DELIVERY_ENV')   || 'sandbox'
+        const baseUrl   = getLalamoveBaseUrl(env)
+
+        const driverPath = `/v3/orders/${lalamoveOrderId}/drivers/${driverId}`
+        const headers = await buildLalamoveHeaders(apiKey, apiSecret, 'GET', driverPath, '', market)
+        const drvRes  = await fetch(`${baseUrl}${driverPath}`, { headers })
+        
+        if (drvRes.ok) {
+          const drvData = await drvRes.json()
+          if (drvData.data) {
+            const driverUpdates = mapLalamoveDriverInfo(drvData.data)
+            Object.assign(updates, driverUpdates)
+          }
+        }
+      } catch (err) {
+        console.error('[lalamove-webhook] Driver details fetch failed:', err)
       }
     }
 
-    // 7. Push Notifications (Epic 6.3)
+    // 7. Apply updates to Database
+    if (Object.keys(updates).length > 1) { 
+      const { error: updateErr } = await supabase.from('orders').update(updates).eq('id', order.id)
+      if (updateErr) console.error('[lalamove-webhook] Order update error:', updateErr)
+    }
+
+    // 8. Loyalty Points Side Effect
+    if (callLoyalty) {
+      fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/award-loyalty-points`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+        },
+        body: JSON.stringify({ orderId: order.id })
+      }).catch(e => console.error('[lalamove-webhook] Loyalty fetch error:', e))
+    }
+
+    // 9. Push Notifications
     const notificationMap: Record<string, { title: string, body: string, screen?: string }> = {
       'ASSIGNING_DRIVER': { title: '🏍️ Finding your driver...', body: 'Searching for a driver for your order.' },
       'PICKED_UP': { title: 'Your order is out for delivery 🚀', body: 'The driver has picked up your order.' },
@@ -114,48 +137,32 @@ serve(async (req) => {
       'CANCELLED': { title: 'Delivery cancelled', body: 'We are finding a new driver for you.' }
     }
 
-
-    if (updates.exception_flag === 'driver_not_found') {
-      notificationMap['REJECTED'] = { title: 'Still searching...', body: 'We are still searching for a driver. Please wait.' }
-    }
-
-    const pushInfo = notificationMap[lalamoveStatus] || (updates.exception_flag === 'driver_not_found' ? notificationMap['REJECTED'] : null)
-
+    const pushInfo = notificationMap[lalamoveStatus]
     if (pushInfo) {
-      try {
-        await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-push-notification`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-          },
-          body: JSON.stringify({
-            userId: order.customer_id,
-            title: pushInfo.title,
-            body: pushInfo.body,
-            data: { 
-              orderId: order.id,
-              screen:  pushInfo.screen 
-            }
-          })
-
+      fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-push-notification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+        },
+        body: JSON.stringify({
+          userId: order.customer_id,
+          title: pushInfo.title,
+          body: pushInfo.body,
+          data: { orderId: order.id, screen: pushInfo.screen }
         })
-      } catch (e) {
-        console.error('Failed to send push notification:', e)
-      }
+      }).catch(e => console.error('[lalamove-webhook] Push fetch error:', e))
     }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },
     })
 
-  } catch (error) {
-    console.error('Webhook Error:', error)
-    // Always return 200 to Lalamove to prevent retries on internal logic errors
+  } catch (error: any) {
+    console.error('[lalamove-webhook] Critical Error:', error)
     return new Response(JSON.stringify({ error: error.message }), {
-      status: 200,
+      status: 200, // Return 200 to acknowledge receipt even on internal error
       headers: { 'Content-Type': 'application/json' },
     })
   }
 })
-

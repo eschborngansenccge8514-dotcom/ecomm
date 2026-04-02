@@ -1,4 +1,4 @@
-import { signTikTokRequest } from "./signature";
+import { signTikTokRequest } from "./signature.ts";
 
 export class TikTokClient {
   private appKey: string;

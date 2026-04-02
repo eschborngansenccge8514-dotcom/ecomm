@@ -1,4 +1,4 @@
-import { signShopeeRequest } from "./signature";
+import { signShopeeRequest } from "./signature.ts";
 
 export interface ShopeeClientConfig {
   partnerId: string | number;

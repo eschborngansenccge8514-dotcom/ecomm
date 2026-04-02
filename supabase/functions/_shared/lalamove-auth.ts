@@ -7,36 +7,25 @@ export async function buildLalamoveHeaders(
   market:    string = 'MY'
 ): Promise<HeadersInit> {
   const timestamp = String(Date.now())
-  const nonce     = crypto.randomUUID().replace(/-/g, '')
 
-  // Lalamove v3 signature format
-  const rawSignature = `${timestamp}\r\n${nonce}\r\n${method.toUpperCase()}\r\n${path}\r\n\r\n${body}`
-  
-  const encoder = new TextEncoder()
-  const keyData = encoder.encode(apiSecret)
-  const msgData = encoder.encode(rawSignature)
-  
+  // Lalamove v3 signature format (no nonce):
+  // {timestamp}\r\n{METHOD}\r\n{path}\r\n\r\n{body}
+  const rawSignature = `${timestamp}\r\n${method.toUpperCase()}\r\n${path}\r\n\r\n${body}`
+
   const key = await crypto.subtle.importKey(
     'raw',
-    keyData,
+    new TextEncoder().encode(apiSecret),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign']
   )
-  
-  const signatureBuffer = await crypto.subtle.sign(
-    'HMAC',
-    key,
-    msgData
-  )
-  
-  const signatureArray = Array.from(new Uint8Array(signatureBuffer))
-  const signature      = signatureArray.map(b => b.toString(16).padStart(2, '0')).join('')
-  
-  const token = `${apiKey}:${timestamp}:${nonce}:${signature}`
 
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawSignature))
+  const signature = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('')
+
+  // Token format: hmac {apiKey}:{timestamp}:{signature}
   return {
-    'Authorization': `hmac ${token}`,
+    'Authorization': `hmac ${apiKey}:${timestamp}:${signature}`,
     'Content-Type':  'application/json',
     'Market':        market,
     'Accept':        'application/json',
@@ -49,4 +38,3 @@ export function getLalamoveBaseUrl(env?: string): string {
     ? 'https://rest.lalamove.com'
     : 'https://rest.sandbox.lalamove.com'
 }
-

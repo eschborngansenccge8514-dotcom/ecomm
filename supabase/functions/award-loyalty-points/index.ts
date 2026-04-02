@@ -9,14 +9,14 @@ const CORS = {
 const ok  = (d: unknown) => new Response(JSON.stringify(d),           { headers: { ...CORS, 'Content-Type': 'application/json' } })
 const err = (m: string)  => new Response(JSON.stringify({ error: m }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
 
-function computeTier(totalSpentRM: number, settings: any): string {
-  if (totalSpentRM >= settings.tier_platinum_rm) return 'platinum'
-  if (totalSpentRM >= settings.tier_gold_rm)     return 'gold'
-  if (totalSpentRM >= settings.tier_silver_rm)   return 'silver'
+function getTier(totalSpent: number, settings: any) {
+  if (totalSpent >= Number(settings.tier_platinum_rm)) return 'platinum'
+  if (totalSpent >= Number(settings.tier_gold_rm))     return 'gold'
+  if (totalSpent >= Number(settings.tier_silver_rm))   return 'silver'
   return 'bronze'
 }
 
-function tierMultiplier(tier: string, settings: any): number {
+function getMultiplier(tier: string, settings: any) {
   switch (tier) {
     case 'platinum': return Number(settings.tier_platinum_multiplier)
     case 'gold':     return Number(settings.tier_gold_multiplier)
@@ -31,6 +31,8 @@ serve(async (req) => {
   const body = await req.json().catch(() => null)
   if (!body?.orderId) return err('orderId is required')
 
+  console.log(`Processing order ${body.orderId}...`)
+
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -43,19 +45,37 @@ serve(async (req) => {
     .eq('id', body.orderId)
     .single()
 
-  if (oErr || !order) return err('Order not found')
-  if (order.status !== 'delivered') return err('Order not yet delivered')
-  if (order.points_earned > 0)      return err('Points already awarded for this order')
-  if (!order.customer_id)           return err('Guest order — no loyalty points')
+  if (oErr || !order) {
+    console.error(`Order lookup failed for ${body.orderId}:`, oErr)
+    return err(oErr?.message || 'Order not found')
+  }
+
+  if (order.status !== 'delivered') {
+    console.log(`Order ${order.id} status is ${order.status}, skipping point award.`)
+    return ok({ skipped: true, reason: 'Order not delivered' })
+  }
+
+  if (order.points_earned > 0) {
+    console.log(`Order ${order.id} already has ${order.points_earned} points awarded.`)
+    return ok({ skipped: true, reason: 'Points already awarded' })
+  }
+
+  if (!order.customer_id) {
+    console.log(`Order ${order.id} has no customer_id (guest checkout).`)
+    return ok({ skipped: true, reason: 'Guest order — no loyalty points' })
+  }
 
   // Fetch merchant loyalty settings
-  const { data: settings } = await supabase
+  const { data: settings, error: sErr } = await supabase
     .from('loyalty_settings')
     .select('*')
     .eq('merchant_id', order.merchant_id)
     .single()
 
-  if (!settings?.is_enabled) return ok({ skipped: true, reason: 'Loyalty program disabled' })
+  if (sErr || !settings?.is_enabled) {
+    console.log(`Loyalty program disabled or missing for merchant ${order.merchant_id}`)
+    return ok({ skipped: true, reason: 'Loyalty program disabled' })
+  }
 
   // Get or create customer loyalty balance row
   const { data: existing } = await supabase
@@ -65,18 +85,26 @@ serve(async (req) => {
     .eq('merchant_id', order.merchant_id)
     .single()
 
-  const currentBalance  = existing?.balance          ?? 0
+  const currentBalance  = existing?.balance           ?? 0
   const currentEarned   = existing?.total_earned      ?? 0
-  const currentSpentRM  = existing?.total_spent_rm    ?? 0
-  const newSpentRM      = currentSpentRM + Number(order.subtotal)
-  const tier            = computeTier(newSpentRM, settings)
-  const multiplier      = tierMultiplier(tier, settings)
-  const basePoints      = Math.floor(Number(order.subtotal) * Number(settings.points_per_rm))
-  const pointsToAward   = Math.floor(basePoints * multiplier)
-  const newBalance      = currentBalance + pointsToAward
-  const newEarned       = currentEarned  + pointsToAward
+  const currentSpentRM  = Number(existing?.total_spent_rm ?? 0)
 
-  // Upsert balance
+  // Calculate new points
+  const orderSubtotal   = Number(order.subtotal)
+  const basePoints      = Math.floor(orderSubtotal * Number(settings.points_per_rm))
+  
+  const newSpentRM      = currentSpentRM + orderSubtotal
+  const tier            = getTier(newSpentRM, settings)
+  const multiplier      = getMultiplier(tier, settings)
+  const pointsToAward   = Math.floor(basePoints * multiplier)
+
+  const newBalance      = currentBalance + pointsToAward
+  const newEarned       = currentEarned + pointsToAward
+
+  console.log(`Order Subtotal: ${orderSubtotal}, Base Points: ${basePoints}, Multiplier: ${multiplier} (Tier: ${tier})`)
+  console.log(`Total Award: ${pointsToAward} pts. New Balance: ${newBalance}`)
+
+  // Update loyalty balance
   const { error: upsertErr } = await supabase
     .from('loyalty_points')
     .upsert({
@@ -89,23 +117,41 @@ serve(async (req) => {
       updated_at:     new Date().toISOString(),
     }, { onConflict: 'customer_id,merchant_id' })
 
-  if (upsertErr) return err(`Balance update failed: ${upsertErr.message}`)
+  if (upsertErr) {
+    console.error(`Failed to update loyalty balance for customer ${order.customer_id}:`, upsertErr)
+    return err(`Balance update failed: ${upsertErr.message}`)
+  }
 
-  // Log transaction
-  await supabase.from('points_transactions').insert({
-    customer_id:   order.customer_id,
-    merchant_id:   order.merchant_id,
-    order_id:      order.id,
-    type:          'earn',
-    points_delta:  pointsToAward,
-    balance_after: newBalance,
-    description:   `Earned for order ${order.id}`,
-    metadata:      { subtotal: order.subtotal, multiplier, tier, basePoints },
-  })
+  // Record transaction
+  const { error: txErr } = await supabase
+    .from('points_transactions')
+    .insert({
+      customer_id:   order.customer_id,
+      merchant_id:   order.merchant_id,
+      order_id:      order.id,
+      type:          'earn',
+      points_delta:  pointsToAward,
+      balance_after: newBalance,
+      description:   `Earned for order ${order.id}`,
+      metadata:      { subtotal: order.subtotal, multiplier, tier, basePoints },
+    })
+
+  if (txErr) console.error(`Failed to record points transaction for order ${order.id}:`, txErr)
 
   // Mark order as points awarded
-  await supabase.from('orders').update({ points_earned: pointsToAward }).eq('id', order.id)
+  const { error: updateErr } = await supabase
+    .from('orders')
+    .update({ points_earned: pointsToAward })
+    .eq('id', order.id)
 
-  console.log(`Awarded ${pointsToAward} pts to customer ${order.customer_id} (tier: ${tier}, ×${multiplier})`)
-  return ok({ pointsAwarded: pointsToAward, newBalance, tier, multiplier })
+  if (updateErr) console.error(`Failed to update order ${order.id} points_earned:`, updateErr)
+
+  console.log(`Successfully awarded ${pointsToAward} pts to customer ${order.customer_id}`)
+  return ok({ 
+    success: true, 
+    pointsAwarded: pointsToAward, 
+    newBalance, 
+    tier, 
+    multiplier 
+  })
 })

@@ -41,12 +41,12 @@ serve(async (req) => {
 
         if (productError) throw productError;
 
-        // 3. Get Credentials
+        // 3. Get Credentials (tokens)
         const { data: creds, error: credError } = await supabase
           .from("marketplace_credentials")
           .select("*")
           .eq("account_id", job.account_id)
-          .eq("credential_type", "oauth_tokens")
+          .eq("credential_type", "tiktok_tokens")
           .eq("is_active", true)
           .single();
 
@@ -55,10 +55,22 @@ serve(async (req) => {
         const encryptionKey = Deno.env.get("APP_ENCRYPTION_KEY_BASE64")!;
         const tokens = decryptJson<any>(creds.encrypted_payload, encryptionKey);
 
-        // 4. Initialize TikTok Client
+        // 4. Get Merchant Config (App Key/Secret)
+        const { data: config } = await supabase
+          .from("merchant_tiktok_config")
+          .select("app_key, app_secret")
+          .eq("merchant_id", job.tenant_id)
+          .single();
+
+        const appKey = config?.app_key || Deno.env.get("TIKTOK_APP_KEY");
+        const appSecret = config?.app_secret || Deno.env.get("TIKTOK_APP_SECRET");
+
+        if (!appKey || !appSecret) throw new Error("TikTok app configuration missing for this merchant");
+
+        // 5. Initialize TikTok Client
         const client = new TikTokClient({
-          appKey: Deno.env.get("TIKTOK_APP_KEY")!,
-          appSecret: Deno.env.get("TIKTOK_APP_SECRET")!,
+          appKey: appKey,
+          appSecret: appSecret,
           baseUrl: Deno.env.get("TIKTOK_BASE_URL"),
           accessToken: tokens.access_token,
           shopId: job.account.shop_id

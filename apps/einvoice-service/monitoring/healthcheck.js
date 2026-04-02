@@ -14,7 +14,7 @@ async function runHealthCheck() {
   try {
     await dbPing();
     const { rows } = await pool.query(
-      `SELECT COUNT(*) AS total FROM einvoices WHERE status = 'pending'
+      `SELECT COUNT(*) AS total FROM einvoicing.einvoices WHERE status = 'pending'
        AND created_at < NOW() - INTERVAL '15 minutes'`
     );
     checks.database  = true;
@@ -50,7 +50,7 @@ async function runHealthCheck() {
   // ── LHDN Connectivity (spot-check first active merchant) ──────────────
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM merchants WHERE status = 'active' LIMIT 1`
+      `SELECT * FROM einvoicing.merchants WHERE status = 'active' LIMIT 1`
     );
     if (rows.length > 0) {
       const token = await getToken(rows[0]);
@@ -77,7 +77,7 @@ async function runHealthCheck() {
         COUNT(*) FILTER (WHERE status = 'suspended')   AS suspended,
         COUNT(*) FILTER (WHERE env = 'production')     AS production,
         COUNT(*) FILTER (WHERE env = 'sandbox')        AS sandbox
-      FROM merchants
+      FROM einvoicing.merchants
     `);
     checks.merchants  = true;
     details.merchants = {

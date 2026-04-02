@@ -1,15 +1,78 @@
 const db        = require('../db/invoice.db');
 const merchant  = require('./merchant.service');
-const builder   = require('./builder');
-const signer    = require('./signer');
-const submitter = require('./submitter');
-const config    = require('../config');
+const builder     = require('./builder');
+const signer      = require('./signer');
+const submitter   = require('./submitter');
+const eligibility = require('./eligibility');
+const config      = require('../config');
+
+/**
+ * Handle a new order: Decide whether to issue individual e-invoice 
+ * or stage it for monthly consolidation.
+ */
+async function processIncomingOrder(merchantUid, orderData) {
+  const m = await merchant.getMerchant(merchantUid);
+  
+  // 1. Run eligibility check
+  const check = eligibility.checkEligibility(orderData, m);
+  
+  if (check.eligible) {
+    // Stage for consolidated e-invoice
+    const now = new Date();
+    await db.stageForConsolidated({
+      merchantId:     m.id,
+      orderNumber:    orderData.orderNumber,
+      subtotal:       orderData.subtotal,
+      tax:            orderData.tax || 0,
+      year:           orderData.year  || now.getFullYear(),
+      month:          orderData.month || (now.getMonth() + 1),
+      isRestricted:   false
+    });
+    
+    return { success: true, status: 'staged', message: 'Order staged for consolidation' };
+  } else {
+    // Must issue individual e-invoice
+    console.log(`[Service] Issue individual: ${check.reason}`);
+    const result = await issueInvoice(m.id, orderData); // issueInvoice handles merchant object or ID
+    
+    // Also record it in staging but marked as restricted so it's excluded from consolidated preview
+    const now = new Date();
+    await db.stageForConsolidated({
+      merchantId:     m.id,
+      orderNumber:    orderData.orderNumber,
+      subtotal:       orderData.subtotal,
+      tax:            orderData.tax || 0,
+      year:           orderData.year  || now.getFullYear(),
+      month:          orderData.month || (now.getMonth() + 1),
+      isRestricted:   true,
+      exclusionReason: check.reason
+    });
+    
+    return { success: true, status: 'issued', data: result };
+  }
+}
+
+/**
+ * Upgrade a staged order to an individual e-invoice if requested by buyer.
+ */
+async function requestIndividualInvoice(merchantUid, orderNumber) {
+  const m = await merchant.getMerchant(merchantUid);
+  
+  // 1. Mark in DB as requested individual
+  await db.markAsIndividualRequested(m.id, orderNumber);
+  
+  // 2. Fetch order details from whatever source (omitted here, assuming payload is in DB or passed)
+  // In a real app, we'd fetch the original order data.
+  // Then call issueInvoice(m.id, orderData);
+  
+  return { success: true, message: 'Order marked for individual submission' };
+}
 
 /**
  * Issue and submit an invoice (or note).
  */
 async function issueInvoice(merchantUid, invoiceData, type = '01') {
-  const m = await merchant.getMerchant(merchantUid);
+  const m = typeof merchantUid === 'object' ? merchantUid : await merchant.getMerchant(merchantUid);
   
   const unsigned = builder.buildInvoice(m, {
     ...invoiceData,
@@ -50,37 +113,33 @@ async function issueInvoice(merchantUid, invoiceData, type = '01') {
 /**
  * Issue and submit a consolidated invoice for a merchant's monthly B2C sales.
  */
-async function issueConsolidatedInvoice(merchantUid, { year, month, orders }) {
+async function issueConsolidatedInvoice(merchantUid, { year, month }) {
   const m = await merchant.getMerchant(merchantUid);
   
-  // Aggregate items from all orders into a single document
-  const items = orders.flatMap(o => o.items || [{
-    description: `Summary for Order ${o.orderNumber}`,
-    quantity: 1,
-    unitPrice: o.subtotal,
-    tax: o.tax,
-  }]);
+  // 1. Fetch eligible staged orders
+  const orders = await db.getStagedConsolidatedOrders(m.id, year, month);
+  if (orders.length === 0) {
+    throw new Error('No eligible staged orders found for this period');
+  }
 
-  const invoiceData = {
-    invoiceNumber: `CON-${year}-${String(month).padStart(2, '0')}-${merchantUid.slice(0,4)}`,
-    buyer: { name: 'General Public', tin: 'EI00000000010' },
-    items,
-  };
-
-  const unsigned = builder.buildInvoice(m, invoiceData, '01');
+  // 2. Build consolidated document
+  const unsigned = builder.buildConsolidatedInvoice(m, year, month, orders);
   const { signedInvoice, docDigest } = signer.signDocument(unsigned, m);
-  const lhdnResponse = await submitter.submitInvoice(m, invoiceData.invoiceNumber, signedInvoice, docDigest);
+  
+  // 3. Submit to LHDN
+  const invoiceNumber = `CON-MS-${m.id}-${year}${String(month).padStart(2, '0')}`;
+  const lhdnResponse = await submitter.submitInvoice(m, invoiceNumber, signedInvoice, docDigest);
 
   const invoiceRecord = await db.createInvoice({
     merchantId:     m.id,
-    orderNumber:    invoiceData.invoiceNumber,
+    orderNumber:    invoiceNumber,
     submissionUid:  lhdnResponse.submissionUID,
     lhdnUuid:       lhdnResponse.uuid,
     lhdnLongId:     lhdnResponse.longId,
     status:         'submitted',
   });
 
-  // Mark all orders as consolidated in the staging table
+  // 4. Mark all orders as consolidated in the staging table
   await db.markOrdersConsolidated(m.id, orders.map(o => o.orderNumber), invoiceRecord.id);
 
   return invoiceRecord;
@@ -116,6 +175,8 @@ async function cancelInvoice(merchantUid, uuid, reason, orderNumber) {
 }
 
 module.exports = {
+  processIncomingOrder,
+  requestIndividualInvoice,
   issueInvoice,
   issueConsolidatedInvoice,
   issueCreditNote,

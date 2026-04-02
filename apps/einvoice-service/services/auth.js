@@ -54,6 +54,16 @@ async function getToken(merchant = null) {
     }
 
     const token = responseBody.access_token;
+    
+    // DEBUG: Decode and log the token payload to identify the authenticated TIN
+    try {
+      const payloadB64 = token.split('.')[1];
+      const payload = JSON.parse(Buffer.from(payloadB64, 'base64').toString());
+      console.log('[Auth] Token Payload:', JSON.stringify(payload, null, 2));
+    } catch (e) {
+      console.log('[Auth] Failed to decode token payload');
+    }
+
     const expiry = Date.now() + (responseBody.expires_in - 60) * 1000;
 
     _tokens.set(cacheKey, { token, expiry });

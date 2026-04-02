@@ -16,8 +16,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // Phase 7 — Credit Balance (EPCheckCreditBalance)
-    const balanceData = await callEasyParcel(supabase, null, 'EPCheckCreditBalance', {})
+    // Phase 7 — Credit Balance (MPCheckCreditBalance)
+    const balanceData = await callEasyParcel(supabase, null, 'MPCheckCreditBalance', {})
 
     const balanceStr = balanceData.result?.credit_balance
     const balance = Number(balanceStr || 0)

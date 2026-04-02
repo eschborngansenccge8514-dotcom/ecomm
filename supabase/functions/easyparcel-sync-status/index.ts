@@ -43,9 +43,9 @@ serve(async (req) => {
 
     for (const order of activeOrders) {
       try {
-        // Phase 5 — Parcel Status (EPParcelStatusBulk)
-        const statusData = await callEasyParcel(supabase, order.id, 'EPParcelStatusBulk', {
-          'bulk[0][order_no]': order.easyparcel_order_no
+        // Phase 5 — Parcel Status (MPParcelStatusBulk)
+        const statusData = await callEasyParcel(supabase, order.id, 'MPParcelStatusBulk', {
+          bulk: [{ order_no: order.easyparcel_order_no }]
         })
 
         const parcel = statusData.result?.[0]
@@ -54,9 +54,9 @@ serve(async (req) => {
         const shipStatus = parcel.ship_status
         const awb        = parcel.awb
 
-        // Phase 6 — Parcel Tracking (EPTrackingBulk)
-        const trackingData = await callEasyParcel(supabase, order.id, 'EPTrackingBulk', {
-          'order_no': order.easyparcel_order_no
+        // Phase 6 — Parcel Tracking (MPTrackingBulk)
+        const trackingData = await callEasyParcel(supabase, order.id, 'MPTrackingBulk', {
+          bulk: [{ order_no: order.easyparcel_order_no }]
         })
         
         const epStatusCode = trackingData.result?.[0]?.ep_status_code

@@ -41,15 +41,22 @@ serve(async (req) => {
     const totalWeightKg = Math.max(totalWeightGrams / 1000, 0.1)
 
     // Call EasyParcel using shared utility
-    const epData = await callEasyParcel(supabase, orderId, 'EPRateCheckingBulk', {
-      'bulk[0][pick_code]':    merchant.postcode,
-      'bulk[0][pick_state]':   getStateCode(merchant.state),
-      'bulk[0][pick_country]': 'MY',
-      'bulk[0][send_code]':    deliveryAddr.postcode,
-      'bulk[0][send_state]':   getStateCode(deliveryAddr.state),
-      'bulk[0][send_country]': 'MY',
-      'bulk[0][weight]':       String(totalWeightKg),
-      'bulk[0][parcel_value]': String(order.total_amount),
+    const epData = await callEasyParcel(supabase, orderId, 'MPRateCheckingBulk', {
+      bulk: [{
+        pick_code:    merchant.postcode,
+        pick_state:   getStateCode(merchant.state),
+        pick_country: 'MY',
+        send_code:    deliveryAddr.postcode,
+        send_state:   getStateCode(deliveryAddr.state),
+        send_country: 'MY',
+        weight:       String(totalWeightKg),
+        parcel_value: String(order.total_amount),
+      }],
+      exclude_fields: [
+        'rates.*.dropoff_point',
+        'rates.*.pickup_point',
+        'pgeon_point'
+      ]
     })
 
     const rates = epData.result?.[0]?.rates ?? []

@@ -1,10 +1,6 @@
-import { serve } from "https://deno.land/std/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { getSupabaseClient } from "../_shared/marketplace.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -12,36 +8,46 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const { tenant_id, region } = await req.json();
+    if (!tenant_id) throw new Error("Missing tenant_id");
 
-    const { tenantId, returnTo } = await req.json();
-    if (!tenantId) throw new Error("Missing tenantId");
-
+    const supabase = getSupabaseClient();
     const state = crypto.randomUUID();
 
-    // 1. Store OAuth state for verification on callback
+    // 1. Fetch Merchant TikTok Config
+    const { data: config, error: configError } = await supabase
+      .from("merchant_tiktok_config")
+      .select("app_key")
+      .eq("merchant_id", tenant_id)
+      .single();
+
+    if (configError || !config) {
+      return new Response(JSON.stringify({ error: "TikTok app configuration not found for this merchant. Please configure it first." }), { 
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // 2. Store OAuth state for verification on callback
     const { error: stateError } = await supabase
       .from("oauth_states")
       .insert({
-        tenant_id: tenantId,
+        tenant_id,
         provider: "tiktok",
         state,
-        metadata: { returnTo }
+        metadata: { region },
+        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
       });
 
     if (stateError) throw stateError;
 
-    // 2. Build TikTok Auth URL
-    const appKey = Deno.env.get("TIKTOK_APP_KEY")!;
-    const redirectUri = encodeURIComponent(`${Deno.env.get("APP_URL")}/api/integrations/tiktok/callback`);
+    // 3. Build TikTok Auth URL
+    const appKey = config.app_key;
     
     // TikTok Shop V2 Authorize URL
-    const url = `https://auth.tiktok-shops.com/oauth/authorize?app_key=${appKey}&state=${state}`;
+    const authUrl = `https://auth.tiktok-shops.com/oauth/authorize?app_key=${appKey}&state=${state}`;
 
-    return new Response(JSON.stringify({ authorizationUrl: url }), {
+    return new Response(JSON.stringify({ authorization_url: authUrl }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });

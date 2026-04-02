@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildLalamoveHeaders, getLalamoveBaseUrl } from '../_shared/lalamove-auth.ts'
-import { retryWithBackoff, logLalamoveApi } from '../_shared/utils.ts'
+import { fetchWithRetry, logLalamoveApi, getLalamoveErrorMessage } from '../_shared/utils.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -79,13 +79,13 @@ serve(async (req) => {
                 address: `${deliveryAddr.line1}${deliveryAddr.line2 ? ', ' + deliveryAddr.line2 : ''}, ${deliveryAddr.city}, ${deliveryAddr.state} ${deliveryAddr.postcode}`,
               },
             ],
-            item: { quantity: '1', weight: 'LESS_THAN_3_KG', categories: ['OTHER'] }
+            // Note: 'item' block is REMOVED to avoid 502 errors in Malaysia sandbox
           },
         })
 
         try {
           const headers = await buildLalamoveHeaders(apiKey, apiSecret, 'POST', path, body)
-          const res     = await fetch(`${baseUrl}${path}`, { method: 'POST', headers, body })
+          const { res, attempts } = await fetchWithRetry(`${baseUrl}${path}`, { method: 'POST', headers, body })
           const resData = await res.json()
 
           await logLalamoveApi(supabase, orderId, {
@@ -93,10 +93,13 @@ serve(async (req) => {
             statusCode: res.status,
             requestBody: body,
             responseBody: resData,
-            attempt: 1,
+            attempt: attempts,
           })
 
-          if (!res.ok) throw new Error(resData?.message)
+          if (!res.ok) {
+            const msg = getLalamoveErrorMessage(resData, `Request failed (${res.status})`)
+            throw new Error(msg)
+          }
 
           return {
             serviceType:  svc.id,

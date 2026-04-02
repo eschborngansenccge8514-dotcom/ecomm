@@ -17,6 +17,27 @@ export function getStateCode(state: string): string {
 }
 
 /**
+ * PHP http_build_query–compatible serialiser (handles nested arrays)
+ */
+export function serializeEasyParcelParams(obj: any, prefix = ''): string {
+  const parts: string[] = []
+  const enc = (v: any) => encodeURIComponent(String(v ?? ''))
+
+  if (Array.isArray(obj)) {
+    obj.forEach((v, i) => {
+      const k = `${prefix}[${i}]`
+      parts.push(typeof v === 'object' && v !== null ? serializeEasyParcelParams(v, k) : `${enc(k)}=${enc(v)}`)
+    })
+  } else if (typeof obj === 'object' && obj !== null) {
+    for (const [key, v] of Object.entries(obj)) {
+      const k = prefix ? `${prefix}[${key}]` : key
+      parts.push(typeof v === 'object' && v !== null ? serializeEasyParcelParams(v, k) : `${enc(k)}=${enc(v)}`)
+    }
+  }
+  return parts.join('&')
+}
+
+/**
  * Returns the collection date based on 12 PM cutoff.
  */
 export function getCollectionDate(): string {
@@ -66,7 +87,7 @@ export async function callEasyParcel(
   supabase: any,
   orderId: string | null,
   action: string,
-  params: Record<string, string>,
+  params: Record<string, any>,
   config?: { apiKey?: string; environment?: string }
 ) {
   const authKey = Deno.env.get('EASYPARCEL_AUTH_KEY')!
@@ -82,13 +103,13 @@ export async function callEasyParcel(
   while (attempt <= MAX_RETRIES) {
     try {
       // Marketplace API requires authentication key + api key for ALL actions in connect version
-      const payload: Record<string, string> = { 
+      const payload: any = { 
         api: apiKey, 
         authentication: authKey,
         ...params 
       }
 
-      const body = new URLSearchParams(payload)
+      const body = serializeEasyParcelParams(payload)
       
       console.log(`[easyparcel-api] Calling ${action} at ${baseUrl}`)
       console.log(`[easyparcel-api] Payload keys: ${Object.keys(payload).join(', ')}`)
