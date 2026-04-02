@@ -1,0 +1,138 @@
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native'
+import { useLocalSearchParams, router } from 'expo-router'
+import { Image } from 'expo-image'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { productsService } from '@/services/products.service'
+import { useCartStore } from '@/stores/cartStore'
+import { VariantSelector } from '@/components/product/VariantSelector'
+import { Button } from '@/components/ui/Button'
+import { formatCurrency } from '@/lib/utils'
+import * as Haptics from 'expo-haptics'
+import Toast from 'react-native-toast-message'
+
+export default function ProductDetailScreen() {
+  const { productId } = useLocalSearchParams<{ productId: string }>()
+  const { addItem, merchantId } = useCartStore()
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
+  const [quantity, setQuantity] = useState(1)
+
+  const { data: product, isLoading } = useQuery({
+    queryKey: ['product', productId],
+    queryFn:  () => productsService.getById(productId),
+  })
+
+  if (isLoading || !product) return null
+
+  const selectedVariant = product.variants.find(v => v.id === selectedVariantId) ?? null
+  const finalPrice = product.price + (selectedVariant?.price_modifier ?? 0)
+  const requiresVariant = product.variants.length > 0 && !selectedVariant
+
+  const handleAddToCart = async () => {
+    if (requiresVariant) {
+      Toast.show({ type: 'error', text1: 'Please select a variant' })
+      return
+    }
+    try {
+      addItem(product, selectedVariant, quantity)
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      Toast.show({ type: 'success', text1: `${product.name} added to cart!` })
+    } catch (err: any) {
+      if (err.message === 'DIFFERENT_MERCHANT') {
+        Alert.alert(
+          'Start new cart?',
+          'Your cart contains items from a different store. Clear it to add this item?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Clear & Add',
+              style: 'destructive',
+              onPress: () => {
+                useCartStore.getState().clearCart()
+                addItem(product, selectedVariant, quantity)
+              },
+            },
+          ]
+        )
+      }
+    }
+  }
+
+  return (
+    <View className="flex-1 bg-white">
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Images */}
+        <Image
+          source={{ uri: product.images?.[0] ?? 'https://via.placeholder.com/600x450' }}
+          style={{ width: '100%', height: 350 }}
+          contentFit="cover"
+        />
+
+        <View className="px-5 pt-8 pb-32">
+          {/* Price & Name */}
+          <Text className="text-3xl font-bold text-gray-900 leading-tight">{product.name}</Text>
+          <View className="flex-row items-center gap-3 mt-4">
+            <Text className="text-2xl font-bold text-primary-600">{formatCurrency(finalPrice)}</Text>
+            {product.compare_at_price && product.compare_at_price > product.price && (
+              <Text className="text-lg text-gray-400 line-through">
+                {formatCurrency(product.compare_at_price)}
+              </Text>
+            )}
+          </View>
+
+          {/* Description */}
+          {product.description && (
+            <View className="mt-8 pt-6 border-t border-gray-100">
+              <Text className="text-gray-900 font-bold mb-3 uppercase tracking-widest text-xs">Product Details</Text>
+              <Text className="text-gray-600 leading-relaxed text-base">{product.description}</Text>
+            </View>
+          )}
+
+          {/* Variants */}
+          {product.variants.length > 0 && (
+            <VariantSelector
+              variants={product.variants}
+              selectedId={selectedVariantId}
+              onSelect={setSelectedVariantId}
+              trackInventory={product.track_inventory ?? true}
+            />
+          )}
+
+          {/* Quantity selector */}
+          <View className="mt-10 pt-6 border-t border-gray-100">
+            <Text className="font-bold text-gray-900 uppercase tracking-widest text-xs mb-4">Select Quantity</Text>
+            <View className="flex-row items-center gap-4">
+              <TouchableOpacity
+                onPress={() => setQuantity(q => Math.max(1, q - 1))}
+                className="w-12 h-12 rounded-2xl bg-gray-100 items-center justify-center shadow-sm"
+              >
+                <Text className="text-xl font-bold text-gray-700">−</Text>
+              </TouchableOpacity>
+              <View className="px-6 py-2 bg-white rounded-2xl border border-gray-100 min-w-[60px] items-center justify-center">
+                <Text className="text-xl font-bold text-gray-900">{quantity}</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setQuantity(q => Math.min(product.track_inventory ? (selectedVariant?.stock_quantity ?? product.stock_quantity) : 9999, q + 1))}
+                className="w-12 h-12 rounded-2xl bg-gray-100 items-center justify-center shadow-sm"
+              >
+                <Text className="text-xl font-bold text-gray-700">+</Text>
+              </TouchableOpacity>
+              <Text className="text-gray-400 text-sm ml-2">
+                {product.track_inventory 
+                  ? `${selectedVariant?.stock_quantity ?? product.stock_quantity} left` 
+                  : 'Unlimited'}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Sticky Add to Cart */}
+      <View className="absolute bottom-0 left-0 right-0 bg-white/95 border-t border-gray-100 px-6 pt-4 pb-10 shadow-lg">
+        <Button onPress={handleAddToCart} size="lg">
+          Add to Cart — {formatCurrency(finalPrice * quantity)}
+        </Button>
+      </View>
+    </View>
+  )
+}
