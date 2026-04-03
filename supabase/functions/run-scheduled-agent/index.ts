@@ -75,18 +75,18 @@ serve(async (req) => {
         .select('*')
         .eq('id', playbook_id)
         .single()
-      
+
       agentInstructions = `
         Execute Playbook: ${playbook.name}
         Steps:
-        ${playbook.steps.map((s: string, i: number) => `${i+1}. ${s}`).join('\n')}
+        ${playbook.steps.map((s: string, i: number) => `${i + 1}. ${s}`).join('\n')}
         Contextual overrides: ${context || 'None'}
       `
     }
 
     // 5. Execute the agent loop (headless)
     const { text } = await generateText({
-      model: google('gemini-1.5-flash'),
+      model: google('gemini-3.1-flash-lite-preview'),
       system: basePrompt + "\n\n" + agentInstructions,
       prompt: "Start the background routine now.",
       tools: buildTools(merchant_id, session.id) as any,

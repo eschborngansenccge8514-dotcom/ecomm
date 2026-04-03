@@ -9,14 +9,16 @@ import { buildContextMessages } from './memory/context-manager'
 import { AgentTracer } from './observability/tracer'
 
 export interface AgentInput {
-  newMessage: string
-  merchantId: string
+  newMessage:   string
+  userId:       string    // For session ownership/persistence (matches FK in agent_sessions)
+  merchantId:   string    // For business data tools (orders, analytics)
   merchantName: string
-  sessionId: string
+  sessionId:    string
 }
 
 export async function runAgent({
   newMessage,
+  userId,
   merchantId,
   merchantName,
   sessionId
@@ -24,7 +26,7 @@ export async function runAgent({
   const t0 = Date.now()
   console.log(`[Agent] START session=${sessionId} msg="${newMessage.slice(0, 40)}"`)
 
-  const tracer = new AgentTracer(merchantId, sessionId)
+  const tracer = new AgentTracer(userId, sessionId)
 
   // Step 1: build context messages
   let messages: CoreMessage[]
@@ -98,7 +100,7 @@ export async function runAgent({
       // Run all side-effects in parallel — none depend on each other
       const labels = ['saveMessages', 'touchSession', 'extractAndSaveMemories', 'tracer.flush']
       const results = await Promise.allSettled([
-        saveMessages(sessionId, merchantId, [
+        saveMessages(sessionId, userId, [
           { role: 'user', content: newMessage },
           { role: 'assistant', content: text }
         ]),

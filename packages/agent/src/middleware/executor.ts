@@ -36,21 +36,33 @@ export async function executeWithGuard<T>(
 ): Promise<T> {
   const supabase = getSupabase()
 
-  // Log action
-  const { data: action, error: actionError } = await supabase
-    .from('agent_actions')
-    .insert({
-      session_id:  sessionId,
-      merchant_id: merchantId,
-      tool_name:   toolName,
-      input,
-      risk_level:  meta.riskLevel,
-      status:      meta.riskLevel === 'high' ? 'pending_approval' : 'executed'
-    })
-    .select()
-    .single()
+  // Log action — best-effort for low/medium risk so a missing table never
+  // blocks a tool call. High risk still requires the row (needed for approval ID).
+  let actionId: string | null = null
+  try {
+    const { data: action, error: actionError } = await supabase
+      .from('agent_actions')
+      .insert({
+        session_id:  sessionId,
+        merchant_id: merchantId,
+        tool_name:   toolName,
+        input,
+        risk_level:  meta.riskLevel,
+        status:      meta.riskLevel === 'high' ? 'pending_approval' : 'executed'
+      })
+      .select()
+      .single()
 
-  if (actionError) throw actionError
+    if (actionError) {
+      if (meta.riskLevel === 'high') throw actionError
+      console.warn(`[executor] Failed to log action for ${toolName}:`, actionError.message)
+    } else {
+      actionId = action?.id ?? null
+    }
+  } catch (err) {
+    if (meta.riskLevel === 'high') throw err
+    console.warn(`[executor] Action logging exception for ${toolName}:`, err)
+  }
 
   // High risk → write to approval queue and halt
   if (meta.riskLevel === 'high') {
@@ -60,7 +72,7 @@ export async function executeWithGuard<T>(
     const { data: approval, error: approvalError } = await supabase
       .from('agent_approvals')
       .insert({
-        action_id:   action.id,
+        action_id:   actionId,
         merchant_id: merchantId,
         risk_level:  'high',
         title,
@@ -73,22 +85,26 @@ export async function executeWithGuard<T>(
 
     if (approvalError) throw approvalError
 
-    throw new AwaitingApprovalError(approval.id, action.id, title)
+    throw new AwaitingApprovalError(approval.id, actionId!, title)
   }
 
   // Low / medium → execute and record result
   try {
     const result = await fn()
-    await supabase
-      .from('agent_actions')
-      .update({ output: result as any, status: 'executed' })
-      .eq('id', action.id)
+    if (actionId) {
+      await supabase
+        .from('agent_actions')
+        .update({ output: result as any, status: 'executed' })
+        .eq('id', actionId)
+    }
     return result
   } catch (err) {
-    await supabase
-      .from('agent_actions')
-      .update({ status: 'failed', output: { error: String(err) } as any })
-      .eq('id', action.id)
+    if (actionId) {
+      await supabase
+        .from('agent_actions')
+        .update({ status: 'failed', output: { error: String(err) } as any })
+        .eq('id', actionId)
+    }
     throw err
   }
 }

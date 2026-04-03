@@ -1,15 +1,14 @@
 import { runAgent, checkRateLimit, createSession } from '@project1/agent'
-import { createClient }  from '@/lib/supabase/server'
+import { getAuthContext } from '@/lib/utils.server'
 
 export const maxDuration = 60
 
 export async function POST(req: Request) {
   // Authenticate from Supabase session cookie
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return new Response('Unauthorized', { status: 401 })
+  const { user, merchant, isAdmin } = await getAuthContext()
+  if (!user || (!merchant && !isAdmin)) return new Response('Unauthorized', { status: 401 })
 
-  // Rate limit check
+  // Rate limit check (scoped to user)
   const limit = checkRateLimit(user.id, 'chat')
   if (!limit.allowed) {
     return new Response(
@@ -28,6 +27,10 @@ export async function POST(req: Request) {
     )
   }
 
+  // Use a virtual merchant ID for admins if needed, but normally they should have a merchant context or be restricted
+  const effectiveMerchantId = merchant?.id || (isAdmin ? 'admin' : null)
+  if (!effectiveMerchantId) return new Response('Unauthorized', { status: 401 })
+
   const body = await req.json()
   const { sessionId: existingSessionId, messages } = body
   let newMessage = body.newMessage
@@ -37,26 +40,20 @@ export async function POST(req: Request) {
     newMessage = messages[messages.length - 1].content
   }
 
-  console.log(`[API] Agent Chat: session=${existingSessionId} msg=${newMessage?.slice(0, 50)}...`)
+  console.log(`[API] Agent Chat: session=${existingSessionId} user=${user.id} merchant=${effectiveMerchantId} msg=${newMessage?.slice(0, 50)}...`)
 
   if (!newMessage?.trim()) return new Response('Empty message', { status: 400 })
 
-  // Get or create session
+  // Get or create session - MUST USE user.id for merchant_id column in database (FK says so)
   const sessionId = existingSessionId
     ?? await createSession(user.id, newMessage)
-
-  // Fetch merchant name
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('business_name')
-    .eq('id', user.id)
-    .single()
 
   try {
     const response = await runAgent({
       newMessage,
-      merchantId: user.id,
-      merchantName: profile?.business_name ?? 'Merchant',
+      userId: user.id,
+      merchantId: effectiveMerchantId,
+      merchantName: merchant?.store_name ?? 'Merchant',
       sessionId
     })
 

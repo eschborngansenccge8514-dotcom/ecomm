@@ -23,6 +23,37 @@ export function AgentChatPanel({ initialSessionId }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    if (initialSessionId) {
+      console.log(`[MerchantMind] Loading history for session: ${initialSessionId}`)
+      const loadHistory = async () => {
+        setIsLoading(true)
+        try {
+          const res = await fetch(`/api/agent/sessions/${initialSessionId}/messages`)
+          console.log(`[MerchantMind] History fetch status: ${res.status}`)
+          if (res.ok) {
+            const history = await res.json()
+            console.log(`[MerchantMind] Loaded ${history.length} messages`)
+            setMessages(history.map((m: any, idx: number) => ({
+              id: `hist-${idx}-${Date.now()}`,
+              role: m.role,
+              content: m.content
+            })))
+          } else {
+            const err = await res.text()
+            console.error(`[MerchantMind] History fetch failed: ${err}`)
+          }
+        } catch (err) {
+          console.error('[MerchantMind] Failed to load history:', err)
+          toast.error('Failed to load chat history')
+        } finally {
+          setIsLoading(false)
+        }
+      }
+      loadHistory()
+    }
+  }, [initialSessionId])
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
