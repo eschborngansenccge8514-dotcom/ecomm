@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   if (!merchantId) return NextResponse.json({ error: 'Missing merchantId' }, { status: 400 })
   
   const { data: cfg } = await supabase
-    .from('merchant_easyparcel_settings')
+    .from('merchant_easyparcel_config')
     .select('*, merchant:merchants(*)')
     .eq('merchant_id', merchantId).single()
     
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { merchantId, ...settings } = body
   
-  const { error } = await supabase.from('merchant_easyparcel_settings').upsert(
+  const { error } = await supabase.from('merchant_easyparcel_config').upsert(
     { ...settings, merchant_id: merchantId, updated_at: new Date().toISOString() },
     { onConflict: 'merchant_id' }
   )

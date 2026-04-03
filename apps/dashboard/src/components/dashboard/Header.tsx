@@ -6,10 +6,8 @@ import { cn } from '@/lib/utils'
 import { NotificationCentre } from '@/components/monitoring/NotificationCentre'
 
 const TITLES: Record<string, string> = {
-  '/':          'Overview',
   '/orders':    'Orders',
   '/products':  'Products',
-  '/delivery':  'Delivery',
   '/settings':  'Settings',
   '/admin/applications': 'Merchant Applications',
   '/admin/merchants':    'Merchant Directory',

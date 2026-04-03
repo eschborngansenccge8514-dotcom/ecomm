@@ -1,22 +1,14 @@
-import { createClient } from '@/lib/supabase/server'
+import { getAuthContext } from '@/lib/utils.server'
 import { notFound, redirect } from 'next/navigation'
 import { OrderDetailClient } from '@/components/dashboard/OrderDetailClient'
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const { supabase, merchant, isAdmin } = await getAuthContext()
 
-  const { data: merchant } = await supabase
-    .from('merchants')
-    .select('id')
-    .eq('owner_id', user.id)
-    .single()
+  const effectiveMerchantId = merchant?.id || 'admin'
 
-  if (!merchant) redirect('/login')
-
-  const { data: order } = await supabase
+  let orderQuery = supabase
     .from('orders')
     .select(`
       *,
@@ -24,8 +16,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       customer:profiles!customer_id(id, full_name, phone)
     `)
     .eq('id', id)
-    .eq('merchant_id', merchant.id)
-    .single()
+
+  if (merchant) {
+    orderQuery = orderQuery.eq('merchant_id', merchant.id)
+  }
+
+  const { data: order } = await orderQuery.single()
 
   if (!order) notFound()
 
@@ -36,18 +32,23 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   }
 
   // Customer's previous orders with this merchant
+  let customerOrderQuery = supabase
+    .from('orders')
+    .select('id', { count: 'exact', head: true })
+    .eq('customer_id', order.customer_id)
+
+  if (merchant) {
+    customerOrderQuery = customerOrderQuery.eq('merchant_id', merchant.id)
+  }
+
   const { count: customerOrderCount } = order.customer_id
-    ? await supabase
-        .from('orders')
-        .select('id', { count: 'exact', head: true })
-        .eq('merchant_id', merchant.id)
-        .eq('customer_id', order.customer_id)
+    ? await customerOrderQuery
     : { count: 0 }
 
   return (
     <OrderDetailClient
       order={orderWithNotes}
-      merchantId={merchant.id}
+      merchantId={effectiveMerchantId}
       customerOrderCount={customerOrderCount ?? 0}
     />
   )

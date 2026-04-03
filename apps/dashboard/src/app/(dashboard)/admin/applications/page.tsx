@@ -1,11 +1,15 @@
-import { createClient } from '@/lib/supabase/server'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 import { MerchantApplicationsClient } from '@/components/dashboard/admin/MerchantApplicationsClient'
+import { redirect } from 'next/navigation'
 
 export default async function AdminApplicationsPage() {
-  const supabase = await createClient()
+  if (!supabaseAdmin) {
+    console.error('supabaseAdmin not initialized. Check SUPABASE_SERVICE_ROLE_KEY.')
+    return <div>Error loading admin data.</div>
+  }
 
-  // Fetch all applications
-  const { data: applications } = await supabase
+  // Fetch all applications using admin client
+  const { data: applications, error: applicationsError } = await supabaseAdmin
     .from('merchant_applications')
     .select(`
       *,
@@ -15,6 +19,8 @@ export default async function AdminApplicationsPage() {
       )
     `)
     .order('created_at', { ascending: false })
+
+  if (applicationsError) console.error('Error fetching applications:', applicationsError)
 
   return (
     <div className="space-y-6">

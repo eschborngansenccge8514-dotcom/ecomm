@@ -16,8 +16,27 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
+    const { merchantId } = await req.json().catch(() => ({}))
+    let epCallConfig = undefined
+    
+    if (merchantId) {
+      const { data: epConfig } = await supabase
+        .from('merchant_easyparcel_config')
+        .select('*')
+        .eq('merchant_id', merchantId)
+        .single()
+      
+      if (epConfig) {
+        epCallConfig = {
+          apiKey:  epConfig.api_key,
+          authKey: epConfig.auth_key,
+          environment: epConfig.environment || 'sandbox'
+        }
+      }
+    }
+
     // Phase 7 — Credit Balance (MPCheckCreditBalance)
-    const balanceData = await callEasyParcel(supabase, null, 'MPCheckCreditBalance', {})
+    const balanceData = await callEasyParcel(supabase, null, 'MPCheckCreditBalance', {}, epCallConfig)
 
     const balanceStr = balanceData.result?.credit_balance
     const balance = Number(balanceStr || 0)

@@ -9,13 +9,13 @@ export async function POST(req: NextRequest) {
 
   const { merchantId, orderNumbers, shipmentIds } = await req.json()
   const { data: cfg } = await supabase
-    .from('merchant_easyparcel_settings')
-    .select('api_key, auth_key, is_demo')
+    .from('merchant_easyparcel_config')
+    .select('*')
     .eq('merchant_id', merchantId).single()
     
   const apiKey  = cfg?.api_key  || process.env.EASYPARCEL_API_KEY
   const authKey = cfg?.auth_key || process.env.EASYPARCEL_AUTH_KEY
-  const isDemo  = cfg ? cfg.is_demo : (process.env.NODE_ENV !== 'production')
+  const isDemo  = cfg ? (cfg.environment === 'sandbox') : (process.env.NODE_ENV !== 'production')
 
   if (!apiKey) return NextResponse.json({ error: 'EasyParcel API Key not configured' }, { status: 400 })
 
@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
           ship_status:  parcel.ship_status ?? undefined,
           awb:          parcel.awb || undefined,
           awb_id_link:  parcel.awb_id_link || undefined,
+          tracking_url: parcel.url || parcel.tracking_url || undefined,
           updated_at:   new Date().toISOString(),
         }).eq('id', shipmentIds[i])
       }

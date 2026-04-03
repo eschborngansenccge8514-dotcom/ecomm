@@ -40,7 +40,7 @@ const FILTERS = [
   { key: 'preparing', label: 'Preparing', statuses: ['confirmed','preparing'] },
   { key: 'done',      label: 'Done',      statuses: ['delivered','cancelled'] },
   { key: 'all',       label: 'All',       statuses: [] },
-]
+] as const
 
 // ─── Order row card ────────────────────────────────────────────────────────────
 function OrderRow({ order, onPress }: { order: any; onPress: () => void }) {
@@ -51,46 +51,64 @@ function OrderRow({ order, onPress }: { order: any; onPress: () => void }) {
   return (
     <TouchableOpacity
       onPress={onPress}
-      activeOpacity={0.85}
-      className={`bg-white rounded-2xl p-4 mb-3 ${isNew ? 'border-2 border-primary-400' : ''}`}
-      style={{ shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }}
+      activeOpacity={0.8}
+      className={`bg-white rounded-[32px] p-5 mb-4 border border-gray-100 shadow-soft ${isNew ? 'border-primary-200' : ''}`}
     >
       {/* Top row */}
-      <View className="flex-row items-start justify-between mb-2">
-        <View className="flex-1">
-          <Text className="font-bold text-gray-900 text-base">{order.order_number}</Text>
-          <Text className="text-gray-400 text-xs mt-0.5">{formatRelativeTime(order.created_at)}</Text>
+      <View className="flex-row items-center justify-between mb-4">
+        <View className="flex-1 mr-3">
+          <View className="flex-row items-center gap-2 mb-1">
+            <Text className="font-bold text-gray-900 text-base font-heading">#{order.order_number}</Text>
+            {isNew && (
+              <View className="bg-primary-500 rounded-full w-2 h-2" />
+            )}
+          </View>
+          <View className="flex-row items-center gap-1.5">
+            <Ionicons name="person-outline" size={12} color="#94a3b8" />
+            <Text className="text-gray-900 font-bold text-xs font-heading">
+              {order.buyer_name ?? 'Guest Buyer'}
+            </Text>
+            <Text className="text-gray-300 text-[10px] uppercase font-bold tracking-tighter">
+              • {formatRelativeTime(order.created_at)}
+            </Text>
+          </View>
         </View>
         <StatusBadge status={order.status} />
       </View>
 
-      {/* Divider */}
-      <View className="h-px bg-gray-50 my-2" />
-
-      {/* Items preview */}
-      <Text className="text-gray-600 text-sm" numberOfLines={2}>{itemNames}</Text>
+      {/* Items preview with background */}
+      <View className="bg-gray-50/80 rounded-2xl p-3 mb-4">
+        <Text className="text-gray-500 text-xs font-medium leading-5" numberOfLines={2}>
+          {itemNames}
+        </Text>
+      </View>
 
       {/* Bottom row */}
-      <View className="flex-row justify-between items-center mt-3">
-        <View className="flex-row items-center gap-1">
-          <Ionicons name="location-outline" size={13} color="#9ca3af" />
-          <Text className="text-gray-400 text-xs" numberOfLines={1}>
+      <View className="flex-row justify-between items-center px-1">
+        <View className="flex-row items-center gap-2">
+          <View className="w-8 h-8 rounded-full bg-gray-50 items-center justify-center border border-gray-100">
+            <Ionicons name="location-outline" size={14} color="#64748b" />
+          </View>
+          <Text className="text-gray-500 text-xs font-semibold truncate max-w-[140px]" numberOfLines={1}>
             {(order.delivery_address as any)?.city ?? 'No address'}
           </Text>
         </View>
-        <View className="flex-row items-center gap-2">
-          <Text className="font-bold text-primary-600 text-base">
-            {formatCurrency(Number(order.total_amount))}
-          </Text>
-          <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
+        <View className="items-end">
+          <Text className="text-gray-400 text-[9px] uppercase font-bold tracking-widest mb-0.5">TOTAL DUE</Text>
+          <View className="flex-row items-center gap-1">
+            <Text className="font-bold text-primary-600 text-lg font-heading">
+              {formatCurrency(Number(order.total_amount))}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color="#cbd5e1" />
+          </View>
         </View>
       </View>
 
       {/* New order action hint */}
       {isNew && (
-        <View className="mt-3 bg-primary-50 rounded-xl px-3 py-2 flex-row items-center gap-2">
-          <Ionicons name="hand-left-outline" size={14} color="#2563eb" />
-          <Text className="text-primary-600 text-xs font-semibold">Tap to accept or reject this order</Text>
+        <View className="mt-4 bg-primary-600 rounded-2xl p-3 flex-row items-center justify-center gap-2 shadow-sm">
+          <Ionicons name="flash-outline" size={14} color="#fff" />
+          <Text className="text-white text-xs font-bold font-semibold">TAP TO PROCESS ORDER</Text>
         </View>
       )}
     </TouchableOpacity>
@@ -154,29 +172,35 @@ export default function MerchantOrdersScreen() {
 
   return (
     <View className="flex-1 bg-gray-50" style={{ paddingTop: insets.top }}>
-      {/* Header */}
-      <View className="bg-white px-5 pt-4 pb-0 border-b border-gray-100">
-        <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-2xl font-bold text-gray-900">Orders</Text>
+      {/* Premium Header */}
+      <View className="bg-white px-6 pt-4 pb-0 border-b border-gray-100 shadow-soft rounded-b-[32px]">
+        <View className="flex-row items-center justify-between mb-5">
+          <View>
+            <Text className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">Order Pipeline</Text>
+            <Text className="text-3xl font-bold text-gray-900 font-heading">Orders</Text>
+          </View>
           {newCount > 0 && (
-            <View className="bg-primary-500 rounded-full px-3 py-1 flex-row items-center gap-1">
-              <Ionicons name="notifications" size={13} color="#fff" />
-              <Text className="text-white text-xs font-bold">{newCount} new</Text>
+            <View className="bg-primary-500 rounded-2xl px-3 py-1.5 flex-row items-center gap-1.5 shadow-sm">
+              <View className="w-2 h-2 rounded-full bg-white opacity-80" />
+              <Text className="text-white text-[10px] font-bold uppercase tracking-widest font-semibold">{newCount} ACTIONABLE</Text>
             </View>
           )}
         </View>
 
         {/* Filter tabs */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4, paddingBottom: 0 }}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={{ gap: 12, paddingBottom: 0, paddingHorizontal: 4 }}
+        >
           {FILTERS.map(f => (
             <TouchableOpacity
               key={f.key}
               onPress={() => setActiveFilter(f.key)}
-              className={`px-4 py-2 rounded-t-xl border-b-2
-                ${activeFilter === f.key ? 'border-primary-500 bg-primary-50' : 'border-transparent'}`}
+              className={`pb-4 px-1 ${activeFilter === f.key ? 'border-b-4 border-primary-500' : 'border-b-4 border-transparent'}`}
             >
-              <Text className={`text-sm font-semibold
-                ${activeFilter === f.key ? 'text-primary-600' : 'text-gray-500'}`}>
+              <Text className={`text-sm font-bold uppercase tracking-widest font-heading
+                ${activeFilter === f.key ? 'text-primary-600' : 'text-gray-400'}`}>
                 {f.label}
               </Text>
             </TouchableOpacity>
@@ -185,19 +209,24 @@ export default function MerchantOrdersScreen() {
       </View>
 
       {isLoading ? (
-        <View className="p-4 gap-3">
-          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-2xl" />)}
+        <View className="p-6 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-44 rounded-3xl" />)}
         </View>
       ) : orders.length === 0 ? (
-        <View className="flex-1 items-center justify-center">
-          <Ionicons name="receipt-outline" size={48} color="#d1d5db" />
-          <Text className="text-gray-400 font-semibold mt-3">No {currentFilter.label.toLowerCase()} orders</Text>
+        <View className="flex-1 items-center justify-center px-10">
+          <View className="w-24 h-24 rounded-[32px] bg-white border border-gray-100 shadow-soft items-center justify-center mb-6">
+            <Ionicons name="receipt-outline" size={44} color="#cbd5e1" />
+          </View>
+          <Text className="text-xl font-bold text-gray-900 text-center font-heading">No Orders found</Text>
+          <Text className="text-gray-400 text-sm text-center mt-2 leading-5 font-medium">
+            There are no {currentFilter.label.toLowerCase()} orders at the moment. Check other filters or wait for new customers!
+          </Text>
         </View>
       ) : (
         <FlatList
           data={orders}
           keyExtractor={o => o.id}
-          contentContainerStyle={{ padding: 16 }}
+          contentContainerStyle={{ padding: 20 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#2563eb" />}
           renderItem={({ item }) => (

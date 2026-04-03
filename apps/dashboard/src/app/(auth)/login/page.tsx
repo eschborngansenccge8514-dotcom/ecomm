@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -7,7 +7,7 @@ import { Input }  from '@/components/ui/input'
 import { Label }  from '@/components/ui/label'
 import toast      from 'react-hot-toast'
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
   const [email, setEmail]     = useState('')
   const [password, setPassword] = useState('')
@@ -101,6 +101,7 @@ export default function LoginPage() {
             New to Go-Buy?{' '}
             <button
               onClick={() => router.push('/register')}
+              type="button"
               className="text-primary-600 font-semibold hover:underline"
             >
               Apply to be a merchant
@@ -109,5 +110,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   )
 }

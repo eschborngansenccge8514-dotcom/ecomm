@@ -14,12 +14,12 @@ export async function POST(req: NextRequest) {
   //           pick_*, send_*, reference }
 
   const { data: cfg } = await supabase
-    .from('merchant_easyparcel_settings')
+    .from('merchant_easyparcel_config')
     .select('*').eq('merchant_id', merchantId).single()
     
   const apiKey  = cfg?.api_key  || process.env.EASYPARCEL_API_KEY
   const authKey = cfg?.auth_key || process.env.EASYPARCEL_AUTH_KEY
-  const isDemo  = cfg ? cfg.is_demo : (process.env.NODE_ENV !== 'production')
+  const isDemo  = cfg ? (cfg.environment === 'sandbox') : (process.env.NODE_ENV !== 'production')
 
   if (!apiKey) return NextResponse.json({ error: 'EasyParcel API Key not configured' }, { status: 400 })
 
@@ -111,11 +111,11 @@ export async function POST(req: NextRequest) {
   
   if (dbErr) console.error('EP save error:', dbErr)
 
-  // Update order with AWB
   if (orderId && success.awb) {
     await supabase.from('orders').update({
-      tracking_number: success.awb,
-      delivery_status: 'picked_up', // Matching existing enum if possible, or using 'shipped' as per system status
+      tracking_number:   success.awb,
+      tracking_url:      success.tracking_url,
+      delivery_status:   'picked_up', 
       delivery_provider: 'easyparcel',
     }).eq('id', orderId)
     

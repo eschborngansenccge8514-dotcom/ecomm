@@ -26,7 +26,7 @@ serve(async (req) => {
 
     const { data: order, error: orderErr } = await supabase
       .from('orders')
-      .select('*, merchant:merchant_id(store_name, address_line1, city, state, postcode, phone)')
+      .select('*, merchant:merchant_id(store_name, address_line1, city, state, postcode, phone), items:order_items(product_name, quantity)')
       .eq('id', orderId)
       .single()
 
@@ -41,12 +41,13 @@ serve(async (req) => {
 
     const epCallConfig = { 
       apiKey:      epConfig?.api_key || Deno.env.get('EASYPARCEL_API_KEY'), 
+      authKey:     epConfig?.auth_key || Deno.env.get('EASYPARCEL_AUTH_KEY'),
       environment: epConfig?.environment || 'sandbox' 
     }
     
     console.log(`[easyparcel-create-order] Using environment: ${epCallConfig.environment}, fallback: ${!epConfig?.api_key}`)
 
-    if (!epCallConfig.apiKey || !Deno.env.get('EASYPARCEL_AUTH_KEY')) {
+    if (!epCallConfig.apiKey || !epCallConfig.authKey) {
       throw new Error('EasyParcel integration is not fully configured (Missing API Key or Auth Key).')
     }
 
@@ -60,28 +61,28 @@ serve(async (req) => {
     let selectedCourier: any = null
     const isStandardDelivery = serviceId === 'standard-delivery' || !serviceId
 
-    // Always check rates ONLY if we don't have a confirmed serviceId or if we need to auto-select
-    if (isStandardDelivery || !serviceId || serviceId === 'auto') {
-      console.log(`[easyparcel-create-order] No specific serviceId provided or standard-delivery requested. Checking available rates...`)
-      const rateData = await callEasyParcel(supabase, orderId, 'MPRateCheckingBulk', {
-        bulk: [{
-          pick_code:    epConfig?.sender_postcode || order.merchant?.postcode,
-          pick_state:   epConfig?.sender_state || getStateCode(order.merchant?.state),
-          pick_country: epConfig?.sender_country || 'MY',
-          send_code:    deliveryAddr.postcode,
-          send_state:   getStateCode(deliveryAddr.state),
-          send_country: 'MY',
-          weight:       String(Math.max(Number(weightKg || 0.5), 0.1).toFixed(1)),
-        }],
-        exclude_fields: [
-          'rates.*.dropoff_point',
-          'rates.*.pickup_point',
-          'pgeon_point'
-        ]
-      }, epCallConfig)
+    // Always do a rate check — needed for auto-select AND to resolve courier name/price for explicit serviceId
+    console.log(`[easyparcel-create-order] Fetching rates to resolve courier details...`)
+    const rateData = await callEasyParcel(supabase, orderId, 'MPRateCheckingBulk', {
+      bulk: [{
+        pick_code:    epConfig?.sender_postcode || order.merchant?.postcode,
+        pick_state:   epConfig?.sender_state || getStateCode(order.merchant?.state),
+        pick_country: epConfig?.sender_country || 'MY',
+        send_code:    deliveryAddr.postcode,
+        send_state:   getStateCode(deliveryAddr.state),
+        send_country: 'MY',
+        weight:       String(Math.max(Number(weightKg || 0.5), 0.1).toFixed(1)),
+      }],
+      exclude_fields: [
+        'rates.*.dropoff_point',
+        'rates.*.pickup_point',
+        'pgeon_point'
+      ]
+    }, epCallConfig)
 
-      const rates = rateData?.result?.[0]?.rates || []
-      
+    const rates = rateData?.result?.[0]?.rates || []
+
+    if (isStandardDelivery || !serviceId || serviceId === 'auto') {
       // If we have no rates, we can't book via API
       if (rates.length === 0) {
         throw new Error('EasyParcel: No available couriers found for this route/weight. You may need to book this parcel manually.')
@@ -108,9 +109,17 @@ serve(async (req) => {
       serviceId = selectedCourier.service_id || selectedCourier.sid?.toString() || selectedCourier.courier_id
       console.log(`[easyparcel-create-order] Auto-selected cheapest: ${selectedCourier.courier_name} (${serviceId}) at RM${selectedCourier.price}`)
     } else {
-      console.log(`[easyparcel-create-order] Specific serviceId provided: ${serviceId}. Skipping rate-check to save time.`)
-      // Note: We don't have the courier name here yet, but we'll get it from the shipment record query if needed
-      // or just use the serviceId as a proxy for now.
+      // Explicit serviceId: look it up in the rates to get name and price
+      selectedCourier = rates.find((r: any) =>
+        r.service_id === serviceId ||
+        String(r.sid) === String(serviceId) ||
+        r.courier_id === serviceId
+      ) || null
+      if (selectedCourier) {
+        console.log(`[easyparcel-create-order] Resolved serviceId ${serviceId} → ${selectedCourier.courier_name} at RM${selectedCourier.price}`)
+      } else {
+        console.warn(`[easyparcel-create-order] Could not match serviceId ${serviceId} in rates; courier name/price will be approximate.`)
+      }
     }
 
     if (!weightKg || isNaN(Number(weightKg)) || Number(weightKg) <= 0) {
@@ -180,8 +189,10 @@ serve(async (req) => {
     const parcel      = result?.parcel?.[0]
     const awb         = parcel?.awb ?? ''
     const awbIdLink   = parcel?.awb_id_link ?? ''
+    const trackingUrl = parcel?.tracking_url ?? ''
     const parcelNo    = parcel?.parcelno ?? ''
     const finalCourierName = selectedCourier?.courier_name || 'Courier'
+    const finalShippingCost = parseFloat(selectedCourier?.price || '0') || 0
 
     console.log(`[easyparcel-create-order] Payment status: "${messagenow}", AWB: ${awb}, Parcel: ${parcelNo}`)
 
@@ -220,10 +231,11 @@ serve(async (req) => {
       ep_order_number:  orderNo,
       ep_parcel_number: parcel?.parcelno || null,
       awb:              awb || null,
-      awb_id_link:      parcel?.awb_id_link || null,
-      tracking_url:     awbIdLink || null,
+      awb_id_link:      awbIdLink || null,
+      tracking_url:     trackingUrl || null,
       courier_name:     finalCourierName,
       service_id:       serviceId,
+      shipping_cost:    finalShippingCost,
       order_status:     messagenow,
       ship_status:      awb ? 'Pending' : 'Undefined Status',
       weight:           Number(weightKg),
@@ -258,7 +270,7 @@ serve(async (req) => {
       delivery_service_id:  serviceId,
       easyparcel_order_no:  orderNo,
       tracking_number:      awb,
-      tracking_url:         awbIdLink,
+      tracking_url:         trackingUrl,
       delivery_status:      awb ? 'pending' : 'not_requested'
     }).eq('id', orderId)
 
@@ -275,8 +287,8 @@ serve(async (req) => {
         orderNo,
         parcelNo,
         trackingNumber: awb, 
-        trackingUrl: awbIdLink, 
-        courierName: finalCourierName,
+        trackingUrl: trackingUrl, 
+        awbIdLink: awbIdLink,
         message: 'EasyParcel order created and paid successfully.' 
       }),
       { headers: { ...CORS, 'Content-Type': 'application/json' } }

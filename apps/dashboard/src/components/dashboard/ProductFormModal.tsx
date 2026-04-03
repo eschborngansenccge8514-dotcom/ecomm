@@ -26,10 +26,13 @@ export function ProductFormModal({ merchantId, categories, product, storeType, o
     description:   product?.description ?? '',
     price:         product?.price       ?? '',
     category_id:   product?.category_id ?? '',
-    status:        product?.status      ?? 'active',
+    status:         product?.status      ?? 'active',
     weight_grams:  product?.weight_grams ?? 500,
     track_inventory: product?.track_inventory ?? true,
     stock_quantity: product?.stock_quantity ?? 0,
+    sku:           product?.sku         ?? '',
+    is_featured:    product?.is_featured ?? false,
+    compare_at_price: product?.compare_at_price ?? '',
   })
   const [variants, setVariants]         = useState<Variant[]>(product?.variants ?? [])
   const [images, setImages]             = useState<string[]>(product?.images ?? [])
@@ -108,6 +111,9 @@ export function ProductFormModal({ merchantId, categories, product, storeType, o
         weight_grams:   Number(form.weight_grams),
         track_inventory: form.track_inventory,
         stock_quantity: form.track_inventory ? Number(form.stock_quantity) : 9999,
+        sku:            form.sku.trim() || null,
+        is_featured:    form.is_featured,
+        compare_at_price: form.compare_at_price ? Number(form.compare_at_price) : null,
         images,
       }
 
@@ -183,7 +189,7 @@ export function ProductFormModal({ merchantId, categories, product, storeType, o
             <div className="flex gap-2 flex-wrap mt-2">
               {images.map((url, i) => (
                 <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden border border-gray-200 group">
-                  <Image src={url} alt="" fill className="object-cover" />
+                  <Image src={url} alt="" fill sizes="80px" className="object-cover" />
                   <button onClick={() => removeImage(i)}
                     className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                     <Trash2 size={14} className="text-white" />
@@ -222,6 +228,18 @@ export function ProductFormModal({ merchantId, categories, product, storeType, o
             </div>
           </div>
 
+          {/* SKU + Featured */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>SKU</Label>
+              <Input value={form.sku} onChange={e => set('sku', e.target.value)} placeholder="e.g. NL-001" />
+            </div>
+            <div className="flex items-center justify-between bg-amber-50/50 border border-amber-100 rounded-xl px-3 py-2 mt-auto h-10">
+              <span className="text-sm font-medium text-amber-900">Featured Product</span>
+              <Switch checked={form.is_featured} onCheckedChange={v => set('is_featured', v)} />
+            </div>
+          </div>
+
           {/* Description */}
           <div>
             <Label>Description</Label>
@@ -235,6 +253,11 @@ export function ProductFormModal({ merchantId, categories, product, storeType, o
               <Label>Price (RM) *</Label>
               <Input type="number" min="0" step="0.01" value={form.price}
                 onChange={e => set('price', e.target.value)} placeholder="0.00" />
+            </div>
+            <div>
+              <Label>Compare-at Price (RM)</Label>
+              <Input type="number" min="0" step="0.01" value={form.compare_at_price}
+                onChange={e => set('compare_at_price', e.target.value)} placeholder="0.00" />
             </div>
             <div>
               <Label>Weight (grams)</Label>

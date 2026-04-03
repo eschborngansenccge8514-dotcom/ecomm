@@ -25,31 +25,41 @@ export function OrderCard({ order, onPress }: OrderCardProps) {
   const textClass = statusParts[1]
 
   return (
-    <TouchableOpacity onPress={onPress} className="bg-white rounded-2xl p-4 mb-3 border border-gray-100 shadow-sm" activeOpacity={0.7}>
-      <View className="flex-row justify-between items-start mb-3">
+    <TouchableOpacity 
+      onPress={onPress} 
+      className="bg-white rounded-3xl p-5 mb-4 border border-gray-100 shadow-soft" 
+      activeOpacity={0.8}
+    >
+      <View className="flex-row justify-between items-center mb-4">
         <View className="flex-1">
-          <Text className="text-sm font-bold text-gray-900" numberOfLines={1}>
-            {order.merchant?.store_name ?? 'Store'}
-          </Text>
-          <Text className="text-xs text-gray-500 mt-0.5">
+          <View className="flex-row items-center gap-1.5 mb-1.5">
+            <Ionicons name="person-outline" size={12} color="#94a3b8" />
+            <Text className="text-sm font-bold text-gray-900 font-heading" numberOfLines={1}>
+              {order.buyer_name ?? 'Guest Buyer'}
+            </Text>
+          </View>
+          <Text className="text-gray-400 text-xs font-medium">
             {formatRelativeTime(order.created_at)} • {order.items?.length ?? 0} {order.items?.length === 1 ? 'item' : 'items'}
           </Text>
         </View>
-        <View className={`${bgClass} px-2.5 py-1 rounded-full`}>
-          <Text className={`${textClass} text-[10px] font-bold uppercase tracking-wider`}>
+        <View className={`${bgClass} px-3 py-1.5 rounded-2xl`}>
+          <Text className={`${textClass} text-[10px] font-bold uppercase tracking-widest font-semibold`}>
             {order.status.replace('_', ' ')}
           </Text>
         </View>
       </View>
 
-      <View className="flex-row justify-between items-center bg-gray-50 p-2.5 rounded-xl">
+      <View className="flex-row justify-between items-center bg-gray-50/80 p-4 rounded-2xl">
         <View>
-          <Text className="text-gray-400 text-[10px] uppercase font-bold tracking-tight">Order ID</Text>
-          <Text className="text-gray-700 font-mono text-xs">#{order.id.slice(-8).toUpperCase()}</Text>
+          <Text className="text-gray-400 text-[9px] uppercase font-bold tracking-widest mb-1">REFERENCE</Text>
+          <View className="flex-row items-center gap-1.5">
+            <Ionicons name="receipt-outline" size={12} color="#64748b" />
+            <Text className="text-gray-600 font-mono text-xs">#{order.id.slice(-8).toUpperCase()}</Text>
+          </View>
         </View>
         <View className="items-end">
-          <Text className="text-gray-400 text-[10px] uppercase font-bold tracking-tight">Total Amount</Text>
-          <Text className="text-primary-600 font-bold text-sm">
+          <Text className="text-gray-400 text-[9px] uppercase font-bold tracking-widest mb-1">REVENUE</Text>
+          <Text className="text-primary-600 font-bold text-lg font-heading">
             {formatCurrency(Number(order.total_amount))}
           </Text>
         </View>

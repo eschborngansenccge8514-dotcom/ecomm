@@ -41,8 +41,23 @@ export default async function CustomersPage({
       .lte('created_at', endDate.toISOString())
       .order('created_at', { ascending: false })
       .limit(50),
-    supabase.rpc('get_new_customer_trend', { p_merchant_id: merchant.id, p_start: fmt(startDate), p_end: fmt(endDate) }),
+    supabase.rpc('get_new_customer_trend',      { p_merchant_id: merchant.id, p_start: fmt(startDate), p_end: fmt(endDate) }),
   ])
+
+  // Fetch all unique customer IDs from loyalty_points and orders for this merchant
+  const [ { data: loyaltyCusts }, { data: orderCusts } ] = await Promise.all([
+    supabase.from('loyalty_points').select('customer_id').eq('merchant_id', merchant.id),
+    supabase.from('orders').select('customer_id').eq('merchant_id', merchant.id),
+  ])
+
+  const associatedIds = Array.from(new Set([
+    ...(loyaltyCusts?.map(l => l.customer_id) ?? []),
+    ...(orderCusts?.map(o => o.customer_id)   ?? []),
+  ]))
+
+  const { data: allCustomers } = associatedIds.length > 0 
+    ? await supabase.from('profiles').select('*').in('id', associatedIds).order('created_at', { ascending: false })
+    : { data: [] }
 
   return (
     <CustomersClient
@@ -57,6 +72,7 @@ export default async function CustomersPage({
       satisfactionSummary={(satisfactionSummary as any)?.[0] ?? {}}
       reviews={(reviews            as any[]) ?? []}
       newTrend={(newTrend          as any[]) ?? []}
+      allCustomers={(allCustomers  as any[]) ?? []}
     />
   )
 }

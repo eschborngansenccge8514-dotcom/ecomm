@@ -140,7 +140,7 @@ export function TabBar({ state, descriptors, navigation }: any) {
 
   const containerProps =
     Platform.OS === 'ios'
-      ? { intensity: 80, tint: 'systemChromeMaterial' as const }
+      ? { intensity: 100, tint: 'light' as const }
       : {}
 
   return (
@@ -150,7 +150,7 @@ export function TabBar({ state, descriptors, navigation }: any) {
         flexDirection: 'row',
         borderTopWidth: 0.5,
         borderTopColor: '#e5e7eb',
-        backgroundColor: Platform.OS === 'android' ? '#ffffff' : undefined,
+        backgroundColor: '#ffffff',
         paddingBottom: insets.bottom,
       }}
     >

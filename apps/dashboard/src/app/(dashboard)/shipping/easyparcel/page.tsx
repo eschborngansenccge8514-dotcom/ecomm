@@ -5,7 +5,7 @@ export default async function EasyParcelPage() {
   const { supabase, merchant } = await getMerchant()
 
   const [{ data: settings }, { data: shipments }, { data: pendingOrders }] = await Promise.all([
-    supabase.from('merchant_easyparcel_settings').select('*').eq('merchant_id', merchant.id).single(),
+    supabase.from('merchant_easyparcel_config').select('*').eq('merchant_id', merchant.id).single(),
     supabase.from('easyparcel_shipments')
       .select('*, orders(order_number, buyer_name)')
       .eq('merchant_id', merchant.id)

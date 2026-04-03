@@ -7,6 +7,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger,
   DropdownMenuLabel,
+  DropdownMenuGroup,
   DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
@@ -50,14 +51,16 @@ export function NotificationCentre({ merchantId }: { merchantId: string }) {
         </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80 p-0">
-        <DropdownMenuLabel className="p-4 border-b">
-          <div className="flex items-center justify-between">
-            <span className="font-bold">Notifications</span>
-            {unreadCount > 0 && (
-              <Badge variant="secondary" className="text-[10px]">{unreadCount} unread</Badge>
-            )}
-          </div>
-        </DropdownMenuLabel>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="p-4 border-b">
+            <div className="flex items-center justify-between">
+              <span className="font-bold">Notifications</span>
+              {unreadCount > 0 && (
+                <Badge variant="secondary" className="text-[10px]">{unreadCount} unread</Badge>
+              )}
+            </div>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <div className="max-h-[400px] overflow-y-auto">
           {notifications.length === 0 ? (
             <div className="p-8 text-center text-gray-400">

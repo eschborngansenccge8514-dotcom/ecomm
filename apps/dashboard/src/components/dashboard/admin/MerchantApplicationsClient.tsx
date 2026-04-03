@@ -59,7 +59,7 @@ export function MerchantApplicationsClient({ initialApplications }: MerchantAppl
   }
 
   const filteredApps = applications.filter(app => 
-    app.store_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    app.store_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     app.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 

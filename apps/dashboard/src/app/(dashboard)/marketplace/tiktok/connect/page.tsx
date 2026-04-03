@@ -140,7 +140,7 @@ export default function TikTokConnectPage() {
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
                   Region
                 </label>
-                <Select value={region} onValueChange={setRegion}>
+                <Select value={region} onValueChange={(val) => val && setRegion(val)}>
                   <SelectTrigger className="h-14 rounded-2xl border-gray-100 bg-gray-50/50 focus:ring-black">
                     <SelectValue placeholder="Select Region" />
                   </SelectTrigger>

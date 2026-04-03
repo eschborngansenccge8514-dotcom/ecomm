@@ -54,9 +54,9 @@ export function MerchantsDirectoryClient({ initialMerchants }: MerchantsDirector
   }
 
   const filteredMerchants = merchants.filter(m => 
-    m.store_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    m.store_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.store_slug.toLowerCase().includes(searchTerm.toLowerCase())
+    m.store_slug?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   return (
@@ -109,7 +109,7 @@ export function MerchantsDirectoryClient({ initialMerchants }: MerchantsDirector
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-gray-900">{m.profiles?.full_name || 'N/A'}</p>
                       <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <Mail size={12} /> {m.profiles?.email || '—'}
+                        <Mail size={12} /> {m.profiles?.phone || '—'}
                       </div>
                     </div>
                   </td>

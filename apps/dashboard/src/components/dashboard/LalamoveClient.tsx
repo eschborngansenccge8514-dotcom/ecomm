@@ -2,7 +2,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter }   from 'next/navigation'
 import { Input }       from '@/components/ui/input'
-import { Button }      from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { cn }          from '@/lib/utils'
 import toast           from 'react-hot-toast'
 import { format }      from 'date-fns'
@@ -16,7 +16,7 @@ import {
 import { useMonitoring, Order } from '@/hooks/useMonitoring'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { getLalamoveStatus, SERVICE_TYPE_LABELS } from '@/lib/lalamove'
+import { getLalamoveStatus, SERVICE_TYPE_LABELS, LALAMOVE_STAGES } from '@/lib/lalamove'
 
 const rm = (v: any) => `RM ${Number(v ?? 0).toFixed(2)}`
 
@@ -31,36 +31,108 @@ const TABS = [
 // ─── Driver Card ──────────────────────────────────────────────────────────────
 function DriverCard({ order }: { order: Order }) {
   if (!order.driver_name) return (
-    <div className="bg-gray-50 rounded-2xl p-4 flex items-center justify-center border border-dashed border-gray-200">
-      <div className="text-center">
-        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm">
-          <User size={18} className="text-gray-300" />
+    <div className="bg-amber-50/50 rounded-2xl p-4 flex items-center justify-between border border-dashed border-amber-200 animate-pulse">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
+          <User size={18} className="text-amber-400" />
         </div>
-        <p className="text-xs font-semibold text-gray-400">Finding driver...</p>
+        <div>
+          <p className="text-xs font-bold text-amber-900">Finding driver...</p>
+          <p className="text-[10px] text-amber-600 font-medium">Broadcasted to nearby riders</p>
+        </div>
       </div>
+      <RefreshCw size={14} className="text-amber-400 animate-spin" />
     </div>
   )
 
   return (
-    <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-100 flex items-center gap-4">
-      <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-blue-600 shadow-sm shrink-0 overflow-hidden">
-        {/* Placeholder for driver photo if available */}
-        <User size={24} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-gray-900 truncate">{order.driver_name}</p>
-        <div className="flex items-center gap-2 mt-0.5">
-          <Badge variant="outline" className="text-[10px] font-bold border-blue-200 text-blue-700 bg-white">
-            {order.driver_plate || 'No Plate'}
-          </Badge>
-          <a href={`tel:${order.driver_phone}`} className="text-blue-600 hover:text-blue-700">
-            <Phone size={12} />
-          </a>
+    <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex flex-col gap-4 group hover:border-blue-200 transition-all">
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-blue-600 shadow-inner shrink-0 overflow-hidden relative">
+          {order.driver_photo_url ? (
+            <img src={order.driver_photo_url} alt={order.driver_name} className="w-full h-full object-cover" />
+          ) : (
+            <User size={24} className="text-gray-300" />
+          )}
+          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-black text-gray-900 truncate">{order.driver_name}</p>
+            <Badge variant="outline" className="text-[9px] font-bold border-blue-100 text-blue-600 bg-blue-50/50 px-1.5 py-0">
+              Verified
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-[11px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded uppercase tracking-tight">
+              {order.driver_plate || 'No Plate'}
+            </span>
+            <a href={`tel:${order.driver_phone}`} className="w-6 h-6 rounded-full bg-green-50 flex items-center justify-center text-green-600 hover:bg-green-100 transition-colors">
+              <Phone size={12} fill="currentColor" />
+            </a>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Vehicle</p>
+          <p className="text-[11px] font-black text-gray-900 mt-0.5">Instant</p>
         </div>
       </div>
-      <div className="text-right">
-        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Status</p>
-        <p className="text-xs font-bold text-blue-700 capitalize">{order.delivery_status.replace(/_/g, ' ')}</p>
+
+      {order.delivery_tracking_url && (
+        <a 
+          href={order.delivery_tracking_url} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className={cn(
+            buttonVariants({ variant: 'outline', size: 'sm' }),
+            "w-full rounded-xl h-9 text-[11px] font-bold border-blue-100 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 group-hover:shadow-sm transition-all"
+          )}
+        >
+          <MapPin size={12} className="mr-2" /> Live Tracking
+        </a>
+      )}
+    </div>
+  )
+}
+
+// ─── Order Progress Bar ───────────────────────────────────────────────────────
+function OrderProgressBar({ currentStage }: { currentStage: number }) {
+  if (currentStage < 0) return null // Cancelled or Failed
+
+  return (
+    <div className="py-4 px-1">
+      <div className="relative flex justify-between">
+        {/* Background Line */}
+        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-100 -translate-y-1/2 rounded-full" />
+        
+        {/* Progress Line */}
+        <div 
+          className="absolute top-1/2 left-0 h-0.5 bg-orange-500 -translate-y-1/2 rounded-full transition-all duration-700 ease-in-out shadow-[0_0_8px_rgba(249,115,22,0.4)]" 
+          style={{ width: `${(currentStage / (LALAMOVE_STAGES.length - 1)) * 100}%` }}
+        />
+
+        {LALAMOVE_STAGES.map((stage, idx) => {
+          const isActive = idx <= currentStage
+          const isCurrent = idx === currentStage
+          
+          return (
+            <div key={stage.id} className="relative flex flex-col items-center">
+              <div 
+                className={cn(
+                  "w-3.5 h-3.5 rounded-full border-2 transition-all duration-500 z-10 bg-white",
+                  isActive ? "border-orange-500 bg-orange-500" : "border-gray-200",
+                  isCurrent && "scale-125 ring-4 ring-orange-100 ring-offset-2 ring-offset-white"
+                )}
+              />
+              <span className={cn(
+                "absolute top-6 text-[9px] font-bold whitespace-nowrap tracking-tighter uppercase transition-all duration-500",
+                isCurrent ? "text-orange-600 scale-110" : isActive ? "text-gray-900" : "text-gray-300"
+              )}>
+                {stage.label}
+              </span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -246,60 +318,75 @@ export function LalamoveClient({
                 {activeOrders.map(order => {
                   const status = getLalamoveStatus(order.delivery_status)
                   return (
-                    <Card key={order.id} className="rounded-[32px] border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all">
-                      <CardHeader className="bg-gray-50/50 border-b border-gray-100 py-4 px-6 flex flex-row items-center justify-between">
+                    <Card key={order.id} className="rounded-[40px] border-gray-100 shadow-sm overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-white group">
+                      <CardHeader className="bg-gray-50/50 border-b border-gray-100 py-5 px-8 flex flex-row items-center justify-between">
                         <div>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Order Number</p>
-                          <p className="text-sm font-black text-gray-900">#{order.order_number}</p>
+                          <div className="flex items-center gap-2">
+                             <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Order ID</p>
+                          </div>
+                          <p className="text-sm font-black text-gray-900 mt-0.5">#{order.order_number}</p>
                         </div>
-                        <Badge className={cn("text-[10px] font-black uppercase px-2 py-0.5", status.bg, status.color)}>
+                        <Badge className={cn("text-[10px] font-black uppercase px-3 py-1 rounded-full shadow-sm", status.bg, status.color)}>
                           {status.label}
                         </Badge>
                       </CardHeader>
-                      <CardContent className="p-6 space-y-4">
-                        <DriverCard order={order} />
+                      <CardContent className="p-8 space-y-8">
+                        <div className="space-y-6">
+                           <OrderProgressBar currentStage={status.stage} />
+                           
+                           <div className="pt-2">
+                             <DriverCard order={order} />
+                           </div>
+                        </div>
                         
-                        <div className="space-y-3">
-                          <div className="flex items-start gap-3">
-                            <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center shrink-0 mt-0.5">
-                              <MapPin size={14} className="text-gray-400" />
+                        <div className="space-y-4">
+                            <div className="flex items-start gap-4 p-4 bg-gray-50/80 rounded-[24px] border border-gray-100/50">
+                              <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center shrink-0 shadow-sm">
+                                <MapPin size={18} className="text-orange-500" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Delivery Destination</p>
+                                <p className="text-xs text-gray-700 font-bold leading-relaxed mt-0.5">{order.delivery_address?.line1 || order.delivery_address?.address || 'No address provided'}</p>
+                                <p className="text-[10px] text-gray-400 font-medium truncate">{[order.delivery_address?.city, order.delivery_address?.state].filter(Boolean).join(', ')}</p>
+                              </div>
                             </div>
-                            <div className="min-w-0">
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Delivery To</p>
-                              <p className="text-xs text-gray-700 font-medium truncate">{(order as any).delivery_address?.line1 || 'Address placeholder'}</p>
-                            </div>
-                          </div>
                           
-                          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                            <div>
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Amount</p>
-                              <p className="text-sm font-bold text-gray-900">{rm(order.total_amount)}</p>
+                          <div className="flex items-center justify-between px-2">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center text-green-600">
+                                <Wallet size={14} />
+                              </div>
+                              <div>
+                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Delivery Fee</p>
+                                <p className="text-sm font-black text-gray-900">{rm(order.delivery_fee)}</p>
+                              </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Order Date</p>
-                              <p className="text-xs font-medium text-gray-700">{format(new Date(order.created_at), 'MMM d, h:mm a')}</p>
+                              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Placed On</p>
+                              <p className="text-xs font-bold text-gray-700">{format(new Date(order.created_at), 'MMM d, h:mm a')}</p>
                             </div>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2 pt-2">
+                        <div className="flex gap-2 pt-2">
                            <Button 
                              size="sm" 
                              variant="outline" 
                              onClick={() => addPriorityFee(order.id)}
                              disabled={!!isActionLoading}
-                             className="rounded-xl text-xs h-9 border-gray-200"
+                             className="flex-1 rounded-2xl text-xs font-bold h-11 border-gray-100 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 transition-all shadow-sm active:scale-95"
                            >
-                             <Plus size={14} className="mr-1.5" /> Priority Fee
+                             <Plus size={16} className="mr-2" /> Add Fee
                            </Button>
                            <Button 
                              size="sm" 
                              variant="outline" 
                              onClick={() => cancelOrder(order.id)}
                              disabled={!!isActionLoading}
-                             className="rounded-xl text-xs h-9 text-red-600 border-red-100 hover:bg-red-50"
+                             className="rounded-2xl w-14 h-11 text-rose-600 border-rose-50 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-sm active:scale-95"
                            >
-                             <XCircle size={14} className="mr-1.5" /> Cancel
+                             <XCircle size={18} />
                            </Button>
                         </div>
                       </CardContent>
@@ -356,7 +443,7 @@ export function LalamoveClient({
                                 <p className="text-[10px] text-gray-400 font-medium">{format(new Date(order.created_at), 'MMM d, yyyy')}</p>
                              </td>
                              <td className="px-6 py-4">
-                                <p className="text-sm font-semibold text-gray-700">{(order as any).customer_name || 'Walk-in Customer'}</p>
+                                <p className="text-sm font-semibold text-gray-700">{order.buyer_name || 'Walk-in Customer'}</p>
                                 <p className="text-[10px] text-gray-400 font-medium">Lalamove: {order.lalamove_order_id || 'Pending'}</p>
                              </td>
                              <td className="px-6 py-4">
@@ -470,7 +557,7 @@ export function LalamoveClient({
                                   )} />
                                   <div className="flex items-start justify-between gap-4">
                                      <div>
-                                        <p className="text-sm font-bold text-gray-900 capitalize">{event.event_type.replace(/_/g, ' ')}</p>
+                                        <p className="text-sm font-bold text-gray-900 capitalize">{(event.event_type || 'Update').replace(/_/g, ' ')}</p>
                                         <p className="text-xs text-gray-400 font-medium">
                                           <Clock size={12} className="inline mr-1" /> {format(new Date(event.created_at), 'MMM d, h:mm a')}
                                         </p>

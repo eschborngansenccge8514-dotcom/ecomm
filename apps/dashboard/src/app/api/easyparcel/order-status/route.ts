@@ -9,13 +9,13 @@ export async function POST(req: NextRequest) {
 
   const { merchantId, orderNumbers, shipmentIds } = await req.json()
   const { data: cfg } = await supabase
-    .from('merchant_easyparcel_settings')
-    .select('api_key, auth_key, is_demo')
+    .from('merchant_easyparcel_config')
+    .select('*')
     .eq('merchant_id', merchantId).single()
     
   const apiKey  = cfg?.api_key  || process.env.EASYPARCEL_API_KEY
   const authKey = cfg?.auth_key || process.env.EASYPARCEL_AUTH_KEY
-  const isDemo  = cfg ? cfg.is_demo : (process.env.NODE_ENV !== 'production')
+  const isDemo  = cfg ? (cfg.environment === 'sandbox') : (process.env.NODE_ENV !== 'production')
 
   if (!apiKey) return NextResponse.json({ error: 'EasyParcel API Key not configured' }, { status: 400 })
 

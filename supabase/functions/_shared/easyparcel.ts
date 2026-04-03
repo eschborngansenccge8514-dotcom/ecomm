@@ -88,9 +88,9 @@ export async function callEasyParcel(
   orderId: string | null,
   action: string,
   params: Record<string, any>,
-  config?: { apiKey?: string; environment?: string }
+  config?: { apiKey?: string; authKey?: string; environment?: string }
 ) {
-  const authKey = Deno.env.get('EASYPARCEL_AUTH_KEY')!
+  const authKey = config?.authKey || Deno.env.get('EASYPARCEL_AUTH_KEY')!
   const apiKey = config?.apiKey || Deno.env.get('EASYPARCEL_API_KEY')!
   const baseUrl = config?.environment === 'sandbox' 
     ? `https://demo.connect.easyparcel.my/?ac=${action}`

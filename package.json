@@ -6,6 +6,12 @@
     "packages/*"
   ],
   "devDependencies": {
-    "supabase": "^2.84.4"
+    "@types/node": "^20.19.37",
+    "supabase": "^2.84.4",
+    "tsx": "^4.21.0"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^3.0.51",
+    "ai": "^6.0.0"
   }
 }

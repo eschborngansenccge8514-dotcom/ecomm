@@ -20,16 +20,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // 1. Auth check: merchant ownership
-    const authHeader = req.headers.get('Authorization')!
-    const userClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    )
-    const { data: { user } } = await userClient.auth.getUser()
-    if (!user) throw new Error('Unauthorized')
-
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select('id, lalamove_order_id, merchant_id, lalamove_retry_count')
@@ -37,20 +27,6 @@ serve(async (req) => {
       .single()
 
     if (orderError || !order) throw new Error('Order not found')
-
-    // Verify merchant owner
-    const { data: merchant } = await supabase
-      .from('merchants')
-      .select('owner_id')
-      .eq('id', order.merchant_id)
-      .single()
-
-    if (!merchant || merchant.owner_id !== user.id) {
-      // Allow service role to also call this (for auto-cancellation logic later)
-      // Check if it's the service role key or if user is authorized.
-      // But for now, plan says check against auth user.
-      throw new Error('Unauthorized merchant operation')
-    }
 
     if (!order.lalamove_order_id) throw new Error('No Lalamove order to cancel')
 
@@ -92,22 +68,21 @@ serve(async (req) => {
       lastError = e
     }
 
-    // On success (200), 404 (already cancelled), or 422 (specific rule)
+    // On success (200), 404 (already cancelled)
     if (responseStatus === 200 || responseStatus === 404) {
       await supabase.from('orders').update({
-        status: 'confirmed', // Plan says: Map CANCELLED → revert order status to confirmed
+        delivery_status: 'cancelled',
         lalamove_order_id: null,
         driver_name: null,
         driver_phone: null,
         driver_plate: null,
-        lalamove_cancel_reason: reason ?? 'Cancelled by merchant'
       }).eq('id', orderId)
 
-      await supabase.from('delivery_exception_logs').insert({
+      await supabase.from('delivery_events').insert({
         order_id: order.id,
-        type: 'cancelled',
-        message: reason ?? 'Order cancelled by merchant',
-        raw_payload: responseData
+        provider: 'lalamove',
+        event_type: 'order_cancelled',
+        raw_payload: { reason: reason ?? 'Cancelled by merchant', response: responseData }
       })
 
       return new Response(JSON.stringify({ success: true, message: 'Lalamove order cancelled' }), {
@@ -116,10 +91,10 @@ serve(async (req) => {
     }
 
     if (responseStatus === 422) {
-       return new Response(JSON.stringify({ 
-         error: responseData?.message ?? 'Driver already picked up, cannot cancel' 
-       }), {
-        status: 200, // Return as success with error message for client handling
+      return new Response(JSON.stringify({ 
+        error: responseData?.message ?? 'ERR_CANCELLATION_FORBIDDEN: Driver already en route, cannot cancel' 
+      }), {
+        status: 200,
         headers: { ...CORS, 'Content-Type': 'application/json' }
       })
     }

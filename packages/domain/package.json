@@ -4,6 +4,8 @@
   "private": true,
   "main": "index.ts",
   "dependencies": {
+    "@ai-sdk/google": "3.0.51",
+    "ai": "3.4.33",
     "zod": "^3.22.4"
   }
 }

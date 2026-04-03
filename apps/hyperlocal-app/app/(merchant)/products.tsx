@@ -26,79 +26,84 @@ function ProductRow({ product, onEdit, onToggle, onDelete }: {
 
   return (
     <View
-      className="bg-white rounded-2xl flex-row gap-3 p-3 mb-3"
-      style={{ shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2, opacity: isActive ? 1 : 0.55 }}
+      className="bg-white rounded-3xl flex-row gap-4 p-4 mb-4 border border-gray-100 shadow-soft"
+      style={{ opacity: isActive ? 1 : 0.6 }}
     >
-      {/* Image */}
-      <Image
-        source={product.images?.[0] ? { uri: product.images[0] } : require('../../assets/placeholder-logo.png')}
-        style={{ width: 72, height: 72, borderRadius: 12 }}
-        contentFit="cover"
-      />
+      {/* Image with overlay for status */}
+      <View>
+        <Image
+          source={product.images?.[0] ? { uri: product.images[0] } : require('../../assets/placeholder-logo.png')}
+          style={{ width: 84, height: 84, borderRadius: 20 }}
+          contentFit="cover"
+        />
+        {!isActive && (
+          <View className="absolute inset-0 bg-gray-900/40 rounded-[20px] items-center justify-center">
+            <Ionicons name="eye-off" size={20} color="#fff" />
+          </View>
+        )}
+      </View>
 
       {/* Details */}
-      <View className="flex-1 justify-between py-0.5">
+      <View className="flex-1 justify-between">
         <View>
-          <Text className="text-gray-900 font-semibold text-sm" numberOfLines={1}>{product.name}</Text>
-          {product.category && (
-            <Text className="text-gray-400 text-xs">{product.category.name}</Text>
-          )}
-          <View className="flex-row items-center gap-2 mt-1">
-            <Text className="text-primary-600 font-bold text-sm">{formatCurrency(product.price)}</Text>
+          <View className="flex-row justify-between items-start">
+            <View className="flex-1 mr-2">
+              <Text className="text-gray-900 font-bold text-base font-heading" numberOfLines={1}>{product.name}</Text>
+              {product.category && (
+                <Text className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">{product.category.name}</Text>
+              )}
+            </View>
+          </View>
+          
+          <View className="flex-row items-center gap-2 mt-2">
+            <Text className="text-primary-600 font-bold text-lg font-heading">{formatCurrency(product.price)}</Text>
             {product.compare_at_price && product.compare_at_price > product.price && (
-              <Text className="text-gray-400 text-xs line-through">{formatCurrency(product.compare_at_price)}</Text>
+              <Text className="text-gray-300 text-xs line-through font-medium">{formatCurrency(product.compare_at_price)}</Text>
             )}
           </View>
         </View>
 
-        <View className="flex-row items-center gap-2 mt-1.5">
+        <View className="flex-row items-center gap-2 mt-2">
           {/* Stock badge */}
-          <View className={`rounded-full px-2 py-0.5 ${isOutOfStock ? 'bg-red-100' : 'bg-gray-100'}`}>
-            <Text className={`text-[10px] font-semibold ${isOutOfStock ? 'text-red-600' : 'text-gray-500'}`}>
+          <View className={`rounded-full px-2.5 py-1 flex-row items-center gap-1.5 ${isOutOfStock ? 'bg-red-50' : 'bg-gray-50'}`}>
+            <View className={`w-1.5 h-1.5 rounded-full ${isOutOfStock ? 'bg-red-500' : 'bg-gray-400'}`} />
+            <Text className={`text-[10px] font-bold uppercase tracking-tighter font-semibold ${isOutOfStock ? 'text-red-700' : 'text-gray-600'}`}>
               {isOutOfStock
-                ? 'Out of stock'
+                ? 'OUT OF STOCK'
                 : product.track_inventory
-                  ? `${product.stock_quantity} left`
-                  : 'Unlimited'}
+                  ? `${product.stock_quantity} IN STOCK`
+                  : 'UNLIMITED STOCK'}
             </Text>
           </View>
-          {product.variants.length > 0 && (
-            <View className="bg-purple-100 rounded-full px-2 py-0.5">
-              <Text className="text-purple-700 text-[10px] font-semibold">
-                {product.variants.length} variant{product.variants.length > 1 ? 's' : ''}
-              </Text>
-            </View>
-          )}
         </View>
       </View>
 
-      {/* Action buttons */}
-      <View className="items-center gap-3 justify-center">
-        {/* Active toggle */}
+      {/* Vertical Action Column */}
+      <View className="justify-between py-0.5">
         <TouchableOpacity
           onPress={onToggle}
-          className={`w-8 h-8 rounded-full items-center justify-center
-            ${isActive ? 'bg-green-100' : 'bg-gray-100'}`}
+          className={`w-9 h-9 rounded-2xl items-center justify-center border
+            ${isActive ? 'bg-green-50 border-green-100' : 'bg-gray-50 border-gray-100'}`}
         >
           <Ionicons
             name={isActive ? 'eye-outline' : 'eye-off-outline'}
-            size={16}
-            color={isActive ? '#16a34a' : '#9ca3af'}
+            size={18}
+            color={isActive ? '#16a34a' : '#94a3b8'}
           />
         </TouchableOpacity>
-        {/* Edit */}
+        
         <TouchableOpacity
           onPress={onEdit}
-          className="w-8 h-8 rounded-full bg-blue-100 items-center justify-center"
+          className="w-9 h-9 rounded-2xl bg-primary-50 border border-primary-100 items-center justify-center"
         >
-          <Ionicons name="pencil-outline" size={16} color="#2563eb" />
+          <Ionicons name="pencil-outline" size={18} color="#2563eb" />
         </TouchableOpacity>
-        {/* Delete */}
+
         <TouchableOpacity
           onPress={onDelete}
-          className="w-8 h-8 rounded-full bg-red-100 items-center justify-center"
+          className="w-9 h-9 rounded-2xl bg-red-50 border border-red-100 items-center justify-center"
         >
-          <Ionicons name="trash-outline" size={16} color="#ef4444" />
+          <Ionicons name="trash-outline" size={18} color="#ef4444" />
         </TouchableOpacity>
       </View>
     </View>
@@ -117,8 +122,10 @@ export default function MerchantProductsScreen() {
   })
 
   const toggleMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      supabase.from('products').update({ status }).eq('id', id),
+    mutationFn: async ({ id, status }: { id: string; status: any }) => {
+      const { error } = await supabase.from('products').update({ status }).eq('id', id)
+      if (error) throw error
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['merchant-products'] }),
   })
 
@@ -147,49 +154,53 @@ export default function MerchantProductsScreen() {
 
   return (
     <View className="flex-1 bg-gray-50" style={{ paddingTop: insets.top }}>
-      {/* Header */}
-      <View className="bg-white px-5 pt-4 pb-4 border-b border-gray-100">
-        <View className="flex-row items-center justify-between mb-3">
+      {/* Premium Header */}
+      <View className="bg-white px-6 pt-4 pb-6 border-b border-gray-100 shadow-soft rounded-b-[32px]">
+        <View className="flex-row items-end justify-between">
           <View>
-            <Text className="text-2xl font-bold text-gray-900">Products</Text>
-            <Text className="text-gray-400 text-sm">
-              {activeCount} active · {inactiveCount} hidden
-            </Text>
+            <Text className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">Catalog Management</Text>
+            <Text className="text-3xl font-bold text-gray-900 font-heading">Products</Text>
+            <View className="flex-row items-center gap-2 mt-1">
+              <View className="w-1.5 h-1.5 rounded-full bg-green-500" />
+              <Text className="text-gray-500 text-xs font-medium">
+                {activeCount} Live Items · {inactiveCount} Archived
+              </Text>
+            </View>
           </View>
           <TouchableOpacity
             onPress={() => router.push('/(merchant)/product/new')}
-            className="bg-primary-500 rounded-xl px-4 py-2.5 flex-row items-center gap-2"
+            className="bg-primary-600 rounded-[22px] px-5 py-3 flex-row items-center gap-2 shadow-soft"
           >
-            <Ionicons name="add" size={18} color="#fff" />
-            <Text className="text-white font-bold text-sm">Add Product</Text>
+            <Ionicons name="add" size={20} color="#fff" />
+            <Text className="text-white font-bold text-sm font-semibold">Add New</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {isLoading ? (
-        <View className="p-4 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+        <View className="p-6 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-3xl" />)}
         </View>
       ) : products.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-8">
-          <View className="w-20 h-20 rounded-full bg-primary-50 items-center justify-center mb-4">
-            <Ionicons name="cube-outline" size={36} color="#2563eb" />
+        <View className="flex-1 items-center justify-center px-10">
+          <View className="w-24 h-24 rounded-[32px] bg-white border border-gray-100 shadow-soft items-center justify-center mb-6">
+            <Ionicons name="cube-outline" size={44} color="#cbd5e1" />
           </View>
-          <Text className="text-lg font-bold text-gray-700 text-center">No products yet</Text>
-          <Text className="text-gray-400 text-sm text-center mt-1">Add your first product so customers can start buying.</Text>
+          <Text className="text-xl font-bold text-gray-900 text-center font-heading">Empty Showcase</Text>
+          <Text className="text-gray-400 text-sm text-center mt-2 leading-5 font-medium">Your store is empty. Add products to start reaching customers in your area.</Text>
           <TouchableOpacity
             onPress={() => router.push('/(merchant)/product/new')}
-            className="mt-5 bg-primary-500 rounded-2xl px-6 py-3 flex-row items-center gap-2"
+            className="mt-8 bg-primary-600 rounded-3xl px-8 py-4 flex-row items-center gap-2 shadow-soft"
           >
-            <Ionicons name="add" size={18} color="#fff" />
-            <Text className="text-white font-semibold">Add First Product</Text>
+            <Ionicons name="rocket-outline" size={18} color="#fff" />
+            <Text className="text-white font-bold text-base font-semibold">Add First Product</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <FlatList
           data={products}
           keyExtractor={p => p.id}
-          contentContainerStyle={{ padding: 16 }}
+          contentContainerStyle={{ padding: 20 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#2563eb" />}
           renderItem={({ item }) => (

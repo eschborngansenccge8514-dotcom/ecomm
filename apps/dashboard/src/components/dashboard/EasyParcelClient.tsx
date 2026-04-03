@@ -153,7 +153,7 @@ function TrackingModal({ shipment, merchantId, onClose }: {
         </div>
 
         <div className="px-8 py-8 border-t border-gray-100 flex gap-4 bg-gray-50/30">
-          {shipment.awb_id_link && (
+          {shipment.awb_id_link && shipment.awb && !shipment.awb.toLowerCase().includes('not available') && (
             <a href={shipment.awb_id_link} target="_blank"
               className="group flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-[0.15em] h-14 rounded-2xl transition-all shadow-xl shadow-indigo-100 hover:shadow-indigo-200 border-none hover:scale-[1.02] active:scale-[0.98]">
               <Download size={16} className="group-hover:-translate-y-0.5 transition-transform" /> Print Label
@@ -463,7 +463,7 @@ export function EasyParcelClient({ merchantId, merchant, initialSettings, initia
                               <div className="flex items-start justify-between gap-6">
                                 <div className="space-y-1">
                                   <p className="text-sm font-bold text-gray-900 capitalize leading-none">
-                                    {event.event_type.replace(/_/g, ' ')}
+                                    {(event.event_type || 'Update').replace(/_/g, ' ')}
                                   </p>
                                   <p className="text-[11px] text-gray-400 font-medium">
                                     <Clock size={12} className="inline mr-1" /> {format(new Date(event.created_at), 'MMM d · h:mm a')}
@@ -599,20 +599,20 @@ export function EasyParcelClient({ merchantId, merchant, initialSettings, initia
                                <span className="text-lg">{courierEmoji(s.courier_name)}</span>
                                <div>
                                   <p className="text-xs font-bold text-gray-700 leading-tight">{s.courier_name}</p>
-                                  <p className="text-[10px] text-gray-400 font-mono">{s.tracking_no || 'No AWB yet'}</p>
+                                  <p className="text-[10px] text-gray-400 font-mono">{s.awb || 'No AWB yet'}</p>
                                </div>
                             </div>
                           </td>
                           <td className="px-8 py-6 text-sm font-bold text-gray-900">
-                            {rm(s.price_pks || s.price)}
+                            {rm(s.shipping_cost)}
                           </td>
                           <td className="px-8 py-6 text-right space-x-2">
                              <Button variant="ghost" size="sm" onClick={() => setTrackShip(s)} className="h-8 w-8 p-0 text-gray-400 hover:text-indigo-600">
                                <Eye size={14} />
                              </Button>
-                             {s.awb_id_link && (
+                             {s.awb_id_link && s.awb && !s.awb.toLowerCase().includes('not available') && (
                                <a href={s.awb_id_link} target="_blank">
-                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-gray-400 hover:text-emerald-600">
+                                 <Button variant="ghost" size="sm" title="Print AWB Label" className="h-8 w-8 p-0 text-gray-400 hover:text-emerald-600">
                                    <Download size={14} />
                                  </Button>
                                </a>

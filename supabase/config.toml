@@ -394,3 +394,23 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # declarative_schema_path = "./declarative"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+[cron.poll_lhdn_status]
+schedule = "*/3 * * * *"
+endpoint = "/functions/v1/poll-lhdn-status"
+
+[cron.morning_briefing]
+schedule = "0 8 * * *"
+endpoint = "/functions/v1/trigger-morning-briefing"
+
+[cron.anomaly_scan]
+schedule = "*/15 * * * *"
+endpoint = "/functions/v1/trigger-anomaly-scan"
+
+[cron.invoice_sweep]
+schedule = "0 18 * * *"
+endpoint = "/functions/v1/trigger-invoice-sweep"
+
+[cron.playbook_runner]
+schedule = "* * * * *"
+endpoint = "/functions/v1/trigger-playbook-runner"

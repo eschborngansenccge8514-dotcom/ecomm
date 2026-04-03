@@ -159,14 +159,14 @@ export default function StoreScreen() {
               
               <View className="flex-row items-center justify-center gap-6 py-4 border-t border-b border-gray-100 mb-2">
                 <View className="items-center">
-                  <Text className="text-xs text-gray-500 font-sans mb-0.5">Delivery Time</Text>
-                  <Text className="text-sm font-bold font-sans text-gray-900">25-35 mins</Text>
+                  <Text className="text-xs text-gray-500 font-sans mb-0.5">Delivery Range</Text>
+                  <Text className="text-sm font-bold font-sans text-gray-900">Up to {merchant.delivery_radius_km ?? 0} km</Text>
                 </View>
                 <View className="h-6 w-[1px] bg-gray-200" />
                 <View className="items-center">
-                  <Text className="text-xs text-gray-500 font-sans mb-0.5">Min. Order</Text>
+                  <Text className="text-xs text-gray-500 font-sans mb-0.5">Store Location</Text>
                   <Text className="text-sm font-bold font-sans text-gray-900">
-                    {(merchant.min_order_amount ?? 0) > 0 ? formatCurrency(merchant.min_order_amount ?? 0) : 'None'}
+                    {merchant.city ?? 'Local Store'}
                   </Text>
                 </View>
               </View>

@@ -42,7 +42,7 @@ export function EasyParcelPanel({ data }: { data: MonitoringData }) {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {Object.entries(stats).map(([label, count]) => (
           <div key={label} className="bg-white border rounded-lg p-3 text-center shadow-sm">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">{label.replace('_', ' ')}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">{(label || '').replace('_', ' ')}</p>
             <p className="text-xl font-bold text-gray-900">{count}</p>
           </div>
         ))}
@@ -122,7 +122,7 @@ export function EasyParcelPanel({ data }: { data: MonitoringData }) {
                           </td>
                           <td className="px-5 py-4">
                             <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-0 text-[10px]">
-                              {order.delivery_status.replace('_', ' ')}
+                              {(order.delivery_status || 'Pending').replace('_', ' ')}
                             </Badge>
                           </td>
                           <td className="px-5 py-4">
@@ -154,7 +154,7 @@ export function EasyParcelPanel({ data }: { data: MonitoringData }) {
                                       )} />
                                       <div>
                                         <p className={cn("text-xs font-bold capitalize", idx === 0 ? "text-blue-600" : "text-gray-900")}>
-                                          {event.event_type.replace('_', ' ')}
+                                          {(event.event_type || 'Update').replace('_', ' ')}
                                         </p>
                                         <p className="text-[10px] text-gray-500">
                                           {new Date(event.created_at).toLocaleString()}

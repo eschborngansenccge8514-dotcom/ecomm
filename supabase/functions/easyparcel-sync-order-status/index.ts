@@ -90,13 +90,14 @@ serve(async (req) => {
       const shipments = merchantGroups[merchantId]
       
       const { data: cfg } = await supabase
-        .from('merchant_easyparcel_settings')
+        .from('merchant_easyparcel_config')
         .select('*')
         .eq('merchant_id', merchantId).single()
 
       const config = cfg ? { 
-        apiKey: cfg.api_key, 
-        environment: cfg.is_demo ? 'sandbox' : 'production' 
+        apiKey: cfg.api_key,
+        authKey: cfg.auth_key,
+        environment: cfg.environment || 'sandbox' 
       } : undefined
 
       const orderNumbers = shipments.map((s: any) => ({ order_no: s.ep_order_number }))
@@ -138,8 +139,8 @@ serve(async (req) => {
               upsertData.ep_parcel_number = parcelInfo.parcelno || parcelInfo.parcel_number
               upsertData.ship_status      = parcelInfo.status || parcelInfo.ship_status
               upsertData.courier_name     = parcelInfo.courier_name
-              upsertData.tracking_url     = parcelInfo.awb_id_link || parcelInfo.tracking_url
-              upsertData.awb_id_link      = parcelInfo.awb_id_link
+              upsertData.tracking_url     = parcelInfo.tracking_url || null
+              upsertData.awb_id_link      = parcelInfo.awb_id_link || null
             }
 
             await supabase

@@ -367,9 +367,9 @@ function StoreCard({
                   </Text>
                 </View>
                 <View className="flex-row items-center gap-1">
-                  <Ionicons name="time" size={14} color="#64748b" />
+                  <Ionicons name="map-outline" size={14} color="#64748b" />
                   <Text className="text-sm font-medium text-gray-500 font-sans">
-                    25-35 min
+                    {merchant.delivery_radius_km}km Range
                   </Text>
                 </View>
               </View>
@@ -380,23 +380,21 @@ function StoreCard({
             </View>
           </View>
 
-          {/* Min order strip */}
-          {merchant.min_order_amount > 0 && (
-            <View className="mt-4 flex-row items-center gap-2">
-              <View className="px-3 py-1.5 bg-green-50 rounded-lg flex-row items-center gap-1.5">
-                <Ionicons name="basket" size={14} color="#10b981" />
-                <Text className="text-xs text-green-700 font-bold font-sans tracking-wide">
-                  MIN RM {merchant.min_order_amount}
-                </Text>
-              </View>
-              <View className="px-3 py-1.5 bg-gray-50 rounded-lg flex-row items-center gap-1.5">
-                <Ionicons name="car" size={14} color="#64748b" />
-                <Text className="text-xs text-gray-600 font-bold font-sans tracking-wide">
-                  PROMO
-                </Text>
-              </View>
+          {/* Location & Radius Strip */}
+          <View className="mt-4 flex-row items-center gap-2">
+            <View className="px-3 py-1.5 bg-primary-50 rounded-lg flex-row items-center gap-1.5">
+              <Ionicons name="navigate-outline" size={12} color="#2563eb" />
+              <Text className="text-[10px] text-primary-700 font-bold font-sans tracking-wide uppercase">
+                {merchant.city ?? 'Local Hub'}
+              </Text>
             </View>
-          )}
+            <View className="px-3 py-1.5 bg-gray-50 rounded-lg flex-row items-center gap-1.5">
+              <Ionicons name="shield-checkmark-outline" size={12} color="#64748b" />
+              <Text className="text-[10px] text-gray-600 font-bold font-sans tracking-wide uppercase">
+                Verified Seller
+              </Text>
+            </View>
+          </View>
         </View>
       </TouchableOpacity>
     </Animated.View>

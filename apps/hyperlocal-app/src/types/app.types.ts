@@ -33,6 +33,7 @@ export type ProductWithVariants = Product & {
 export type OrderWithItems = Order & {
   items: OrderItem[]
   merchant: Pick<Merchant, 'id' | 'store_name' | 'logo_url'>
+  buyer_name?: string | null
 }
 
 export type CartWithItems = Cart & {

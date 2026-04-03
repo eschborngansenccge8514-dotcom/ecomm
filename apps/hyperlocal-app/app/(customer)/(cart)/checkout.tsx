@@ -387,7 +387,10 @@ export default function CheckoutScreen() {
             .eq('id', orderId)
         }
         Toast.show({ type: 'success', text1: 'Order placed! 🎉', text2: orderNumber })
-        router.replace(`/(customer)/(orders)/${orderId}`)
+        router.back() // Pop checkout off the cart stack so Cart tab shows empty cart
+        setTimeout(() => {
+          router.replace(`/(customer)/(orders)/${orderId}`)
+        }, 100)
       } else {
         router.replace({
           pathname: '/(customer)/(cart)/payment-webview',

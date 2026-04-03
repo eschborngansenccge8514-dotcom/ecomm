@@ -21,24 +21,25 @@ import {
   Zap,
   PieChart,
   Palette,
-  Box
+  Box,
+  ShieldAlert
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'react-hot-toast'
+import { ApprovalsBadge } from '@/components/nav/ApprovalsBadge'
 
 const NAV = [
-  { href: '/',            label: 'Overview',    icon: LayoutDashboard },
-  { href: '/operations',  label: 'Operations',  icon: Zap             },
+  { href: '/agent',       label: 'MerchantMind', icon: Zap             },
+  { href: '/operations',  label: 'Operations',  icon: LayoutDashboard },
   { href: '/orders',      label: 'Orders',      icon: ShoppingBag     },
+  { href: '/agent/approvals', label: 'Approvals', icon: ShieldAlert, badge: <ApprovalsBadge /> },
   { href: '/products',    label: 'Products',    icon: Package         },
   { href: '/categories',  label: 'Categories',  icon: Tag             },
   { href: '/customers',   label: 'Customers',   icon: Users           },
-  { href: '/analytics',   label: 'Analytics',   icon: BarChart2       },
   { href: '/reports/products', label: 'Product Analytics', icon: PieChart },
   { href: '/reports',     label: 'Reports',     icon: FileText        },
   { href: '/loyalty',     label: 'Loyalty',     icon: Star            },
-  { href: '/delivery',    label: 'Delivery',    icon: Truck           },
   { href: '/shipping/easyparcel', label: 'EasyParcel', icon: Box        },
   { href: '/shipping/lalamove',   label: 'Lalamove',   icon: Zap        },
   { href: '/einvoices',   label: 'E-Invoicing', icon: FileCheck       },
@@ -121,7 +122,7 @@ export function Sidebar({ merchant, profile }: { merchant: any; profile: any }) 
           <p className="px-3 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
             {isAdmin ? 'Merchant View' : 'Management'}
           </p>
-          {NAV.map(({ href, label, icon: Icon }) => {
+          {NAV.map(({ href, label, icon: Icon, badge }) => {
             const active = href === '/' ? pathname === '/' : pathname.startsWith(href)
             if (isAdmin && (href === '/settings' || href === '/settings/store')) return null // Admins handle global settings
             return (
@@ -134,7 +135,8 @@ export function Sidebar({ merchant, profile }: { merchant: any; profile: any }) 
                 )}
               >
                 <Icon size={18} />
-                {label}
+                <span className="flex-1">{label}</span>
+                {badge}
               </Link>
             )
           })}

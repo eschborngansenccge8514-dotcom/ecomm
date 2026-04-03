@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { getAuthContext } from '@/lib/utils.server'
 import { redirect } from 'next/navigation'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { Header } from '@/components/dashboard/Header'
@@ -9,31 +9,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
-
-  // Fetch profile and merchant in parallel — saves one sequential round-trip
-  const [{ data: profile }, { data: merchant }] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', user.id).single(),
-    supabase.from('merchants').select('*').eq('owner_id', user.id).single(),
-  ])
-
-  const isAdmin = profile?.role === 'admin'
-
-  if (!merchant && !isAdmin) {
-    if (profile?.role === 'merchant') {
-      redirect('/apply')
-    }
-    // For any other authenticated role (like customer) that shouldn't be here
-    redirect('/login')
-  }
+  const { user, profile, merchant, isAdmin } = await getAuthContext()
 
   // Define a default merchant-like object for admins without a store
   const displayMerchant = merchant || {

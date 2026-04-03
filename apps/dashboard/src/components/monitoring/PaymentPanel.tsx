@@ -118,7 +118,7 @@ export function PaymentPanel({ data }: { data: MonitoringData }) {
                         order.payment_status === 'paid' ? "bg-green-500" : 
                         order.payment_status === 'failed' ? "bg-red-500" : "bg-yellow-500"
                       )} />
-                      <span className="text-[10px] text-gray-500 capitalize">{order.payment_status.replace('_', ' ')}</span>
+                      <span className="text-[10px] text-gray-500 capitalize">{(order.payment_status || 'Unpaid').replace('_', ' ')}</span>
                     </div>
                   </div>
                 </div>

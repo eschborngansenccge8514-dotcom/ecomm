@@ -79,16 +79,95 @@ const STATUS_COLOR: Record<string, string> = {
 
 // ─── Order status timeline definition ────────────────────────────────────────
 
-const TIMELINE_STEPS = [
-  { key: 'paid', label: 'Order Placed', tsKey: 'created_at' },
-  { key: 'confirmed', label: 'Accepted', tsKey: 'confirmed_at' },
-  { key: 'preparing', label: 'Preparing', tsKey: 'preparing_at' },
-  { key: 'ready_for_pickup', label: 'Ready', tsKey: 'ready_at' },
-  { key: 'out_for_delivery', label: 'Out for Delivery', tsKey: 'dispatched_at' },
-  { key: 'delivered', label: 'Delivered', tsKey: 'delivered_at' },
-]
+const getProviderSteps = (order: any) => {
+  const provider = order.delivery_provider || (order.delivery_type === 'pickup' ? 'self_pickup' : null)
+  
+  if (provider === 'lalamove') {
+    return [
+      { key: 'paid', label: 'Order Placed', tsKey: 'created_at' },
+      { key: 'preparing', label: 'Preparing', tsKey: 'preparing_at' },
+      { key: 'finding_driver', label: 'Finding Driver', tsKey: 'ready_at' },
+      { key: 'driver_assigned', label: 'Driver Assigned', tsKey: null },
+      { key: 'picked_up', label: 'Driver Picked Up', tsKey: 'dispatched_at' },
+      { key: 'delivered', label: 'Delivered', tsKey: 'delivered_at' },
+    ]
+  }
 
-const STATUS_ORDER = ['paid', 'confirmed', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered']
+  if (provider === 'easyparcel') {
+    return [
+      { key: 'paid', label: 'Order Placed', tsKey: 'created_at' },
+      { key: 'preparing', label: 'Preparing', tsKey: 'preparing_at' },
+      { key: 'pending_arrangement', label: 'Booking Courier', tsKey: 'ready_at' },
+      { key: 'collected', label: 'Courier Collected', tsKey: null },
+      { key: 'delivering', label: 'In Transit', tsKey: 'dispatched_at' },
+      { key: 'delivered', label: 'Delivered', tsKey: 'delivered_at' },
+    ]
+  }
+
+  if (provider === 'self_pickup') {
+     return [
+      { key: 'paid', label: 'Order Placed', tsKey: 'created_at' },
+      { key: 'preparing', label: 'Preparing', tsKey: 'preparing_at' },
+      { key: 'ready_for_pickup', label: 'Ready for Pickup', tsKey: 'ready_at' },
+      { key: 'delivered', label: 'Picked Up', tsKey: 'delivered_at' },
+     ]
+  }
+
+  // Default Standard Delivery
+  return [
+    { key: 'paid', label: 'Order Placed', tsKey: 'created_at' },
+    { key: 'confirmed', label: 'Accepted', tsKey: 'confirmed_at' },
+    { key: 'preparing', label: 'Preparing', tsKey: 'preparing_at' },
+    { key: 'out_for_delivery', label: 'Out for Delivery', tsKey: 'dispatched_at' },
+    { key: 'delivered', label: 'Delivered', tsKey: 'delivered_at' },
+  ]
+}
+
+function getActiveStepIndex(order: any, steps: any[]) {
+   const primaryStatus = order.status
+   const delStatus = (order.delivery_status || '').toLowerCase()
+   const shipStatus = (order.ship_status || '').toLowerCase()
+   const provider = order.delivery_provider || (order.delivery_type === 'pickup' ? 'self_pickup' : null)
+
+   if (primaryStatus === 'cancelled' || primaryStatus === 'refunded' || primaryStatus === 'failed') return -1
+
+   if (provider === 'lalamove') {
+      if (primaryStatus === 'delivered') return steps.length - 1
+      if (['picked_up', 'in_transit'].includes(delStatus)) return 4
+      if (['on_the_way', 'driver_assigned'].includes(delStatus)) return 3
+      if (['finding_driver', 'assigning_driver'].includes(delStatus)) return 2
+      if (primaryStatus === 'preparing' || primaryStatus === 'confirmed') return 1
+      if (primaryStatus === 'paid') return 0
+      return 1 
+   }
+
+   if (provider === 'easyparcel') {
+      if (primaryStatus === 'delivered' || shipStatus.includes('delivered') || shipStatus.includes('successfully')) return steps.length - 1
+      if (shipStatus.includes('transit') || shipStatus.includes('delivering')) return 4
+      if (shipStatus.includes('collected') || shipStatus.includes('drop off')) return 3
+      if (shipStatus.includes('pending') || shipStatus.includes('arrangement') || order.tracking_number) return 2
+      if (primaryStatus === 'preparing' || primaryStatus === 'confirmed') return 1
+      if (primaryStatus === 'paid') return 0
+      return 1
+   }
+
+   if (provider === 'self_pickup') {
+      if (primaryStatus === 'delivered') return 3
+      if (primaryStatus === 'ready_for_pickup') return 2
+      if (primaryStatus === 'preparing' || primaryStatus === 'confirmed') return 1
+      if (primaryStatus === 'paid') return 0
+      return 0
+   }
+
+   // Standard
+   if (primaryStatus === 'delivered') return 4
+   if (primaryStatus === 'out_for_delivery') return 3
+   if (primaryStatus === 'preparing') return 2
+   if (primaryStatus === 'confirmed') return 1
+   if (primaryStatus === 'paid') return 0
+
+   return 0
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -121,7 +200,6 @@ function Row({ label, value, valueClass }: { label: string; value: React.ReactNo
 
 function StatusTimeline({ order }: { order: any }) {
   const cancelled = order.status === 'cancelled'
-  const currentIdx = STATUS_ORDER.indexOf(order.status)
 
   if (cancelled) {
     return (
@@ -139,13 +217,16 @@ function StatusTimeline({ order }: { order: any }) {
     )
   }
 
+  const steps = getProviderSteps(order)
+  const currentIdx = getActiveStepIndex(order, steps)
+
   return (
     <div className="space-y-0">
-      {TIMELINE_STEPS.map((step, i) => {
-        const isDone = STATUS_ORDER.indexOf(step.key) <= currentIdx
-        const isActive = step.key === order.status
-        const timestamp = order[step.tsKey]
-        const isLast = i === TIMELINE_STEPS.length - 1
+      {steps.map((step, i) => {
+        const isDone = i <= currentIdx
+        const isActive = i === currentIdx
+        const timestamp = step.tsKey ? order[step.tsKey] : null
+        const isLast = i === steps.length - 1
 
         return (
           <div key={step.key} className="flex gap-3">
@@ -187,85 +268,10 @@ function StatusTimeline({ order }: { order: any }) {
   )
 }
 
-// ─── Print invoice ────────────────────────────────────────────────────────────
-
-function printInvoice(order: any) {
-  const addr = order.delivery_address as any
-  const items = (order.items ?? []) as any[]
-  const html = `
-    <html>
-      <head>
-        <title>Invoice ${order.order_number}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; font-size: 13px; color: #111; padding: 32px; }
-          h1   { font-size: 20px; margin-bottom: 4px; }
-          .sub { color: #666; font-size: 12px; margin-bottom: 24px; }
-          table { width: 100%; border-collapse: collapse; margin: 16px 0; }
-          th    { text-align: left; border-bottom: 2px solid #111; padding: 6px 0; font-size: 12px; }
-          td    { padding: 6px 0; border-bottom: 1px solid #eee; font-size: 12px; }
-          .total-row td { font-weight: bold; border-top: 2px solid #111; border-bottom: none; }
-          .address { background: #f7f7f7; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 12px; line-height: 1.6; }
-          .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #dcfce7; color: #166534; font-size: 11px; font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <h1>Tax Invoice</h1>
-        <p class="sub">Order: ${order.order_number} &nbsp;·&nbsp; ${format(new Date(order.created_at), 'd MMM yyyy, h:mm a')}</p>
-
-        ${addr ? `
-        <div class="address">
-          <strong>Deliver to:</strong><br/>
-          ${addr.name ?? ''}<br/>
-          ${addr.line1 ?? ''}, ${addr.line2 ? addr.line2 + ', ' : ''}${addr.city ?? ''}, ${addr.state ?? ''} ${addr.postcode ?? ''}<br/>
-          ${addr.phone ?? ''}
-        </div>
-        ` : ''}
-
-        <table>
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Variant</th>
-              <th style="text-align:center">Qty</th>
-              <th style="text-align:right">Unit Price</th>
-              <th style="text-align:right">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${items.map(i => `
-              <tr>
-                <td>${i.product_name}</td>
-                <td style="color:#666">${i.variant_name ?? '—'}</td>
-                <td style="text-align:center">${i.quantity}</td>
-                <td style="text-align:right">RM ${Number(i.unit_price).toFixed(2)}</td>
-                <td style="text-align:right">RM ${Number(i.line_total).toFixed(2)}</td>
-              </tr>
-            `).join('')}
-            <tr><td colspan="5" style="padding-top:8px"></td></tr>
-            <tr><td colspan="4" style="text-align:right;color:#666">Subtotal</td><td style="text-align:right">RM ${Number(order.subtotal).toFixed(2)}</td></tr>
-            <tr><td colspan="4" style="text-align:right;color:#666">Delivery Fee</td><td style="text-align:right">${order.delivery_fee > 0 ? `RM ${Number(order.delivery_fee).toFixed(2)}` : 'Free'}</td></tr>
-            ${order.points_discount > 0 ? `<tr><td colspan="4" style="text-align:right;color:#f59e0b">Points Discount</td><td style="text-align:right;color:#f59e0b">-RM ${Number(order.points_discount).toFixed(2)}</td></tr>` : ''}
-            ${order.discount_amount > 0 ? `<tr><td colspan="4" style="text-align:right;color:#16a34a">Promo Discount</td><td style="text-align:right;color:#16a34a">-RM ${Number(order.discount_amount).toFixed(2)}</td></tr>` : ''}
-            <tr class="total-row">
-              <td colspan="4" style="text-align:right">TOTAL</td>
-              <td style="text-align:right">RM ${Number(order.total_amount).toFixed(2)}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <p>Payment: <strong>${(order.payment_method ?? '—').replace(/_/g, ' ')}</strong> &nbsp; <span class="badge">${order.payment_status}</span></p>
-        <p style="margin-top:24px;font-size:11px;color:#999">Thank you for your order.</p>
-      </body>
-    </html>
-  `
-  const win = window.open('', '_blank')
-  if (!win) return
-  win.document.write(html)
-  win.document.close()
-  win.focus()
-  win.print()
-}
+import { 
+  printInvoice, 
+  updateOrderStatus 
+} from '@/lib/order-actions'
 
 // ─── Modals ──────────────────────────────────────────────────────────────────
 
@@ -688,6 +694,7 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
   const [couriers, setCouriers] = useState<any[]>([])
   const [loadingCouriers, setLoadingCouriers] = useState(false)
   const [courierError, setCourierError] = useState<string | null>(null)
+  const [merchant, setMerchant] = useState<any>(null)
   const [eInvoice, setEInvoice] = useState<any>(null)
   const [isIssuingEInvoice, setIsIssuingEInvoice] = useState(false)
   const [showEInvoiceModal, setShowEInvoiceModal] = useState(false)
@@ -753,6 +760,18 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
     }
     fetchEInvoice()
     
+    // Fetch merchant profile
+    const fetchMerchant = async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('merchants')
+        .select('*')
+        .eq('id', merchantId)
+        .single()
+      if (data) setMerchant(data)
+    }
+    fetchMerchant()
+
     // Also fetch merchant e-invoice config for defaults
     const fetchConfig = async () => {
       const supabase = createClient()
@@ -1225,6 +1244,7 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
       setEInvoice(data.data)
       setShowEInvoiceModal(false)
       toast.success('E-Invoice issued successfully! 📄')
+      
       router.refresh()
     } catch (err: any) {
       toast.dismiss(tId)
@@ -1304,8 +1324,14 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
               </p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => printInvoice(order)} className="h-9 px-3 bg-white">
-            <Printer size={15} className="mr-1.5" /> Print Invoice
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => eInvoice ? printInvoice(order, merchant, merchantEinvoiceConfig, eInvoice) : setShowEInvoiceModal(true)} 
+            className="h-9 px-3 bg-white text-gray-700 border-gray-200 shadow-sm hover:bg-gray-50 transition-all active:scale-95"
+          >
+            {eInvoice ? <Printer size={15} className="mr-1.5 text-blue-600" /> : <FileCheck size={15} className="mr-1.5 text-amber-500" />}
+            {eInvoice ? 'Print Tax Invoice' : 'Issue & Print Invoice'}
           </Button>
         </div>
 
@@ -1554,7 +1580,9 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
                           <span className="font-bold text-gray-900">{easyparcelShipment.courier_name || 'Standard Courier'}</span>
                           <span className={cn(
                             'text-[10px] font-black uppercase px-2 py-0.5 rounded-full ring-1 ring-inset',
-                            shipStatusMeta(easyparcelShipment.ship_status || easyparcelShipment.order_status).cls.replace('bg-', 'ring-').replace('text-', 'bg-').replace('text-', 'text-')
+                            shipStatusMeta(easyparcelShipment.ship_status || easyparcelShipment.order_status).bg.replace('bg-', 'ring-') + ' ' + 
+                            shipStatusMeta(easyparcelShipment.ship_status || easyparcelShipment.order_status).bg + ' ' +
+                            shipStatusMeta(easyparcelShipment.ship_status || easyparcelShipment.order_status).color
                           )}>
                             {shipStatusMeta(easyparcelShipment.ship_status || easyparcelShipment.order_status).label}
                           </span>
@@ -1735,17 +1763,17 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
                       Issue an official LHDN e-invoice for this order once it is confirmed and paid.
                     </p>
                     <button 
-                      onClick={handleIssueEInvoice}
-                      disabled={isIssuingEInvoice || order.status === 'cancelled' || order.payment_status !== 'paid'}
+                      onClick={() => eInvoice ? printInvoice(order, merchant, merchantEinvoiceConfig, eInvoice) : handleIssueEInvoice()}
+                      disabled={isIssuingEInvoice || order.status === 'cancelled' || (order.payment_status !== 'paid' && !eInvoice)}
                       className={cn(
                         "w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm border-0",
-                        order.payment_status === 'paid' && order.status !== 'cancelled'
+                        (order.payment_status === 'paid' && order.status !== 'cancelled') || eInvoice
                           ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-100" 
                           : "bg-gray-100 text-gray-400 cursor-not-allowed"
                       )}
                     >
-                      {isIssuingEInvoice ? <Loader2 size={16} className="animate-spin" /> : <FileCheck size={16} />}
-                      {isIssuingEInvoice ? 'Submitting to LHDN...' : 'Issue E-Invoice'}
+                      {isIssuingEInvoice ? <Loader2 size={16} className="animate-spin" /> : (eInvoice ? <Printer size={16} /> : <FileCheck size={16} />)}
+                      {isIssuingEInvoice ? 'Submitting to LHDN...' : (eInvoice ? 'Print Tax Invoice' : 'Issue & Print E-Invoice')}
                     </button>
                     {order.payment_status !== 'paid' && (
                       <p className="text-[10px] text-amber-600 text-center font-medium">

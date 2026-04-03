@@ -4,8 +4,10 @@
   "private": true,
   "main": "index.ts",
   "dependencies": {
-    "@project1/domain": "workspace:*",
+    "@ai-sdk/google": "3.0.51",
     "@project1/db": "workspace:*",
+    "@project1/domain": "workspace:*",
+    "ai": "3.4.33",
     "zod": "^3.22.4"
   }
 }

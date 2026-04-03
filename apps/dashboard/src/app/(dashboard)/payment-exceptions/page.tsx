@@ -1,20 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
+import { getAuthContext } from '@/lib/utils.server'
 import { redirect } from 'next/navigation'
 import PaymentExceptionsClient from '@/components/dashboard/PaymentExceptionsClient'
 
 export default async function PaymentExceptionsPage() {
-  const supabase = await createClient()
+  const { user, merchant, isAdmin } = await getAuthContext()
   
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: merchant } = await supabase
-    .from('merchants')
-    .select('id')
-    .eq('owner_id', user.id)
-    .single()
-
-  if (!merchant) redirect('/')
+  const effectiveMerchantId = merchant?.id || 'admin'
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -23,7 +14,7 @@ export default async function PaymentExceptionsPage() {
         <p className="text-gray-500 mt-1">Monitor duplicate webhooks, stuck payments, and failed transactions.</p>
       </div>
 
-      <PaymentExceptionsClient merchantId={merchant.id} />
+      <PaymentExceptionsClient merchantId={effectiveMerchantId} />
     </div>
   )
 }

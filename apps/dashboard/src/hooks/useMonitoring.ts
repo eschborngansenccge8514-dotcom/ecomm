@@ -15,17 +15,22 @@ export type Order = {
   delivery_status: string
   delivery_fee: number
   delivery_tracking_id: string
+  delivery_tracking_url?: string
   lalamove_order_id: string
   easyparcel_order_no: string
   tracking_number: string
   driver_name: string
   driver_phone: string
   driver_plate: string
+  driver_photo_url?: string
   last_driver_lat: number
   last_driver_lng: number
   last_driver_update_at: string
   exception_flag: string
   exception_flagged_at: string
+  delivery_metadata?: any
+  delivery_address?: any
+  buyer_name?: string
   created_at: string
   updated_at: string
 }
@@ -76,7 +81,7 @@ export function useMonitoring(merchantId: string) {
       // Fetch orders with only the columns the UI needs
       const { data: ordersData } = await supabase
         .from('orders')
-        .select('id, order_number, status, payment_status, payment_method, total_amount, delivery_provider, delivery_status, delivery_fee, delivery_tracking_id, lalamove_order_id, easyparcel_order_no, tracking_number, driver_name, driver_phone, driver_plate, last_driver_lat, last_driver_lng, last_driver_update_at, exception_flag, exception_flagged_at, created_at, updated_at')
+        .select('id, order_number, status, payment_status, payment_method, total_amount, delivery_provider, delivery_status, delivery_fee, delivery_tracking_id, delivery_tracking_url, lalamove_order_id, easyparcel_order_no, tracking_number, driver_name, driver_phone, driver_plate, driver_photo_url, last_driver_lat, last_driver_lng, last_driver_update_at, exception_flag, exception_flagged_at, delivery_metadata, delivery_address, buyer_name, created_at, updated_at')
         .eq('merchant_id', merchantId)
         .order('updated_at', { ascending: false })
         .limit(50)

@@ -29,24 +29,68 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   const body = await req.json().catch(() => null)
-  if (!body?.orderId) return err('orderId is required')
-
-  console.log(`Processing order ${body.orderId}...`)
+  const { order_id, points, customer_id, reason, merchant_id } = body ?? {}
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   )
 
+  // 1. Handle Manual Awarding (AI Agent Gesture)
+  if (points && customer_id && merchant_id) {
+    console.log(`Manual award: ${points} pts to customer ${customer_id} (Reason: ${reason})`)
+    
+    // Get current balance
+    const { data: existing } = await supabase
+      .from('loyalty_points')
+      .select('*')
+      .eq('customer_id', customer_id)
+      .eq('merchant_id', merchant_id)
+      .single()
+
+    const currentBalance = existing?.balance ?? 0
+    const newBalance = currentBalance + points
+
+    const { error: upsertErr } = await supabase
+      .from('loyalty_points')
+      .upsert({
+        customer_id,
+        merchant_id,
+        balance: newBalance,
+        total_earned: (existing?.total_earned ?? 0) + points,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'customer_id,merchant_id' })
+
+    if (upsertErr) return err(upsertErr.message)
+
+    await supabase.from('points_transactions').insert({
+      customer_id,
+      merchant_id,
+      type: 'earn',
+      points_delta: points,
+      balance_after: newBalance,
+      description: reason || 'Manual adjustment',
+      order_id: order_id
+    })
+
+    return ok({ success: true, pointsAwarded: points, newBalance })
+  }
+
+  // 2. Original Automatic Order-based logic
+  const finalOrderId = order_id || body?.orderId
+  if (!finalOrderId) return err('order_id is required')
+
+  console.log(`Processing order ${finalOrderId}...`)
+
   // Fetch order
   const { data: order, error: oErr } = await supabase
     .from('orders')
     .select('id, merchant_id, customer_id, subtotal, status, points_earned')
-    .eq('id', body.orderId)
+    .eq('id', finalOrderId)
     .single()
 
   if (oErr || !order) {
-    console.error(`Order lookup failed for ${body.orderId}:`, oErr)
+    console.error(`Order lookup failed for ${finalOrderId}:`, oErr)
     return err(oErr?.message || 'Order not found')
   }
 

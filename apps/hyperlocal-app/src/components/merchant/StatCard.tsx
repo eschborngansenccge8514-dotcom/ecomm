@@ -20,12 +20,14 @@ export function StatCard({ label, value, icon, color }: StatCardProps) {
   const styles = colorMap[color]
 
   return (
-    <View className="flex-1 bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-      <View className={cn('w-10 h-10 rounded-xl items-center justify-center mb-3', styles.bg)}>
-        <Ionicons name={icon} size={20} color={styles.icon} />
+    <View className="flex-1 bg-white rounded-3xl p-5 border border-gray-100 shadow-soft">
+      <View className={cn('w-12 h-12 rounded-2xl items-center justify-center mb-4', styles.bg)}>
+        <Ionicons name={icon} size={24} color={styles.icon} />
       </View>
-      <Text className="text-gray-500 text-xs font-semibold mb-1 uppercase tracking-wider">{label}</Text>
-      <Text className="text-gray-900 text-lg font-bold" numberOfLines={1}>{value}</Text>
+      <View>
+        <Text className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1 font-semibold">{label}</Text>
+        <Text className="text-gray-900 text-xl font-bold font-heading" numberOfLines={1}>{value}</Text>
+      </View>
     </View>
   )
 }

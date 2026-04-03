@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildLalamoveHeaders, getLalamoveBaseUrl } from '../_shared/lalamove-auth.ts'
-import { retryWithBackoff, logLalamoveApi } from '../_shared/utils.ts'
+import { logLalamoveApi } from '../_shared/utils.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -32,72 +32,59 @@ serve(async (req) => {
       .single()
 
     if (orderError || !order) throw new Error('Order not found')
-    if (!order.lalamove_order_id) throw new Error('Lalamove order ID missing')
+    if (!order.lalamove_order_id) throw new Error('Lalamove order ID missing — delivery may not have been booked yet')
 
     const apiKey = Deno.env.get('LALAMOVE_API_KEY')!
     const apiSecret = Deno.env.get('LALAMOVE_API_SECRET')!
+    const market = Deno.env.get('LALAMOVE_MARKET') || 'MY'
     const baseUrl = getLalamoveBaseUrl()
-    const path = `/v3/orders/${order.lalamove_order_id}`
 
-    // Lalamove takes priorityFee in RM for MY market, but we should verify if it's sen or RM.
-    // Plan says "convert RM to sen". Actually, Lalamove API usually takes RM in v3.
-    // Wait, let's check Lalamove v3 docs if possible. 
-    // "priorityFee": { "amount": "1.00", "currency": "MYR" } is standard v3 format.
-    // However, I'll follow the plan's RM -> sen instruction just in case, but usually v3 is string amount.
-    // Actually, I'll stick to a standard string format for v3.
-    
+    // Correct Lalamove API: POST /v3/orders/{lalamoveOrderId}/priority-fee
+    const path = `/v3/orders/${order.lalamove_order_id}/priority-fee`
+
     const body = JSON.stringify({
       data: {
-        priorityFee: tipAmountNum.toFixed(2) // Convert to string RM with 2 decimals
+        priorityFee: tipAmountNum.toFixed(2)
       }
     })
 
-    let responseData: any = null
-    let responseStatus = 200
+    const headers = await buildLalamoveHeaders(apiKey, apiSecret, 'POST', path, body, market)
+    const res = await fetch(`${baseUrl}${path}`, { method: 'POST', headers, body })
+    const responseData = await res.json()
 
-    await retryWithBackoff(async () => {
-      const headers = await buildLalamoveHeaders(apiKey, apiSecret, 'PATCH', path, body)
-      const res = await fetch(`${baseUrl}${path}`, { method: 'PATCH', headers, body })
-      responseStatus = res.status
-      responseData = await res.json()
-
-      await logLalamoveApi(supabase, order.id, {
-        endpoint: path,
-        method: 'PATCH',
-        statusCode: res.status,
-        requestBody: body,
-        responseBody: responseData,
-        attempt: 1
-      })
-
-      if (!res.ok) {
-        throw new Error(responseData?.message ?? 'Lalamove PATCH failed')
-      }
+    await logLalamoveApi(supabase, order.id, {
+      endpoint: path,
+      method: 'POST',
+      statusCode: res.status,
+      requestBody: body,
+      responseBody: responseData,
+      attempt: 1
     })
 
-    if (responseStatus === 200) {
-      const newPriorityFee = (parseFloat(order.priority_fee_added as any) || 0) + tipAmountNum
-      await supabase.from('orders').update({
-        priority_fee_added: newPriorityFee
-      }).eq('id', orderId)
-
-      await supabase.from('delivery_exception_logs').insert({
-        order_id: order.id,
-        type: 'priority_fee_added',
-        message: `Added RM ${tipAmountNum} priority fee`,
-        raw_payload: responseData
-      })
-
-      return new Response(JSON.stringify({ 
-        success: true, 
-        priorityFeeExtra: tipAmountNum,
-        totalPriorityFee: newPriorityFee
-      }), {
-        headers: { ...CORS, 'Content-Type': 'application/json' }
-      })
+    if (!res.ok) {
+      const msg = responseData?.message ?? responseData?.error?.message ?? `Priority fee failed (${res.status})`
+      throw new Error(msg)
     }
 
-    throw new Error('Unexpected response from Lalamove')
+    const newPriorityFee = (parseFloat(order.priority_fee_added as any) || 0) + tipAmountNum
+    await supabase.from('orders').update({
+      priority_fee_added: newPriorityFee
+    }).eq('id', orderId)
+
+    await supabase.from('delivery_exception_logs').insert({
+      order_id: order.id,
+      type: 'priority_fee_added',
+      message: `Added RM ${tipAmountNum.toFixed(2)} priority fee`,
+      raw_payload: responseData
+    })
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      priorityFeeAdded: tipAmountNum,
+      totalPriorityFee: newPriorityFee
+    }), {
+      headers: { ...CORS, 'Content-Type': 'application/json' }
+    })
 
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {

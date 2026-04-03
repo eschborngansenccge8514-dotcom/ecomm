@@ -40,6 +40,19 @@ serve(async (req) => {
     }, 0)
     const totalWeightKg = Math.max(totalWeightGrams / 1000, 0.1)
 
+    // Fetch per-merchant EasyParcel configuration
+    const { data: epConfig } = await supabase
+      .from('merchant_easyparcel_config')
+      .select('*')
+      .eq('merchant_id', order.merchant_id)
+      .single()
+
+    const epCallConfig = { 
+      apiKey:      epConfig?.api_key || Deno.env.get('EASYPARCEL_API_KEY'), 
+      authKey:     epConfig?.auth_key || Deno.env.get('EASYPARCEL_AUTH_KEY'),
+      environment: epConfig?.environment || 'sandbox' 
+    }
+
     // Call EasyParcel using shared utility
     const epData = await callEasyParcel(supabase, orderId, 'MPRateCheckingBulk', {
       bulk: [{
@@ -57,7 +70,7 @@ serve(async (req) => {
         'rates.*.pickup_point',
         'pgeon_point'
       ]
-    })
+    }, epCallConfig)
 
     const rates = epData.result?.[0]?.rates ?? []
     

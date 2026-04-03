@@ -73,7 +73,11 @@ export default function MerchantLayout() {
       screenOptions={{
         headerShown:          false,
         tabBarActiveTintColor: '#2563eb',
-        tabBarStyle:          { borderTopColor: '#f3f4f6' },
+        tabBarInactiveTintColor: '#9ca3af',
+        tabBarStyle: {
+          borderTopColor: '#f3f4f6',
+          backgroundColor: '#ffffff',
+        },
       }}
     >
       <Tabs.Screen

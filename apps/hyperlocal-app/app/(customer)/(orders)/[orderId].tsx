@@ -32,30 +32,112 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   refunded:         { label: 'Refunded',           color: '#4b5563', bg: '#f3f4f6', icon: 'return-down-back-outline',        description: 'Refund has been processed'             },
 }
 
-// Order steps in sequence
-const ORDER_STEPS = [
-  'pending',
-  'paid',
-  'confirmed',
-  'preparing',
-  'ready_for_pickup',
-  'out_for_delivery',
-  'delivered',
-]
+// ─── Provider timeline logic ───────────────────────────────────────────────────
+
+const getProviderSteps = (order: any) => {
+  const provider = order.delivery_provider || (order.delivery_type === 'pickup' ? 'self_pickup' : null)
+  
+  if (provider === 'lalamove') {
+    return [
+      { key: 'paid', label: 'Payment Received', desc: 'Order confirmed', icon: 'card-outline' as const },
+      { key: 'preparing', label: 'Preparing', desc: 'Customizing your items', icon: 'restaurant-outline' as const },
+      { key: 'finding_driver', label: 'Finding Driver', desc: 'Booking a Lalamove rider', icon: 'search-outline' as const },
+      { key: 'driver_assigned', label: 'Driver Assigned', desc: order.driver_name ? `Rider: ${order.driver_name}` : 'A driver is heading to the store', icon: 'bicycle-outline' as const },
+      { key: 'picked_up', label: 'On The Way', desc: 'Your order is in transit', icon: 'map-outline' as const },
+      { key: 'delivered', label: 'Delivered', desc: 'Enjoy your order!', icon: 'checkmark-done-circle-outline' as const },
+    ]
+  }
+
+  if (provider === 'easyparcel') {
+    return [
+      { key: 'paid', label: 'Payment Received', desc: 'Order confirmed', icon: 'card-outline' as const },
+      { key: 'preparing', label: 'Preparing', desc: 'Packing your shipment', icon: 'cube-outline' as const },
+      { key: 'pending_arrangement', label: 'Processing', desc: 'Courier is being arranged', icon: 'time-outline' as const },
+      { key: 'collected', label: 'Collected', desc: 'Package with courier', icon: 'scan-outline' as const },
+      { key: 'delivering', label: 'In Transit', desc: order.tracking_number ? `Tracking: ${order.tracking_number}` : 'Package is on its way', icon: 'airplane-outline' as const },
+      { key: 'delivered', label: 'Delivered', desc: 'Your package arrived', icon: 'checkmark-done-circle-outline' as const },
+    ]
+  }
+
+  if (provider === 'self_pickup') {
+     return [
+      { key: 'paid', label: 'Payment Received', desc: 'Order confirmed', icon: 'card-outline' as const },
+      { key: 'preparing', label: 'Preparing', desc: 'Merchant is preparing your order', icon: 'restaurant-outline' as const },
+      { key: 'ready_for_pickup', label: 'Ready for Pickup', desc: 'Your order is packed and ready', icon: 'bag-check-outline' as const },
+      { key: 'delivered', label: 'Completed', desc: 'Picked up successfully', icon: 'checkmark-done-circle-outline' as const },
+     ]
+  }
+
+  // Default Standard Delivery
+  return [
+    { key: 'paid', label: 'Payment Received', desc: 'Order confirmed', icon: 'card-outline' as const },
+    { key: 'confirmed', label: 'Order Confirmed', desc: 'Merchant processing order', icon: 'checkmark-done-outline' as const },
+    { key: 'preparing', label: 'Preparing', desc: 'Packing your items', icon: 'restaurant-outline' as const },
+    { key: 'out_for_delivery', label: 'Out for Delivery', desc: 'Courier is on the way', icon: 'bicycle-outline' as const },
+    { key: 'delivered', label: 'Delivered', desc: 'Order successfully delivered', icon: 'checkmark-done-circle-outline' as const },
+  ]
+}
+
+function getActiveStepIndex(order: any, steps: any[]) {
+   const primaryStatus = order.status
+   const delStatus = (order.delivery_status || '').toLowerCase()
+   const shipStatus = (order.ship_status || '').toLowerCase()
+   const provider = order.delivery_provider || (order.delivery_type === 'pickup' ? 'self_pickup' : null)
+
+   if (primaryStatus === 'cancelled' || primaryStatus === 'refunded' || primaryStatus === 'failed') return -1
+
+   if (provider === 'lalamove') {
+      if (primaryStatus === 'delivered') return steps.length - 1
+      if (['picked_up', 'in_transit'].includes(delStatus)) return 4
+      if (['on_the_way', 'driver_assigned'].includes(delStatus)) return 3
+      if (['finding_driver', 'assigning_driver'].includes(delStatus)) return 2
+      if (primaryStatus === 'preparing' || primaryStatus === 'confirmed') return 1
+      if (primaryStatus === 'paid') return 0
+      return 1 
+   }
+
+   if (provider === 'easyparcel') {
+      if (primaryStatus === 'delivered' || shipStatus.includes('delivered') || shipStatus.includes('successfully')) return steps.length - 1
+      if (shipStatus.includes('transit') || shipStatus.includes('delivering')) return 4
+      if (shipStatus.includes('collected') || shipStatus.includes('drop off')) return 3
+      if (shipStatus.includes('pending') || shipStatus.includes('arrangement') || order.tracking_number) return 2
+      if (primaryStatus === 'preparing' || primaryStatus === 'confirmed') return 1
+      if (primaryStatus === 'paid') return 0
+      return 1
+   }
+
+   if (provider === 'self_pickup') {
+      if (primaryStatus === 'delivered') return 3
+      if (primaryStatus === 'ready_for_pickup') return 2
+      if (primaryStatus === 'preparing' || primaryStatus === 'confirmed') return 1
+      if (primaryStatus === 'paid') return 0
+      return 0
+   }
+
+   // Standard
+   if (primaryStatus === 'delivered') return 4
+   if (primaryStatus === 'out_for_delivery') return 3
+   if (primaryStatus === 'preparing') return 2
+   if (primaryStatus === 'confirmed') return 1
+   if (primaryStatus === 'paid') return 0
+
+   return 0
+}
 
 // ─── Tracking timeline ─────────────────────────────────────────────────────────
-function TrackingTimeline({ currentStatus }: { currentStatus: string }) {
+function TrackingTimeline({ order }: { order: any }) {
+  const currentStatus = order.status
   const isCancelled = currentStatus === 'cancelled' || currentStatus === 'refunded'
 
   if (isCancelled) {
-    const cfg = STATUS_CONFIG[currentStatus]
+    const cfg = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.cancelled
     return (
       <View className="items-center py-4 gap-2">
         <View
           className="w-16 h-16 rounded-full items-center justify-center"
           style={{ backgroundColor: cfg.bg }}
         >
-          <Ionicons name={cfg.icon} size={32} color={cfg.color} />
+          <Ionicons name={cfg.icon as any} size={32} color={cfg.color} />
         </View>
         <Text style={{ color: cfg.color, fontWeight: '700', fontSize: 15 }}>{cfg.label}</Text>
         <Text className="text-gray-400 text-sm text-center">{cfg.description}</Text>
@@ -63,18 +145,18 @@ function TrackingTimeline({ currentStatus }: { currentStatus: string }) {
     )
   }
 
-  const currentIdx = ORDER_STEPS.indexOf(currentStatus)
+  const steps = getProviderSteps(order)
+  const currentIdx = getActiveStepIndex(order, steps)
 
   return (
     <View className="py-2">
-      {ORDER_STEPS.map((step, idx) => {
-        const cfg      = STATUS_CONFIG[step]
+      {steps.map((step, idx) => {
         const isDone   = idx <= currentIdx
         const isActive = idx === currentIdx
-        const isLast   = idx === ORDER_STEPS.length - 1
+        const isLast   = idx === steps.length - 1
 
         return (
-          <View key={step} className="flex-row gap-3">
+          <View key={step.key} className="flex-row gap-3">
             {/* Line + dot column */}
             <View className="items-center" style={{ width: 28 }}>
               {/* Top connector line */}
@@ -103,7 +185,7 @@ function TrackingTimeline({ currentStatus }: { currentStatus: string }) {
               >
                 {isDone && (
                   <Ionicons
-                    name={isActive ? cfg.icon : 'checkmark'}
+                    name={isActive ? step.icon : 'checkmark'}
                     size={isActive ? 14 : 11}
                     color="#fff"
                   />
@@ -134,10 +216,10 @@ function TrackingTimeline({ currentStatus }: { currentStatus: string }) {
                   color: isDone ? '#111827' : '#9ca3af',
                 }}
               >
-                {cfg.label}
+                {step.label}
               </Text>
               {isActive && (
-                <Text className="text-gray-500 text-xs mt-0.5">{cfg.description}</Text>
+                <Text className="text-gray-500 text-xs mt-0.5">{step.desc}</Text>
               )}
             </View>
           </View>
@@ -408,7 +490,7 @@ export default function OrderDetailScreen() {
 
         {/* Progress tracker */}
         <SectionCard title="📍  Order Progress">
-          <TrackingTimeline currentStatus={order.status} />
+          <TrackingTimeline order={order} />
         </SectionCard>
 
         {/* Order items */}

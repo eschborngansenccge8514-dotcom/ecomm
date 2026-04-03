@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   const { orderId, merchantId, priorityFee } = await req.json()
   
   const { data, error } = await supabase.functions.invoke('lalamove-add-priority-fee', {
-    body: { orderId, merchantId, priorityFee }
+    body: { orderId, merchantId, tipAmount: priorityFee }
   })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })

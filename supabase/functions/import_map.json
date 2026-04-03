@@ -4,6 +4,11 @@
     "tiktok/": "../../packages/integrations/tiktok/",
     "google-merchant/": "../../packages/integrations/google-merchant/",
     "crypto": "../../packages/integrations/crypto.ts",
-    "shared/": "./_shared/"
+    "shared/": "./_shared/",
+    "agent/": "../../packages/agent/",
+    "ai": "https://esm.sh/ai",
+    "zod": "https://esm.sh/zod",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
+    "@ai-sdk/google": "https://esm.sh/@ai-sdk/google"
   }
 }
