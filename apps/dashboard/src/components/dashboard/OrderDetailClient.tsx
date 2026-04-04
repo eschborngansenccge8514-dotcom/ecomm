@@ -267,11 +267,11 @@ function StatusTimeline({ order }: { order: any }) {
     </div>
   )
 }
-
 import { 
   printInvoice, 
   updateOrderStatus 
 } from '@/lib/order-actions'
+import { invokeWorker } from '@/lib/worker'
 
 // ─── Modals ──────────────────────────────────────────────────────────────────
 
@@ -809,8 +809,7 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
     const tid = toast.loading('Syncing EasyParcel status...')
     
     try {
-      const supabase = createClient()
-      const { data, error } = await supabase.functions.invoke('easyparcel-sync-order-status', {
+      const { data, error } = await invokeWorker('easyparcel-sync-status', {
         body: { order_id: order.id }
       })
 
@@ -820,6 +819,7 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
         toast.success('EasyParcel status synced successfully', { id: tid })
         await fetchEasyParcelShipment()
         // Also refresh order to pick up tracking number
+        const supabase = createClient()
         const { data: updatedOrder } = await supabase.from('orders').select('*').eq('id', order.id).single()
         if (updatedOrder) setOrder(updatedOrder)
       } else {
@@ -868,7 +868,7 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
 
     // Auto-book Lalamove if confirmed
     if (nextStatus === 'confirmed' && order.delivery_provider === 'lalamove') {
-      supabase.functions.invoke('lalamove-create-order', { body: { orderId: order.id } })
+      invokeWorker('lalamove-create-order', { body: { orderId: order.id } })
         .then(({ data, error: fErr }) => {
           if (fErr || data?.error) {
             toast.error('Lalamove auto-booking failed. Please book manually.')
@@ -881,7 +881,7 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
 
     // Award loyalty points on delivery
     if (nextStatus === 'delivered') {
-      supabase.functions.invoke('award-loyalty-points', { body: { orderId: order.id } })
+      invokeWorker('award-loyalty-points', { body: { orderId: order.id } })
         .then(({ data, error: fErr }) => {
           if (fErr) {
             console.error('Loyalty award error:', fErr)
@@ -905,7 +905,7 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
         .then(({ data: epConfig }) => {
           if (epConfig?.auto_book_on_ready) {
             const tId = toast.loading('Auto-booking EasyParcel...')
-            supabase.functions.invoke('easyparcel-create-order', { body: { orderId: order.id } })
+            invokeWorker('easyparcel-create-order', { body: { orderId: order.id } })
               .then(({ data, error: fErr }) => {
                 toast.dismiss(tId)
                 if (fErr || data?.error) {
@@ -928,12 +928,11 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
     const tId = toast.loading('Awarding loyalty points...')
 
     try {
-      const supabase = createClient()
-      const { data, error: fErr } = await supabase.functions.invoke('award-loyalty-points', { body: { orderId: order.id } })
+      const { data, error } = await invokeWorker('award-loyalty-points', { body: { orderId: order.id } })
       toast.dismiss(tId)
 
-      if (fErr || data?.error) {
-        toast.error(`Award failed: ${data?.error || fErr?.message}`)
+      if (error || data?.error) {
+        toast.error(`Award failed: ${data?.error || error?.message}`)
       } else if (data?.success) {
         toast.success(`${data.pointsAwarded} points awarded! 🌟`)
         setOrder((prev: any) => ({ ...prev, points_earned: data.pointsAwarded }))
@@ -961,15 +960,14 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
     if (isUpdating) return
     setIsUpdating(true)
     const tId = toast.loading('Syncing latest status from Lalamove...')
-    const supabase = createClient()
 
     try {
-      const { data, error: fErr } = await supabase.functions.invoke('lalamove-get-order-status', {
+      const { data, error } = await invokeWorker('lalamove-get-order-status', {
         body: { orderId: order.id }
       })
 
-      if (fErr || data?.error) {
-        throw new Error(data?.error || fErr?.message || 'Sync failed')
+      if (error || data?.error) {
+        throw new Error(data?.error || error?.message || 'Sync failed')
       }
 
       if (data.changed) {
@@ -991,9 +989,8 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
   const handleRetry = async () => {
     askConfirm('Book Lalamove', 'Book this delivery with Lalamove?', async () => {
       setIsUpdating(true)
-      const supabase = createClient()
       try {
-        const { data, error } = await supabase.functions.invoke('lalamove-retry-order', { body: { orderId: order.id } })
+        const { data, error } = await invokeWorker('lalamove-test-connection', { body: { orderId: order.id } })
         if (error || data?.error) throw new Error(error?.message ?? data?.error)
         if (data?.priceChanged) {
           askConfirm(
@@ -1002,7 +999,7 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
             async () => {
               setIsUpdating(true)
               try {
-                const { data: r2, error: e2 } = await supabase.functions.invoke('lalamove-retry-order', { body: { orderId: order.id, confirmPriceChange: true } })
+                const { data: r2, error: e2 } = await invokeWorker('lalamove-retry-order', { body: { orderId: order.id, confirmPriceChange: true } })
                 if (e2 || r2?.error) throw new Error(e2?.message ?? r2?.error)
                 toast.success('Booked successfully! 🏍️')
                 router.refresh()
@@ -1025,9 +1022,8 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
   const handleCancelLalamove = () => {
     askConfirm('Cancel Lalamove?', 'Cancel the Lalamove delivery booking?', async () => {
       setIsUpdating(true)
-      const supabase = createClient()
       try {
-        const { data, error } = await supabase.functions.invoke('lalamove-cancel', { body: { orderId: order.id, reason: 'Cancelled by merchant' } })
+        const { data, error } = await invokeWorker('lalamove-cancel', { body: { orderId: order.id, reason: 'Cancelled by merchant' } })
         if (error || data?.error) throw new Error(error?.message ?? data?.error)
         toast.success('Cancelled successfully')
         router.refresh()
@@ -1041,9 +1037,8 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
   const doAddTip = async (tip: number) => {
     setShowTip(false)
     setIsUpdating(true)
-    const supabase = createClient()
     try {
-      const { data, error } = await supabase.functions.invoke('lalamove-add-priority-fee', { body: { orderId: order.id, tipAmount: tip } })
+      const { data, error } = await invokeWorker('lalamove-add-priority-fee', { body: { orderId: order.id, tipAmount: tip } })
       if (error || data?.error) throw new Error(error?.message ?? data?.error)
       toast.success(`RM ${tip} tip added!`)
       router.refresh()
@@ -1059,7 +1054,7 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
     
     try {
       // Fetch available couriers for this order
-      const { data, error } = await supabase.functions.invoke('get-delivery-quotes', {
+      const { data, error } = await invokeWorker('get-delivery-quotes', {
         body: {
           merchantId: order.merchant_id,
           deliveryAddress: order.delivery_address,
@@ -1098,7 +1093,7 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
     
     const supabase = createClient()
     try {
-      const { data, error } = await supabase.functions.invoke('easyparcel-create-order', {
+      const { data, error } = await invokeWorker('easyparcel-create-order', {
         body: { 
           orderId: order.id,
           serviceId // Pass the merchant's choice
@@ -1135,7 +1130,7 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
         setIsUpdating(true)
         const supabase = createClient()
         try {
-          const { data, error } = await supabase.functions.invoke('razorpay-refund', {
+          const { data, error } = await invokeWorker('razorpay-refund', {
             body: { orderId: order.id }
           })
           
@@ -1173,7 +1168,7 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
     setIsUpdating(true)
     const supabase = createClient()
     try {
-      const { data, error } = await supabase.functions.invoke('billplz-refund', {
+      const { data, error } = await invokeWorker('billplz-refund', {
         body: { 
           orderId: order.id,
           bankCode: billplzRefundData.bankCode,
@@ -1223,9 +1218,9 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
     const tId = toast.loading('Submitting to LHDN MyInvois...')
     
     try {
-      const { data, error } = await supabase.functions.invoke('einvoice-submit', {
+      const { data, error } = await invokeWorker('einvoice-submit', {
         body: { 
-          order_id: order.id, 
+          orderId: order.id, 
           merchant_id: merchantId,
           customer: overrides?.customer,
           merchant_overrides: overrides?.merchantOverrides

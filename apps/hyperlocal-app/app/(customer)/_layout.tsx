@@ -31,6 +31,7 @@ export default function CustomerLayout() {
 
       {/* Hidden from tab bar */}
       <Tabs.Screen name="(store)"   options={{ href: null }} />
+      <Tabs.Screen name="support"   options={{ href: null }} />
     </Tabs>
   )
 }

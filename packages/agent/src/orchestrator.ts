@@ -1,5 +1,4 @@
-import { streamText, createTextStreamResponse, stepCountIs } from 'ai'
-import type { CoreMessage } from 'ai'
+import { streamText, stepCountIs } from 'ai'
 import { google } from '@ai-sdk/google'
 import { buildTools } from './tools'
 import { buildSystemPrompt } from './prompts/system'
@@ -126,6 +125,6 @@ export async function runAgent({
     }
   })
 
-  // ai@6: streamText is synchronous — result.textStream is a ReadableStream<string>
-  return createTextStreamResponse({ textStream: result.textStream })
+  // ai@6: return standard UI message stream protocol
+  return result.toUIMessageStreamResponse()
 }

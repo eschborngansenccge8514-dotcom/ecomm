@@ -12,6 +12,20 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/einvoices',
+        destination: '/einvoice',
+        permanent: true,
+      },
+      {
+        source: '/einvoices/:path*',
+        destination: '/einvoice/:path*',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

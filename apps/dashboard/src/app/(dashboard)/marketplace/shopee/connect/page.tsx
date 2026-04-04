@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
+import { invokeWorker } from '@/lib/worker'
 
 export default function ShopeeConnectPage() {
   const [loading, setLoading] = useState(false)
@@ -85,8 +86,8 @@ export default function ShopeeConnectPage() {
 
       if (configError) throw new Error(`Failed to save configuration: ${configError.message}`)
 
-      // 2. Call Edge Function to start OAuth
-      const { data, error: functionError } = await supabase.functions.invoke('shopee-auth-start', {
+      // 2. Call Worker to start OAuth
+      const { data, error: functionError } = await invokeWorker('shopee-auth-start', {
         body: { tenant_id: merchant.id }
       })
 

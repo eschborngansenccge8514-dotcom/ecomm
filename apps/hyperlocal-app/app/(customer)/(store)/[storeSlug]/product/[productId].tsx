@@ -8,8 +8,10 @@ import { useCartStore } from '@/stores/cartStore'
 import { VariantSelector } from '@/components/product/VariantSelector'
 import { Button } from '@/components/ui/Button'
 import { formatCurrency } from '@/lib/utils'
+import { isStoreOpen } from '@/lib/merchant-utils'
 import * as Haptics from 'expo-haptics'
 import Toast from 'react-native-toast-message'
+import type { ProductWithMerchant } from '@/services/products.service'
 
 export default function ProductDetailScreen() {
   const { productId } = useLocalSearchParams<{ productId: string }>()
@@ -19,7 +21,7 @@ export default function ProductDetailScreen() {
 
   const { data: product, isLoading } = useQuery({
     queryKey: ['product', productId],
-    queryFn:  () => productsService.getById(productId),
+    queryFn:  () => productsService.getById(productId) as Promise<ProductWithMerchant>,
   })
 
   if (isLoading || !product) return null
@@ -29,6 +31,17 @@ export default function ProductDetailScreen() {
   const requiresVariant = product.variants.length > 0 && !selectedVariant
 
   const handleAddToCart = async () => {
+    const { isOpen, nextStatusChange } = isStoreOpen(product.merchant)
+    
+    if (!isOpen) {
+      Alert.alert(
+        'Store Closed',
+        `This store is currently closed. It will reopen at ${nextStatusChange ?? 'its scheduled time'}. You can't add items to cart right now.`,
+        [{ text: 'OK' }]
+      )
+      return
+    }
+
     if (requiresVariant) {
       Toast.show({ type: 'error', text1: 'Please select a variant' })
       return

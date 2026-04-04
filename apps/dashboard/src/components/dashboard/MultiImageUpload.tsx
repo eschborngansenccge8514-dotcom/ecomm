@@ -58,19 +58,9 @@ export function MultiImageUpload({
     setImages(prev => [...prev, newImage])
 
     try {
+      const { uploadToR2 } = await import('@/lib/storage')
       const fileName = `${path}/${Date.now()}-${file.name}`
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        })
-
-      if (error) throw error
-
-      const { data: { publicUrl } } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(data.path)
+      const publicUrl = await uploadToR2(file, `${bucket}/${fileName}`)
 
       setImages(prev => prev.map(img =>
         img.id === id ? { ...img, url: publicUrl, status: 'complete', progress: 100 } : img

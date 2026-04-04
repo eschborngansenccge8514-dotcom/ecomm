@@ -1,13 +1,5 @@
-const nodemailer = require('nodemailer');
-
-const transporter = nodemailer.createTransport({
-  host:   process.env.SMTP_HOST,
-  port:   parseInt(process.env.SMTP_PORT) || 587,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+const config       = require('../config');
+const emailService = require('../services/email.service');
 
 /**
  * Send failure alert to ops team.
@@ -29,10 +21,24 @@ Action required: Review failed job in /admin/merchants/${merchantId}/dlq
 
   // Email ops team
   if (process.env.ALERT_TO) {
-    await transporter.sendMail({
-      from:    process.env.ALERT_FROM,
-      to:      process.env.ALERT_TO,
-      subject, text,
+    await emailService.sendMail({
+      from:       config.EMAIL.FROM,
+      to:         config.EMAIL.TO,
+      subject, 
+      text,
+      templateId: config.EMAIL.RESEND_ALERT_TID,
+      variables: {
+        alertType:    'Failure Alert',
+        merchantName: merchantName || merchantId,
+        merchantId:   merchantId,
+        jobId:        jobId,
+        jobType:      jobType,
+        orderNumber:  orderNumber || 'N/A',
+        error:        error,
+        attempts:     attempts,
+        time:         new Date().toISOString(),
+        actionUrl:    `${process.env.ADMIN_URL || '/admin'}/merchants/${merchantId}/dlq`
+      }
     }).catch(e => console.error('[Alert] Email failed:', e.message));
   }
 
@@ -73,10 +79,19 @@ Review at: ${process.env.ADMIN_URL || '/admin'}/dlq
   `.trim();
 
   if (process.env.ALERT_TO) {
-    await transporter.sendMail({
-      from: process.env.ALERT_FROM,
-      to:   process.env.ALERT_TO,
-      subject, text,
+    await emailService.sendMail({
+      from:       config.EMAIL.FROM,
+      to:         config.EMAIL.TO,
+      subject, 
+      text,
+      templateId: config.EMAIL.RESEND_ALERT_TID,
+      variables: {
+        alertType:    'Weekly DLQ Report',
+        totalFailed:  summary.totalFailed,
+        merchants:    summary.merchants,
+        time:         new Date().toISOString(),
+        actionUrl:    `${process.env.ADMIN_URL || '/admin'}/dlq`
+      }
     }).catch(e => console.error('[Alert] DLQ report email failed:', e.message));
   }
 

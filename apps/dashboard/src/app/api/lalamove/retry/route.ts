@@ -1,6 +1,6 @@
-
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { invokeWorkerServer } from '@/lib/worker-server'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -9,10 +9,10 @@ export async function POST(req: NextRequest) {
 
   const { orderId, merchantId } = await req.json()
   
-  const { data, error } = await supabase.functions.invoke('lalamove-retry-order', {
+  const { data, error } = await invokeWorkerServer('lalamove-retry-order', {
     body: { orderId, merchantId }
   })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (error) return NextResponse.json({ error: error.message || error.error || 'Retry failed' }, { status: 400 })
   return NextResponse.json(data)
 }

@@ -233,6 +233,8 @@ function PointsSection({ balance, settings, usePoints, setUsePoints, pointsToRed
 }
 
 // ─── Main screen ───────────────────────────────────────────────────────────────
+import { invokeWorker } from '@/lib/worker'
+
 export default function CheckoutScreen() {
   const insets  = useSafeAreaInsets()
   const { user } = useAuthStore()
@@ -361,7 +363,7 @@ export default function CheckoutScreen() {
 
       // ─── 3. Redeem points if selected ─────────────────────────────────────────
       if (usePoints && pointsToRedeem > 0 && user && pointsPreview) {
-        const { data: redeemData } = await supabase.functions.invoke('redeem-loyalty-points', {
+        const { data: redeemData } = await invokeWorker('redeem-loyalty-points', {
           body: {
             orderId,
             pointsToRedeem: pointsPreview.actualPoints,

@@ -13,12 +13,14 @@ import Animated, {
 import { BlurView } from 'expo-blur'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Linking, Alert } from 'react-native'
 
 import { merchantsService } from '@/services/merchants.service'
 import { productsService } from '@/services/products.service'
 import { ProductCard } from '@/components/product/ProductCard'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { formatCurrency } from '@/lib/utils'
+import { isStoreOpen, formatOperatingHour, getDayName } from '@/lib/merchant-utils'
 import type { ProductWithVariants } from '@/types/app.types'
 
 const AnimatedSectionList = createAnimatedComponent(SectionList)
@@ -58,6 +60,35 @@ export default function StoreScreen() {
       scrollY.value = event.contentOffset.y
     },
   })
+
+  const { isOpen, nextStatusChange } = merchant ? isStoreOpen(merchant) : { isOpen: true }
+  const activeAnnouncement = merchant?.announcements?.find(a => a.is_active)
+
+  const handleProductPress = (product: any) => {
+    if (!isOpen) {
+      Alert.alert(
+        'Store Closed',
+        `This store is currently closed. It will reopen at ${nextStatusChange ?? 'its scheduled time'}. You can still browse products, but ordering is disabled.`,
+        [{ text: 'OK' }]
+      )
+      return
+    }
+    router.push(`/(customer)/(store)/${storeSlug}/product/${product.id}`)
+  }
+
+  const handleCall = () => {
+    if (merchant?.phone) Linking.openURL(`tel:${merchant.phone}`)
+  }
+
+  const handleEmail = () => {
+    if (merchant?.email) Linking.openURL(`mailto:${merchant.email}`)
+  }
+
+  const handleGetDirections = () => {
+    const address = `${merchant?.address_line1}, ${merchant?.city}, ${merchant?.state}, ${merchant?.postcode}`
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+    Linking.openURL(url)
+  }
 
   // Animated Hooks
   const bannerStyle = useAnimatedStyle(() => {
@@ -128,17 +159,39 @@ export default function StoreScreen() {
                 />
                 <View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, { backgroundColor: 'rgba(0,0,0,0.3)' }]} />
               </Animated.View>
+
+              {/* Announcement Overlay if scroll is low */}
+              {activeAnnouncement && (
+                <View 
+                  className="absolute bottom-12 left-4 right-4 p-3 rounded-2xl flex-row items-center gap-3"
+                  style={{ backgroundColor: activeAnnouncement.bg_color + 'E6' }}
+                >
+                  <Ionicons name="megaphone" size={20} color={activeAnnouncement.text_color} />
+                  <Text className="flex-1 font-sans font-medium text-sm" style={{ color: activeAnnouncement.text_color }}>
+                    {activeAnnouncement.message}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Store Information Card overlapping the banner */}
             <View className="bg-white rounded-[32px] mx-4 pt-6 pb-8 px-6 -mt-10 border border-gray-100 shadow-sm" style={styles.shadowHeavy}>
               <View className="items-center -mt-16 mb-4">
-                <View className="bg-white p-1 rounded-[22px] shadow-sm border border-gray-100">
+                <View className="bg-white p-1 rounded-[22px] shadow-sm border border-gray-100 relative">
                   <Image
                     source={{ uri: merchant.logo_url ?? 'https://via.placeholder.com/100' }}
                     style={{ width: 80, height: 80, borderRadius: 18 }}
                     contentFit="cover"
                   />
+                  {/* Open/Closed Badge */}
+                  <View 
+                    style={{ position: 'absolute', bottom: -10, alignSelf: 'center' }}
+                    className={`px-3 py-1 rounded-full border-2 border-white shadow-sm ${isOpen ? 'bg-emerald-500' : 'bg-red-500'}`}
+                  >
+                    <Text className="text-white text-[10px] font-bold uppercase tracking-wider">
+                      {isOpen ? 'Open' : 'Closed'}
+                    </Text>
+                  </View>
                 </View>
               </View>
 
@@ -157,11 +210,22 @@ export default function StoreScreen() {
                 </View>
               </View>
               
-              <View className="flex-row items-center justify-center gap-6 py-4 border-t border-b border-gray-100 mb-2">
+              <View className="flex-row items-center justify-center gap-6 py-4 border-t border-b border-gray-100 mb-6">
                 <View className="items-center">
                   <Text className="text-xs text-gray-500 font-sans mb-0.5">Delivery Range</Text>
                   <Text className="text-sm font-bold font-sans text-gray-900">Up to {merchant.delivery_radius_km ?? 0} km</Text>
                 </View>
+                {(merchant.min_order_amount ?? 0) > 0 && (
+                  <>
+                    <View className="h-6 w-[1px] bg-gray-200" />
+                    <View className="items-center">
+                      <Text className="text-xs text-gray-500 font-sans mb-0.5">Min. Order</Text>
+                      <Text className="text-sm font-bold font-sans text-gray-900">
+                        {formatCurrency(merchant.min_order_amount!)}
+                      </Text>
+                    </View>
+                  </>
+                )}
                 <View className="h-6 w-[1px] bg-gray-200" />
                 <View className="items-center">
                   <Text className="text-xs text-gray-500 font-sans mb-0.5">Store Location</Text>
@@ -172,10 +236,68 @@ export default function StoreScreen() {
               </View>
 
               {merchant.description && (
-                <Text className="text-gray-600 text-sm mt-4 leading-relaxed font-sans text-center">
+                <Text className="text-gray-600 text-sm mb-6 leading-relaxed font-sans text-center">
                   {merchant.description}
                 </Text>
               )}
+
+              {/* Enhanced Info Section */}
+              <View className="bg-gray-50 rounded-2xl p-4 gap-4">
+                {/* Contact Row */}
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1 pr-4">
+                    <Text className="text-xs text-gray-500 font-sans uppercase font-bold tracking-wider mb-1">Contact Details</Text>
+                    <Text className="text-sm text-gray-900 font-sans" numberOfLines={1}>{merchant.phone || 'No phone set'}</Text>
+                    <Text className="text-sm text-gray-500 font-sans" numberOfLines={1}>{merchant.email || 'No email set'}</Text>
+                  </View>
+                  <View className="flex-row gap-2">
+                    {merchant.phone && (
+                      <TouchableOpacity onPress={handleCall} className="w-10 h-10 bg-white rounded-full items-center justify-center shadow-sm border border-gray-100">
+                        <Ionicons name="call" size={18} color="#2563eb" />
+                      </TouchableOpacity>
+                    )}
+                    {merchant.email && (
+                      <TouchableOpacity onPress={handleEmail} className="w-10 h-10 bg-white rounded-full items-center justify-center shadow-sm border border-gray-100">
+                        <Ionicons name="mail" size={18} color="#2563eb" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+
+                {/* Address Row */}
+                <View className="border-t border-gray-100 pt-4">
+                  <Text className="text-xs text-gray-500 font-sans uppercase font-bold tracking-wider mb-1">Physical Address</Text>
+                  <View className="flex-row items-start justify-between">
+                    <Text className="flex-1 text-sm text-gray-900 font-sans leading-5 pr-4">
+                      {merchant.address_line1 ? (
+                        `${merchant.address_line1}${merchant.address_line2 ? `, ${merchant.address_line2}` : ''}\n${merchant.postcode} ${merchant.city}, ${merchant.state}`
+                      ) : (
+                        'Address not available'
+                      )}
+                    </Text>
+                    <TouchableOpacity onPress={handleGetDirections} className="bg-primary-600 px-4 py-2 rounded-lg">
+                      <Text className="text-white text-xs font-bold">Directions</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Hours Row */}
+                {merchant.operating_hours && merchant.operating_hours.length > 0 && (
+                  <View className="border-t border-gray-100 pt-4">
+                    <Text className="text-xs text-gray-500 font-sans uppercase font-bold tracking-wider mb-2">Operating Hours</Text>
+                    {merchant.operating_hours.map((h) => (
+                      <View key={h.id} className="flex-row justify-between mb-1.5">
+                        <Text className={`text-xs font-sans ${h.day_of_week === new Date().getDay() ? 'font-bold text-gray-900' : 'text-gray-500'}`}>
+                          {getDayName(h.day_of_week)}
+                        </Text>
+                        <Text className={`text-xs font-sans ${h.day_of_week === new Date().getDay() ? 'font-bold text-gray-900' : 'text-gray-500'}`}>
+                          {formatOperatingHour(h)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
             </View>
           </View>
         )}
@@ -188,13 +310,29 @@ export default function StoreScreen() {
           <ProductCard
             product={item}
             index={index}
-            onPress={() => router.push(`/(customer)/(store)/${storeSlug}/product/${item.id}`)}
+            onPress={() => handleProductPress(item)}
           />
         )}
         stickySectionHeadersEnabled
         contentContainerStyle={{ paddingBottom: 100 }}
         refreshing={loadingProducts}
       />
+
+      {/* Floating Chat Button */}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => router.push({
+          pathname: '/(customer)/support',
+          params: { 
+            merchantId: merchant.owner_id, 
+            storeName: merchant.store_name 
+          }
+        })}
+        style={[styles.chatFAB, styles.shadowHeavy]}
+        className="bg-primary-600 w-14 h-14 rounded-full items-center justify-center absolute bottom-10 right-6 z-50 border-4 border-white"
+      >
+        <Ionicons name="chatbox-ellipses" size={24} color="#fff" />
+      </TouchableOpacity>
     </View>
   )
 }
@@ -218,5 +356,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 24,
     elevation: 10,
+  },
+  chatFAB: {
+    position: 'absolute',
+    bottom: 32,
+    right: 24,
+    shadowColor: '#2563eb',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    elevation: 8,
   }
 })

@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import toast from 'react-hot-toast'
+import { invokeWorker } from '@/lib/worker'
 
 export default function TikTokConnectPage() {
   const [loading, setLoading] = useState(false)
@@ -86,8 +87,8 @@ export default function TikTokConnectPage() {
 
       if (configError) throw new Error(`Failed to save configuration: ${configError.message}`)
 
-      // 2. Call Edge Function to start OAuth
-      const { data, error: functionError } = await supabase.functions.invoke('tiktok-auth-start', {
+      // 2. Call Worker to start OAuth
+      const { data, error: functionError } = await invokeWorker('tiktok-auth-start', {
         body: { 
           tenant_id: merchant.id,
           region: region

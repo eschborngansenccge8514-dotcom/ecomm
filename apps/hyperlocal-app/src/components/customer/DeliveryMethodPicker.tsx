@@ -146,6 +146,8 @@ function TabBtn({
 }
 
 // ─── Main component ────────────────────────────────────────────────────────────
+import { invokeWorker } from '@/lib/worker'
+
 export function DeliveryMethodPicker({
   merchantId, selectedAddress, cartSubtotal,
   totalWeightKg, selected, onSelect,
@@ -200,7 +202,7 @@ export function DeliveryMethodPicker({
     setIsInstantLoading(true)
     setInstError(null)
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('get-delivery-quotes', {
+      const { data, error: fnError } = await invokeWorker('get-delivery-quotes', {
         body: {
           mode: 'instant',
           merchantId,
@@ -236,7 +238,7 @@ export function DeliveryMethodPicker({
     setIsCourierLoading(true)
     setCourError(null)
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('get-delivery-quotes', {
+      const { data, error: fnError } = await invokeWorker('get-delivery-quotes', {
         body: {
           mode: 'courier',
           merchantId,

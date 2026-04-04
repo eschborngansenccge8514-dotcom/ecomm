@@ -93,4 +93,24 @@ module.exports = {
     ATTEMPTS: 5,
     BACKOFF_DELAY: 3000,
   },
+
+  // ── Email ─────────────────────────────────────────────────────────────────
+  EMAIL: {
+    SERVICE:              process.env.EMAIL_SERVICE || 'smtp', // smtp | resend
+    RESEND_API_KEY:       process.env.RESEND_API_KEY,
+    RESEND_INVOICE_TID:   process.env.RESEND_INVOICE_TEMPLATE_ID,
+    RESEND_ALERT_TID:     process.env.RESEND_ALERT_TEMPLATE_ID,
+    
+    // SMTP (Legacy fallback)
+    SMTP: {
+      HOST: process.env.SMTP_HOST,
+      PORT: parseInt(process.env.SMTP_PORT) || 587,
+      USER: process.env.SMTP_USER,
+      PASS: process.env.SMTP_PASS,
+    },
+    
+    // Alerts
+    FROM:  process.env.ALERT_FROM,
+    TO:    process.env.ALERT_TO,
+  }
 };

@@ -485,7 +485,7 @@ Deno.serve(async (req) => {
     let summary = ''
 
     const result = await streamText({
-      model: google('gemini-2.5-flash'),
+      model: google('gemini-3.1-flash-lite-preview'),
       system: buildScheduledRunSystemPrompt(merchantName, run_type),
       messages: [{ role: 'user', content: instruction }],
       tools,
@@ -808,7 +808,7 @@ export async function runAgent({ newMessage, merchantId, merchantName, sessionId
   ]
 
   const result = streamText({
-    model: google('gemini-2.5-flash', {
+    model: google('gemini-3.1-flash-lite-preview', {
       tools: [{ fileSearch: { fileSearchStoreNames: [process.env.GEMINI_FILE_SEARCH_STORE_ID!] } }]
     }),
     system:   buildSystemPrompt(merchantName) + memoryContext,

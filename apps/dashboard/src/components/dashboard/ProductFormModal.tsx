@@ -65,15 +65,11 @@ export function ProductFormModal({ merchantId, categories, product, storeType, o
     if (!files.length) return
     setUploading(true)
     try {
+      const { uploadToR2 } = await import('@/lib/storage')
       const urls: string[] = []
       for (const file of files.slice(0, 5 - images.length)) {
-        const ext  = file.name.split('.').pop()
-        const path = `${merchantId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-        const { error } = await supabase.storage
-          .from('product-images')
-          .upload(path, file, { cacheControl: '3600', upsert: false })
-        if (error) throw error
-        const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(path)
+        const path = `product-images/${merchantId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${file.name.split('.').pop()}`
+        const publicUrl = await uploadToR2(file, path)
         urls.push(publicUrl)
       }
       setImages(prev => [...prev, ...urls])

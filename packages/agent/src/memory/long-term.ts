@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import { google }       from '@ai-sdk/google'
-import { embed, generateText }        from 'ai'
+import { google } from '@ai-sdk/google'
+import { embed, generateText } from 'ai'
 
 function getAdmin() {
   return createClient(
@@ -11,8 +11,8 @@ function getAdmin() {
 
 export async function saveLongTermMemory(
   merchantId: string,
-  content:    string,
-  type:       'fact' | 'preference' | 'pattern'
+  content: string,
+  type: 'fact' | 'preference' | 'pattern'
 ) {
   const admin = getAdmin()
   const { embedding } = await embed({
@@ -25,8 +25,8 @@ export async function saveLongTermMemory(
 // NEW: Retrieve relevant memories for a given query
 export async function retrieveRelevantMemories(
   merchantId: string,
-  query:      string,
-  limit:      number = 5
+  query: string,
+  limit: number = 5
 ): Promise<string[]> {
   const admin = getAdmin()
 
@@ -38,7 +38,7 @@ export async function retrieveRelevantMemories(
   const { data } = await admin.rpc('match_agent_memory', {
     query_embedding: embedding,
     merchant_id_arg: merchantId,
-    match_count:     limit
+    match_count: limit
   })
 
   return (data ?? [])
@@ -53,7 +53,7 @@ export async function extractAndSaveMemories(
   assistantReply: string
 ) {
   const { text } = await generateText({
-    model: google('gemini-2.5-flash'),
+    model: google('gemini-3.1-flash-lite-preview'),
     prompt: `Extract any specific merchant preferences, reusable patterns, or key business facts from this turn.
 If nothing new or specific is found, return "NONE".
 Format each finding as a short bullet point.

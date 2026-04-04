@@ -2,7 +2,37 @@ import type { Database } from './supabase'
 
 // Convenience row type aliases
 export type Profile     = Database['public']['Tables']['profiles']['Row']
-export type Merchant    = Database['public']['Tables']['merchants']['Row']
+export type Merchant = Omit<Database['public']['Tables']['merchants']['Row'], 'operating_hours'> & {
+  average_rating?: number | null
+  review_count?:   number | null
+  operating_hours?: OperatingHour[]
+  announcements?:   Announcement[]
+}
+
+export type OperatingHour = {
+  id: string
+  merchant_id: string
+  day_of_week: number
+  open_time: string | null
+  close_time: string | null
+  is_closed: boolean
+}
+
+export type Announcement = {
+  id: string
+  merchant_id: string
+  message: string
+  type: 'info' | 'promo' | 'warning' | 'holiday'
+  bg_color: string
+  text_color: string
+  link_url: string | null
+  link_text: string | null
+  is_active: boolean
+  starts_at: string | null
+  ends_at: string | null
+  sort_order: number
+  created_at: string
+}
 export type Product     = Database['public']['Tables']['products']['Row']
 export type ProductVariant = Database['public']['Tables']['product_variants']['Row']
 export type Category    = Database['public']['Tables']['categories']['Row']

@@ -210,7 +210,7 @@ export class AgentTracer {
   constructor(
     private merchantId: string,
     private sessionId:  string,
-    private model:      string = 'gemini-2.5-flash',
+    private model:      string = 'gemini-3.1-flash-lite-preview',
     private runType:    string = 'chat'
   ) {
     this.startTime = Date.now()
@@ -282,7 +282,7 @@ export async function runAgent({ newMessage, merchantId, merchantName, sessionId
   let stepCount = 0
 
   const result = streamText({
-    model: google('gemini-2.5-flash', {
+    model: google('gemini-3.1-flash-lite-preview', {
       tools: [{ fileSearch: { fileSearchStoreNames: [process.env.GEMINI_FILE_SEARCH_STORE_ID!] } }]
     }),
     system:   buildSystemPrompt(merchantName) + memoryContext,
@@ -648,10 +648,10 @@ export async function POST(req: Request) {
     .single()
 
   const messages = await buildContextMessages(sessionId, user.id, newMessage)
-  const tracer   = new AgentTracer(user.id, sessionId, 'gemini-2.5-flash', 'hyperlocal')
+  const tracer   = new AgentTracer(user.id, sessionId, 'gemini-3.1-flash-lite-preview', 'hyperlocal')
 
   const result = streamText({
-    model:    google('gemini-2.5-flash'),
+    model:    google('gemini-3.1-flash-lite-preview'),
     system:   HYPERLOCAL_SYSTEM_PROMPT(profile?.business_name ?? 'Merchant'),
     messages,
     tools:    buildHyperlocalTools(user.id, sessionId),

@@ -1,5 +1,9 @@
 import { supabase } from '@/lib/supabase'
-import type { InsertProduct, ProductWithVariants, UpdateProduct } from '@/types/app.types'
+import type { InsertProduct, Merchant, ProductWithVariants, UpdateProduct } from '@/types/app.types'
+
+export type ProductWithMerchant = ProductWithVariants & {
+  merchant: Merchant
+}
 
 export const productsService = {
   // Get all products for a merchant (customer view — active only)
@@ -28,14 +32,19 @@ export const productsService = {
   },
 
   // Get single product
-  async getById(id: string): Promise<ProductWithVariants | null> {
+  async getById(id: string): Promise<ProductWithMerchant | null> {
     const { data, error } = await supabase
       .from('products')
-      .select('*, variants:product_variants(*), category:categories(*)')
+      .select(`
+        *,
+        variants:product_variants(*),
+        category:categories(*),
+        merchant:merchants(*, operating_hours:merchant_operating_hours(*))
+      `)
       .eq('id', id)
       .single()
     if (error) return null
-    return data as ProductWithVariants
+    return (data as any) as ProductWithMerchant
   },
 
   async create(payload: InsertProduct): Promise<ProductWithVariants> {

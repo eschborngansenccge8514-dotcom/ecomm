@@ -9,6 +9,8 @@ import { Truck, ExternalLink, Package, MapPin, Loader2, AlertCircle, AlertTriang
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 
+import { invokeWorker } from '@/lib/worker'
+
 const PROVIDER_LABELS: Record<string, string> = {
   lalamove:  '🏍️  Lalamove',
   easyparcel: '📦  EasyParcel',
@@ -19,7 +21,6 @@ export function DeliveryClient({ orders: initial, merchantId }: { orders: any[];
   const [orders, setOrders]   = useState(initial)
   const [activeTab, setActiveTab] = useState<'active' | 'exceptions'>('active')
   const [booking, setBooking] = useState<string | null>(null)
-  const supabase = createClient()
   const router = useRouter()
 
   // Sync state with server-side prop updates
@@ -41,7 +42,7 @@ export function DeliveryClient({ orders: initial, merchantId }: { orders: any[];
     }
     setBooking(order.id)
     try {
-      const { data, error } = await supabase.functions.invoke('lalamove-create-order', {
+      const { data, error } = await invokeWorker('lalamove-create-order', {
         body: {
           orderId:      order.id,
           quotationId:  order.delivery_quote_id,
@@ -62,7 +63,7 @@ export function DeliveryClient({ orders: initial, merchantId }: { orders: any[];
   const handleSyncEasyParcel = async (order: any) => {
     setBooking(order.id)
     try {
-      const { data, error } = await supabase.functions.invoke('easyparcel-sync-status', {
+      const { data, error } = await invokeWorker('easyparcel-sync-status', {
         body: { orderId: order.id },
       })
       if (error || data?.error) throw new Error(error?.message ?? data?.error)
@@ -77,7 +78,7 @@ export function DeliveryClient({ orders: initial, merchantId }: { orders: any[];
   const handleBookEasyParcel = async (order: any) => {
     setBooking(order.id)
     try {
-      const { data, error } = await supabase.functions.invoke('easyparcel-create-order', {
+      const { data, error } = await invokeWorker('easyparcel-create-order', {
         body: { orderId: order.id },
       })
       if (error || data?.error) throw new Error(data?.error || error?.message || 'Failed to book courier')
@@ -95,7 +96,7 @@ export function DeliveryClient({ orders: initial, merchantId }: { orders: any[];
     if (!confirm('Retry this Lalamove booking?')) return
     setBooking(orderId)
     try {
-      const { data, error } = await supabase.functions.invoke('lalamove-retry-order', {
+      const { data, error } = await invokeWorker('lalamove-retry-order', {
         body: { orderId }
       })
       if (error || data?.error) throw new Error(error?.message ?? data?.error)

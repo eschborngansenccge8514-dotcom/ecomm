@@ -1,23 +1,5 @@
-const nodemailer = require('nodemailer');
-
-// Transporter per merchant sender — cached to avoid recreating on every email
-const _transporters = new Map();
-
-function getTransporter() {
-  const key = `${process.env.SMTP_HOST}:${process.env.SMTP_PORT}`;
-  if (_transporters.has(key)) return _transporters.get(key);
-
-  const t = nodemailer.createTransport({
-    host:   process.env.SMTP_HOST,
-    port:   parseInt(process.env.SMTP_PORT) || 587,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-  _transporters.set(key, t);
-  return t;
-}
+const config       = require('../config');
+const emailService = require('../services/email.service');
 
 /**
  * Send invoice confirmation email to customer.
@@ -34,10 +16,22 @@ async function sendInvoiceEmail(merchant, { customerEmail, customerName, orderNu
   };
   const label = typeLabels[invoiceType] || 'e-Invoice';
 
-  await getTransporter().sendMail({
-    from:    `"${merchant.name}" <${merchant.email || process.env.SMTP_USER}>`,
-    to:      customerEmail,
-    subject: `Your ${label} for Order #${orderNumber} — ${merchant.name}`,
+  const subject = `Your ${label} for Order #${orderNumber} — ${merchant.name}`;
+
+  await emailService.sendMail({
+    from:       `"${merchant.name}" <${merchant.email || process.env.SMTP_USER}>`,
+    to:         customerEmail,
+    subject:    subject,
+    templateId: config.EMAIL.RESEND_INVOICE_TID,
+    variables: {
+      merchantName: merchant.name,
+      merchantTin:  merchant.tin,
+      customerName: customerName || 'Valued Customer',
+      orderNumber:  orderNumber,
+      qrCodeUrl:    qrCodeUrl,
+      uuid:         uuid,
+      documentType: label,
+    },
     html: `
       <!DOCTYPE html>
       <html>

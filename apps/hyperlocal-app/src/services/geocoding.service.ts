@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { invokeWorker } from '@/lib/worker'
 
 function buildAddressString(parts: {
   line1: string; line2?: string | null
@@ -29,7 +29,7 @@ export const geocodingService = {
         state:   address.state,
         postcode: address.postcode,
       })
-      const { data, error } = await supabase.functions.invoke('geocode-address', {
+      const { data, error } = await invokeWorker('geocode-address', {
         body: { type: 'address', id: addressId, addressString },
       })
       if (error || data?.error) {
@@ -54,7 +54,7 @@ export const geocodingService = {
         state:    address.state,
         postcode: address.postcode,
       })
-      const { data, error } = await supabase.functions.invoke('geocode-address', {
+      const { data, error } = await invokeWorker('geocode-address', {
         body: { type: 'merchant', id: merchantId, addressString },
       })
       if (error || data?.error) {

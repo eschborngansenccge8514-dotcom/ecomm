@@ -588,7 +588,7 @@ export async function runAgent({
   const tools = buildTools(merchantId, sessionId)
 
   const result = streamText({
-    model: google('gemini-2.5-flash', {
+    model: google('gemini-3.1-flash-lite-preview', {
       // Gemini File Search store for LHDN regulatory knowledge
       tools: [{
         fileSearch: {

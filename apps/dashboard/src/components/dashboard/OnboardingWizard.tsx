@@ -155,10 +155,13 @@ export function OnboardingWizard({ merchant }: { merchant: any }) {
                          <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={async (e) => {
                             const file = e.target.files?.[0]
                             if (!file) return
-                            const { data, error } = await supabase.storage.from('merchant-assets').upload(`${merchant.id}/logos/${Date.now()}-${file.name}`, file)
-                            if (error) { toast.error(error.message); return }
-                            const { data: { publicUrl } } = supabase.storage.from('merchant-assets').getPublicUrl(data.path)
-                            setAppearance((p: any) => ({ ...p, logoUrl: publicUrl }))
+                            try {
+                              const { uploadToR2 } = await import('@/lib/storage')
+                              const publicUrl = await uploadToR2(file, `merchant-assets/${merchant.id}/logos/${Date.now()}-${file.name}`)
+                              setAppearance((p: any) => ({ ...p, logoUrl: publicUrl }))
+                            } catch (err: any) {
+                              toast.error(err.message)
+                            }
                          }} />
                        </div>
                        <div className="flex-1 space-y-2">
@@ -198,10 +201,13 @@ export function OnboardingWizard({ merchant }: { merchant: any }) {
                           <input type="file" className="hidden" onChange={async (e) => {
                              const file = e.target.files?.[0]
                              if (!file) return
-                             const { data, error } = await supabase.storage.from('merchant-assets').upload(`${merchant.id}/banners/${Date.now()}-${file.name}`, file)
-                             if (error) { toast.error(error.message); return }
-                             const { data: { publicUrl } } = supabase.storage.from('merchant-assets').getPublicUrl(data.path)
-                             setAppearance((p: any) => ({ ...p, bannerUrl: publicUrl }))
+                             try {
+                               const { uploadToR2 } = await import('@/lib/storage')
+                               const publicUrl = await uploadToR2(file, `merchant-assets/${merchant.id}/banners/${Date.now()}-${file.name}`)
+                               setAppearance((p: any) => ({ ...p, bannerUrl: publicUrl }))
+                             } catch (err: any) {
+                               toast.error(err.message)
+                             }
                           }} />
                           <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-[10px] font-bold text-gray-900 border border-white">CHANGE BANNER</div>
                        </label>

@@ -16,19 +16,25 @@ export const merchantsService = {
 
     const { data, error } = await query
     if (error) throw error
-    return data ?? []
+    return (data as any) as Merchant[]
   },
 
   // Get a single store by slug (for store detail page)
   async getBySlug(slug: string): Promise<Merchant | null> {
     const { data, error } = await supabase
       .from('merchants')
-      .select('*, average_rating, review_count')
+      .select(`
+        *,
+        average_rating,
+        review_count,
+        operating_hours:merchant_operating_hours(*),
+        announcements:store_announcements(*)
+      `)
       .eq('store_slug', slug)
       .eq('status', 'active')
       .maybeSingle()
     if (error) return null
-    return data
+    return (data as any) as Merchant
   },
 
   // Merchant self-registration
@@ -39,7 +45,7 @@ export const merchantsService = {
       .select()
       .single()
     if (error) throw error
-    return data
+    return (data as any) as Merchant
   },
 
   // Update merchant profile
@@ -51,7 +57,7 @@ export const merchantsService = {
       .select()
       .single()
     if (error) throw error
-    return data
+    return (data as any) as Merchant
   },
 
   // Check if slug is available

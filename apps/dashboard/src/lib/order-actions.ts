@@ -248,12 +248,13 @@ export async function bulkUpdateOrderStatus(orderIds: string[], newStatus: strin
   if (error) throw error
   return data
 }
+import { invokeWorker } from './worker'
+
 /**
  * Invokes Lalamove order creation
  */
 export async function bookLalamoveOrder(orderId: string) {
-  const supabase = createClient()
-  const { data, error } = await supabase.functions.invoke('lalamove-create-order', {
+  const { data, error } = await invokeWorker('lalamove-create-order', {
     body: { orderId }
   })
   if (error) throw error
@@ -264,8 +265,7 @@ export async function bookLalamoveOrder(orderId: string) {
  * Invokes Lalamove order cancellation
  */
 export async function cancelLalamoveOrder(orderId: string) {
-  const supabase = createClient()
-  const { data, error } = await supabase.functions.invoke('lalamove-cancel', {
+  const { data, error } = await invokeWorker('lalamove-cancel', {
     body: { orderId }
   })
   if (error) throw error
@@ -276,8 +276,7 @@ export async function cancelLalamoveOrder(orderId: string) {
  * Syncs Lalamove status
  */
 export async function syncLalamoveStatus(orderId: string) {
-  const supabase = createClient()
-  const { data, error } = await supabase.functions.invoke('lalamove-get-order-status', {
+  const { data, error } = await invokeWorker('lalamove-get-order-status', {
     body: { orderId }
   })
   if (error) throw error
@@ -288,8 +287,7 @@ export async function syncLalamoveStatus(orderId: string) {
  * Syncs EasyParcel order status
  */
 export async function syncEasyParcelStatus(orderId: string) {
-  const supabase = createClient()
-  const { data, error } = await supabase.functions.invoke('easyparcel-sync-order-status', {
+  const { data, error } = await invokeWorker('easyparcel-sync-order-status', {
     body: { order_id: orderId }
   })
   if (error) throw error
@@ -300,8 +298,7 @@ export async function syncEasyParcelStatus(orderId: string) {
  * Fetches EasyParcel delivery quotes/rates
  */
 export async function getEasyParcelRates(orderId: string) {
-  const supabase = createClient()
-  const { data, error } = await supabase.functions.invoke('get-delivery-quotes', {
+  const { data, error } = await invokeWorker('get-delivery-quotes', {
     body: { orderId }
   })
   if (error) throw error

@@ -2,6 +2,7 @@ import { runAgent, checkRateLimit, createSession } from '@project1/agent'
 import { getAuthContext } from '@/lib/utils.server'
 
 export const maxDuration = 60
+export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
   // Authenticate from Supabase session cookie
@@ -27,22 +28,19 @@ export async function POST(req: Request) {
     )
   }
 
-  // Use a virtual merchant ID for admins if needed, but normally they should have a merchant context or be restricted
-  const effectiveMerchantId = merchant?.id || (isAdmin ? 'admin' : null)
-  if (!effectiveMerchantId) return new Response('Unauthorized', { status: 401 })
-
   const body = await req.json()
-  const { sessionId: existingSessionId, messages } = body
+  const { sessionId: existingSessionId, messages, merchantId: bodyMerchantId } = body
+
+  // Use a virtual merchant ID for admins if needed, but normally they should have a merchant context or be restricted
+  // If admin, prioritize merchantId from body (so they can scope the chat)
+  const effectiveMerchantId = merchant?.id || bodyMerchantId || (isAdmin ? 'admin' : null)
+  if (!effectiveMerchantId) return new Response('Unauthorized', { status: 401 })
   let newMessage = body.newMessage
 
-  // If using standard useChat append/handleSubmit, the message is in the last index of 'messages'
-  if (messages && Array.isArray(messages) && messages.length > 0) {
-    newMessage = messages[messages.length - 1].content
-  }
-
-  console.log(`[API] Agent Chat: session=${existingSessionId} user=${user.id} merchant=${effectiveMerchantId} msg=${newMessage?.slice(0, 50)}...`)
-
+  // Ensure standard extraction
   if (!newMessage?.trim()) return new Response('Empty message', { status: 400 })
+  
+  console.log(`[API] Agent Chat: session=${existingSessionId} user=${user.id} merchant=${effectiveMerchantId} msg=${newMessage?.slice(0, 50)}...`)
 
   // Get or create session - MUST USE user.id for merchant_id column in database (FK says so)
   const sessionId = existingSessionId
@@ -59,6 +57,7 @@ export async function POST(req: Request) {
 
     response.headers.set('x-session-id', sessionId)
     response.headers.set('Access-Control-Expose-Headers', 'x-session-id')
+    response.headers.set('X-Accel-Buffering', 'no') // Disable proxy buffering
     return response
   } catch (err: any) {
     console.error('[API] Agent Error:', err)

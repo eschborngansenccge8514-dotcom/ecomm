@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { invokeWorkerServer } from '@/lib/worker-server'
 
 export async function POST(req: Request) {
   try {
@@ -20,12 +21,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Merchant not found' }, { status: 404 })
     }
 
-    // Call the Consolidated E-Invoice Edge Function
+    // Call the Consolidated E-Invoice Worker Route
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth() + 1; // 1-indexed
 
-    const { data: result, error: invokeError } = await supabase.functions.invoke('einvoice-consolidate-v3', {
+    const { data: result, error: invokeError } = await invokeWorkerServer('einvoice-consolidate', {
       body: { 
         merchant_id: merchant.id,
         year,
@@ -34,8 +35,8 @@ export async function POST(req: Request) {
     });
 
     if (invokeError) {
-      console.error('Edge Function Invoke Error:', invokeError);
-      return NextResponse.json({ error: (invokeError as any).error || invokeError.message || 'Failed to trigger consolidation' }, { status: 400 });
+      console.error('Worker Invoke Error:', invokeError);
+      return NextResponse.json({ error: invokeError.error || invokeError.message || 'Failed to trigger consolidation' }, { status: 400 });
     }
 
     if (result && result.success === false) {

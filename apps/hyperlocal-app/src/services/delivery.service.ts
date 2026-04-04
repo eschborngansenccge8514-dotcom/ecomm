@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { invokeWorker } from '@/lib/worker'
 
 export type LalamoveQuote = {
   serviceType:   string
@@ -37,28 +37,28 @@ function check(data: any, error: any) {
 
 export const deliveryService = {
   getLalamoveQuotes: async (orderId: string): Promise<LalamoveQuote[]> => {
-    const { data, error } = await supabase.functions.invoke('lalamove-quote', {
+    const { data, error } = await invokeWorker('lalamove-quote', {
       body: { orderId },
     })
     return check(data, error).quotes ?? []
   },
 
   bookLalamove: async (orderId: string, quotationId: string, serviceType: string) => {
-    const { data, error } = await supabase.functions.invoke('lalamove-create-order', {
+    const { data, error } = await invokeWorker('lalamove-create-order', {
       body: { orderId, quotationId, serviceType },
     })
     return check(data, error) as { success: boolean; lalamoveOrderId: string }
   },
 
   getEasyParcelRates: async (orderId: string): Promise<{ rates: EasyParcelRate[]; weightKg: number }> => {
-    const { data, error } = await supabase.functions.invoke('easyparcel-rate-check', {
+    const { data, error } = await invokeWorker('easyparcel-rate-check', {
       body: { orderId },
     })
     return check(data, error)
   },
 
   bookEasyParcel: async (orderId: string, serviceId: string, weightKg: number) => {
-    const { data, error } = await supabase.functions.invoke('easyparcel-create-order', {
+    const { data, error } = await invokeWorker('easyparcel-create-order', {
       body: { orderId, serviceId, weightKg },
     })
     return check(data, error) as { success: boolean; orderNo: string; awb: string; trackingUrl: string }

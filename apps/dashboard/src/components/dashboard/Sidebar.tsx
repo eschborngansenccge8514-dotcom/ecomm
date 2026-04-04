@@ -22,7 +22,10 @@ import {
   PieChart,
   Palette,
   Box,
-  ShieldAlert
+  ShieldAlert,
+  Headphones,
+  Monitor,
+  ArrowUpRight
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -31,6 +34,7 @@ import { ApprovalsBadge } from '@/components/nav/ApprovalsBadge'
 
 const NAV = [
   { href: '/agent',       label: 'MerchantMind', icon: Zap             },
+  { href: '/pos',         label: 'Web POS',      icon: Monitor         },
   { href: '/operations',  label: 'Operations',  icon: LayoutDashboard },
   { href: '/orders',      label: 'Orders',      icon: ShoppingBag     },
   { href: '/agent/approvals', label: 'Approvals', icon: ShieldAlert, badge: <ApprovalsBadge /> },
@@ -42,7 +46,9 @@ const NAV = [
   { href: '/loyalty',     label: 'Loyalty',     icon: Star            },
   { href: '/shipping/easyparcel', label: 'EasyParcel', icon: Box        },
   { href: '/shipping/lalamove',   label: 'Lalamove',   icon: Zap        },
-  { href: '/einvoices',   label: 'E-Invoicing', icon: FileCheck       },
+  { href: '/einvoice',   label: 'E-Invoicing', icon: FileCheck       },
+  { href: '/support/inbox', label: 'Support Inbox', icon: Headphones   },
+  { href: '/support/settings', label: 'Support Setup', icon: Headphones },
   { href: '/marketplace', label: 'Marketplace', icon: Store           },
   { href: '/payment-exceptions', label: 'Payment Errors', icon: AlertCircle },
   { href: '/settings/store', label: 'Store Theme', icon: Palette       },
@@ -95,26 +101,16 @@ export function Sidebar({ merchant, profile }: { merchant: any; profile: any }) 
       {/* Nav links */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         {isAdmin && (
-          <div className="mb-4">
-            <p className="px-3 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              Administration
-            </p>
-            {ADMIN_NAV.map(({ href, label, icon: Icon }) => {
-              const active = pathname.startsWith(href)
-              return (
-                <Link key={href} href={href}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
-                    active
-                      ? 'bg-purple-50 text-purple-600'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  )}
-                >
-                  <Icon size={18} />
-                  {label}
-                </Link>
-              )
-            })}
+          <div className="mb-6 px-1">
+            <Link href="/admin"
+              className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-all shadow-sm"
+            >
+              <div className="flex items-center gap-2">
+                <ShieldAlert size={16} className="text-purple-400" />
+                <span>Admin Dashboard</span>
+              </div>
+              <ArrowUpRight size={14} className="text-slate-500" />
+            </Link>
           </div>
         )}
 

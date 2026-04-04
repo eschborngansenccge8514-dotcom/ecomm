@@ -7,11 +7,14 @@
   ],
   "devDependencies": {
     "@types/node": "^20.19.37",
+    "@types/uuid": "^11.0.0",
     "supabase": "^2.84.4",
     "tsx": "^4.21.0"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.51",
-    "ai": "^6.0.0"
+    "@ai-sdk/react": "^3.0.147",
+    "ai": "^6.0.0",
+    "react-native-sse": "^1.2.1"
   }
 }

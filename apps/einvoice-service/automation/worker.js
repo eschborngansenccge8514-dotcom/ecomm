@@ -66,7 +66,8 @@ const worker = new Worker('einvoice', async (job) => {
       throw new Error(`[Worker] Unknown job type: ${jobType}`);
   }
 
-  // ── Email customer (skip for consolidated — no individual buyer) ──────
+  // ── Email customer (Moved to Cloudflare Worker status polling for automation) ──
+  /*
   if (jobType !== 'consolidated' && data.buyer?.email) {
     await sendInvoiceEmail(merchant, {
       customerEmail: data.buyer.email,
@@ -79,6 +80,7 @@ const worker = new Worker('einvoice', async (job) => {
       console.error(`[Worker] Email failed for ${data.orderNumber}: ${err.message}`)
     );
   }
+  */
 
   console.log(`[Worker] ✅ Done — merchant="${merchantId}" uuid="${result.uuid}"`);
   return result;

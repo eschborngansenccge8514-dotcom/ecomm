@@ -99,19 +99,40 @@ function OrderCard({ order, onPress }: { order: any; onPress: () => void }) {
         {order.items?.map((i: any) => `${i.product_name} ×${i.quantity}`).join(', ') ?? 'Items'}
       </Text>
 
-      {/* Bottom row: total + order number */}
-      <View className="flex-row justify-between items-center mt-3">
+      {/* Bottom row: total + order number + Chat */}
+      <View className="flex-row justify-between items-end mt-3">
         <View>
           <Text className="text-gray-400 text-xs">{order.order_number}</Text>
           <Text className="text-gray-400 text-xs">{itemCount} item{itemCount !== 1 ? 's' : ''}</Text>
         </View>
-        <View className="items-end">
-          <Text className="text-primary-600 font-bold text-base">
-            {formatCurrency(Number(order.total_amount))}
-          </Text>
-          <View className="flex-row items-center gap-1">
-            <Text className="text-gray-400 text-xs">View details</Text>
-            <Ionicons name="chevron-forward" size={12} color="#9ca3af" />
+        
+        <View className="flex-row items-center gap-3">
+          <TouchableOpacity
+            onPress={(e) => {
+              e.stopPropagation()
+              router.push({
+                pathname: '/(customer)/support',
+                params: { 
+                  merchantId: order.merchant?.owner_id, 
+                  storeName: order.merchant?.store_name,
+                  orderId: order.id,
+                }
+              })
+            }}
+            className="flex-row items-center gap-1.5 bg-primary-50 px-3 py-1.5 rounded-lg"
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={14} color="#2563eb" />
+            <Text className="text-primary-600 font-bold text-xs">Ask AI</Text>
+          </TouchableOpacity>
+
+          <View className="items-end">
+            <Text className="text-primary-600 font-bold text-base">
+              {formatCurrency(Number(order.total_amount))}
+            </Text>
+            <View className="flex-row items-center gap-1">
+              <Text className="text-gray-400 text-xs">View details</Text>
+              <Ionicons name="chevron-forward" size={12} color="#9ca3af" />
+            </View>
           </View>
         </View>
       </View>

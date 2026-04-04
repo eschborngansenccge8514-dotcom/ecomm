@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import toast from 'react-hot-toast'
+import { invokeWorker } from '@/lib/worker'
 
 const LAZADA_REGIONS = [
   { id: 'MY', name: 'Malaysia', flag: '🇲🇾' },
@@ -95,8 +96,8 @@ export default function LazadaConnectPage() {
 
       if (configError) throw new Error(`Failed to save configuration: ${configError.message}`)
 
-      // 2. Call Edge Function to start OAuth
-      const { data, error: functionError } = await supabase.functions.invoke('lazada-auth-start', {
+      // 2. Call Worker to start OAuth
+      const { data, error: functionError } = await invokeWorker('lazada-auth-start', {
         body: { 
           tenant_id: merchant.id,
           region: selectedRegion

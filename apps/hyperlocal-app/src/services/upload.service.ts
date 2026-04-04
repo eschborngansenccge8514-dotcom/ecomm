@@ -3,46 +3,62 @@ import * as FileSystem from 'expo-file-system'
 import { Platform } from 'react-native'
 import { decode } from 'base64-arraybuffer'
 
-type BucketName = 'avatars' | 'merchant-assets' | 'product-images' | 'review-images'
+const WORKER_URL = process.env.EXPO_PUBLIC_WORKER_URL!
 
 export const uploadService = {
   async uploadImage(
-    bucket: BucketName,
+    bucket: string,
     folder: string,
     localUri: string,
     fileName?: string
   ): Promise<string> {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) throw new Error('Not authenticated')
+
     const name = fileName ?? `${Date.now()}.jpg`
-    const path = `${folder}/${name}`
+    const path = `${bucket}/${folder}/${name}`
 
-    let body: ArrayBuffer
-
+    const formData = new FormData()
+    
     if (Platform.OS === 'web') {
       const response = await fetch(localUri)
-      body = await response.arrayBuffer()
+      const blob = await response.blob()
+      formData.append('file', blob, name)
     } else {
-      // Native read as base64
+      // Native read as base64 and convert to blob-like object for FormData
       const base64 = await FileSystem.readAsStringAsync(localUri, {
         encoding: 'base64',
       })
-      body = decode(base64)
+      // In React Native, we can use an object with uri, type, and name
+      // @ts-ignore
+      formData.append('file', {
+        uri: localUri,
+        type: 'image/jpeg',
+        name: name,
+      })
+    }
+    
+    formData.append('path', path)
+
+    const response = await fetch(`${WORKER_URL}/storage/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const error = await response.json() as any
+      throw new Error(error.error || 'Upload failed')
     }
 
-    const { error } = await supabase.storage
-      .from(bucket)
-      .upload(path, body, {
-        contentType: 'image/jpeg',
-        upsert: true,
-      })
-
-    if (error) throw error
-
-    const { data } = supabase.storage.from(bucket).getPublicUrl(path)
-    return data.publicUrl
+    const { url } = await response.json() as any
+    return url
   },
 
-  getPublicUrl(bucket: BucketName, path: string): string {
-    const { data } = supabase.storage.from(bucket).getPublicUrl(path)
-    return data.publicUrl
+  getPublicUrl(bucket: string, path: string): string {
+    // For R2, the public URL is served via the worker
+    return `${WORKER_URL}/storage/${bucket}/${path}`
   },
 }

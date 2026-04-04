@@ -12,6 +12,7 @@ import {
   Eye, EyeOff, Copy, CheckCircle2, XCircle,
   Loader2, ExternalLink, AlertTriangle, RefreshCw,
 } from 'lucide-react'
+import { invokeWorker } from '@/lib/worker'
 
 // ─── Reference data ────────────────────────────────────────────────────────
 
@@ -98,7 +99,7 @@ export function LalamoveSettings({ config: initial, merchantId }: {
   const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
 
   // Webhook URL — the endpoint Lalamove calls
-  const webhookUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/lalamove-webhook`
+  const webhookUrl = `https://functions-worker.jjooi1707.workers.dev/webhooks/lalamove`
 
   const handleCopyWebhook = () => {
     navigator.clipboard.writeText(webhookUrl)
@@ -115,7 +116,7 @@ export function LalamoveSettings({ config: initial, merchantId }: {
     setTesting(true)
     setTestResult(null)
 
-    const { data, error } = await supabase.functions.invoke('lalamove-test-connection', {
+    const { data, error } = await invokeWorker('lalamove-test-connection', {
       body: {
         merchantId,
         apiKey:      form.api_key,

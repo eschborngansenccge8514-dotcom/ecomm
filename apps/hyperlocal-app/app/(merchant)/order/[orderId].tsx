@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import Toast from 'react-native-toast-message'
 import { DeliveryBookingSheet } from '@/components/merchant/DeliveryBookingSheet'
+import { invokeWorker } from '@/lib/worker'
 
 // Merchant-facing status flow — only forward transitions are allowed
 const NEXT_ACTIONS: Record<string, { label: string; nextStatus: string; color: string; icon: keyof typeof Ionicons.glyphMap }[]> = {
@@ -114,9 +115,9 @@ export default function MerchantOrderDetailScreen() {
 
       // Auto-book Lalamove if confirmed
       if (nextStatus === 'confirmed' && order.delivery_provider === 'lalamove') {
-        supabase.functions.invoke('lalamove-create-order', {
+        invokeWorker('lalamove-create-order', {
           body: { orderId },
-        }).then(({ data, error: fErr }) => {
+        }).then(({ data, error: fErr }: any) => {
           if (fErr || data?.error) {
             const msg = data?.error || fErr?.message || 'Unknown error'
             console.error('[Lalamove] Auto-booking failed:', msg)
@@ -132,9 +133,9 @@ export default function MerchantOrderDetailScreen() {
 
       // Award loyalty points if delivered
       if (nextStatus === 'delivered') {
-        supabase.functions.invoke('award-loyalty-points', {
+        invokeWorker('award-loyalty-points', {
           body: { orderId },
-        }).then(({ data, error: fErr }) => {
+        }).then(({ data, error: fErr }: any) => {
           if (fErr) console.warn('[Loyalty] Award failed:', fErr)
           else if (data?.pointsAwarded > 0) {
             Toast.show({
