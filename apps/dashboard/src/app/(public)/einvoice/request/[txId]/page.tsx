@@ -16,8 +16,13 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'react-hot-toast'
+import { cn } from '@/lib/utils'
 
 type IdType = 'BRN' | 'MyKad' | 'Passport'
+
+const TIN_REGEX = /^(IG|C|OG|TA|NR|EI|F|SG)[0-9]{10,12}$/
+const NRIC_REGEX = /^[0-9]{12}$/
+const GENERAL_TIN = 'EI00000000010'
 
 export default function EinvoiceRequestPage() {
   const params = useParams()
@@ -30,11 +35,62 @@ export default function EinvoiceRequestPage() {
   const [formData, setFormData] = useState({
     name: '',
     tin: '',
+    email: '',
     idType: 'BRN' as IdType,
     idNumber: '',
-    email: '',
     address: ''
   })
+
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const validate = () => {
+    const newErrors: Record<string, string> = {}
+    
+    // Clean data first
+    const cleanTin = formData.tin.trim().toUpperCase().replace(/[\s-]/g, '')
+    const cleanId = formData.idNumber.trim().toUpperCase().replace(/[\s-]/g, '')
+
+    if (cleanTin !== GENERAL_TIN) {
+      if (!TIN_REGEX.test(cleanTin)) {
+        newErrors.tin = 'Invalid TIN format. Must start with prefix (e.g., IG, C) followed by 10-12 digits.'
+      }
+    }
+
+    if (formData.idType === 'MyKad') {
+      if (!NRIC_REGEX.test(cleanId)) {
+        newErrors.idNumber = 'MyKad must be exactly 12 digits (no dashes).'
+      }
+    } else if (formData.idType === 'BRN' && cleanId.length < 5) {
+      newErrors.idNumber = 'Invalid BRN format.'
+    }
+
+    if (!formData.name.trim()) newErrors.name = 'Full name is required.'
+    if (!formData.address.trim()) newErrors.address = 'Address is required.'
+    
+    if (formData.email.trim()) {
+       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+          newErrors.email = 'Invalid email address format.'
+       }
+    } else {
+       newErrors.email = 'Email address is required for LHDN submission.'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleGeneralPublic = () => {
+    setFormData({
+      ...formData,
+      name: 'GENERAL PUBLIC',
+      tin: GENERAL_TIN,
+      email: 'customer@example.com',
+      idType: 'MyKad',
+      idNumber: 'NA',
+      address: 'N/A'
+    })
+    setErrors({})
+  }
 
   useEffect(() => {
     async function fetchTx() {
@@ -57,19 +113,27 @@ export default function EinvoiceRequestPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!validate()) {
+      toast.error('Please fix the errors in the form.')
+      return
+    }
+    
     setIsSubmitting(true)
+
+    const cleanTin = formData.tin.trim().toUpperCase().replace(/[\s-]/g, '')
+    const cleanId = formData.idNumber.trim().toUpperCase().replace(/[\s-]/g, '')
 
     const supabase = createClient()
     const { error } = await supabase
       .from('pos_einvoice_requests')
       .insert({
         transaction_id: txId,
-        customer_name: formData.name,
-        customer_tin: formData.tin,
+        customer_name: formData.name.trim().toUpperCase(),
+        customer_tin: cleanTin,
         customer_id_type: formData.idType,
-        customer_id_number: formData.idNumber,
-        customer_email: formData.email,
-        customer_address: formData.address
+        customer_id_number: cleanId,
+        customer_email: formData.email.trim(),
+        customer_address: formData.address.trim()
       })
 
     if (error) {
@@ -111,7 +175,7 @@ export default function EinvoiceRequestPage() {
         <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Thank You!</h2>
         <p className="text-slate-500 max-w-xs mx-auto">
           Your e-invoice request for **{txn.merchants?.store_name}** has been received. 
-          The validated e-invoice will be sent to **{formData.email}**.
+          The merchant will process your validation accordingly.
         </p>
       </div>
       <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm w-full max-w-xs">
@@ -157,8 +221,45 @@ export default function EinvoiceRequestPage() {
                 placeholder="e.g. ADAM BIN GANI"
                 value={formData.name}
                 onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})}
-                className="w-full h-14 px-5 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-900/5 focus:border-slate-900 font-bold transition-all"
+                className={cn(
+                  "w-full h-14 px-5 rounded-2xl bg-slate-50 border focus:outline-none focus:ring-4 focus:ring-slate-900/5 focus:border-slate-900 font-bold transition-all",
+                  errors.name ? "border-red-500 bg-red-50" : "border-slate-100"
+                )}
               />
+              {errors.name && <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-widest">{errors.name}</p>}
+            </div>
+
+            <div className="flex gap-2">
+               <button 
+                 type="button"
+                 onClick={handleGeneralPublic}
+                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+               >
+                 Individual / General Public? (Quick Fill)
+               </button>
+            </div>
+
+            {/* Email Address */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <Mail size={14} className="text-slate-300" />
+                Email Address
+              </label>
+              <input 
+                required
+                type="email"
+                placeholder="e.g. adam@example.com"
+                value={formData.email}
+                onChange={e => {
+                  setFormData({...formData, email: e.target.value})
+                  if (errors.email) setErrors({...errors, email: ''})
+                }}
+                className={cn(
+                  "w-full h-14 px-5 rounded-2xl bg-slate-50 border focus:outline-none focus:ring-4 focus:ring-slate-900/5 focus:border-slate-900 font-bold transition-all",
+                  errors.email ? "border-red-500 bg-red-50" : "border-slate-100"
+                )}
+              />
+              {errors.email && <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-widest">{errors.email}</p>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -173,31 +274,20 @@ export default function EinvoiceRequestPage() {
                   type="text"
                   placeholder="e.g. IG23456789"
                   value={formData.tin}
-                  onChange={e => setFormData({...formData, tin: e.target.value.toUpperCase()})}
-                  className="w-full h-14 px-5 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-900/5 focus:border-slate-900 font-bold transition-all"
+                  onChange={e => {
+                    setFormData({...formData, tin: e.target.value.toUpperCase()})
+                    if (errors.tin) setErrors({...errors, tin: ''})
+                  }}
+                  className={cn(
+                    "w-full h-14 px-5 rounded-2xl bg-slate-50 border focus:outline-none focus:ring-4 focus:ring-slate-900/5 focus:border-slate-900 font-bold transition-all",
+                    errors.tin ? "border-red-500 bg-red-50" : "border-slate-100"
+                  )}
                 />
+                {errors.tin && <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-widest leading-tight">{errors.tin}</p>}
               </div>
 
-               {/* Email */}
+               {/* ID Type & Number (Moved here to fill the grid) */}
                <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <Mail size={14} className="text-slate-300" />
-                  Email Address
-                </label>
-                <input 
-                  required
-                  type="email"
-                  placeholder="your@email.com"
-                  value={formData.email}
-                  onChange={e => setFormData({...formData, email: e.target.value})}
-                  className="w-full h-14 px-5 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-900/5 focus:border-slate-900 font-bold transition-all"
-                />
-              </div>
-            </div>
-
-            {/* ID Type & Number */}
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="w-full md:w-32 space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID Type</label>
                 <select 
                   value={formData.idType}
@@ -209,18 +299,26 @@ export default function EinvoiceRequestPage() {
                   <option value="Passport">Passport</option>
                 </select>
               </div>
-              <div className="flex-1 space-y-2">
+            </div>
+
+            <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID Number</label>
                 <input 
                   required
                   type="text"
-                  placeholder="Registration / ID No."
+                  placeholder={formData.idType === 'MyKad' ? '12-digit NRIC' : 'Registration / ID No.'}
                   value={formData.idNumber}
-                  onChange={e => setFormData({...formData, idNumber: e.target.value.toUpperCase()})}
-                  className="w-full h-14 px-5 rounded-2xl bg-slate-50 border border-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-900/5 focus:border-slate-900 font-bold transition-all"
+                  onChange={e => {
+                    setFormData({...formData, idNumber: e.target.value.toUpperCase()})
+                    if (errors.idNumber) setErrors({...errors, idNumber: ''})
+                  }}
+                  className={cn(
+                    "w-full h-14 px-5 rounded-2xl bg-slate-50 border focus:outline-none focus:ring-4 focus:ring-slate-900/5 focus:border-slate-900 font-bold transition-all",
+                    errors.idNumber ? "border-red-500 bg-red-50" : "border-slate-100"
+                  )}
                 />
+                {errors.idNumber && <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-widest">{errors.idNumber}</p>}
               </div>
-            </div>
 
             {/* Address */}
             <div className="space-y-2">
@@ -250,7 +348,7 @@ export default function EinvoiceRequestPage() {
 
         <p className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest px-8 leading-relaxed">
           The merchant will process your request and submit it to MyInvois. 
-          You will receive the validated e-invoice via email once approved.
+          You can check the status on this portal.
         </p>
       </div>
     </div>

@@ -11,3 +11,6 @@ ENVIRONMENT = "development"
 [[r2_buckets]]
 binding = "R2_BUCKET"
 bucket_name = "ecomm-assets"
+
+[triggers]
+crons = [ "0 8 * * *", "*/10 * * * *" ]

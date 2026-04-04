@@ -17,8 +17,13 @@ import MapView, { Marker, Polyline } from 'react-native-maps'
 import { supabase } from '@/lib/supabase'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useAuthStore } from '@/stores/authStore'
 import Toast from 'react-native-toast-message'
+
+const TIN_REGEX = /^(IG|C|OG|TA|NR|EI|F|SG)[0-9]{10,12}$/
+const NRIC_REGEX = /^[0-9]{12}$/
+const BRN_REGEX = /^[a-zA-Z0-9]{1,20}$/
 // ─── Status config (same as orders list) ──────────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: keyof typeof Ionicons.glyphMap; description: string }> = {
   pending:          { label: 'Pending Payment',    color: '#92400e', bg: '#fef3c7', icon: 'time-outline',                  description: 'Waiting for payment confirmation'       },
@@ -346,26 +351,90 @@ export default function OrderDetailScreen() {
 
   const [showInvoiceForm, setShowInvoiceForm] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [einvoiceDetails, setEinvoiceDetails] = useState({ tin: '', id_no: '' })
+  const [einvoiceDetails, setEinvoiceDetails] = useState({ tin: '', id_type: 'NRIC' as 'NRIC' | 'BRN' | 'PASSPORT', id_no: '', classification_code: '022' })
+  const [einvoiceErrors, setEinvoiceErrors] = useState<Record<string, string>>({})
+  const { user } = useAuthStore()
+  const [hasPrefilled, setHasPrefilled] = useState(false)
+
+  // Pre-fill E-Invoice details from last order
+  useEffect(() => {
+    if (!user?.id || hasPrefilled) return
+
+    const fetchLastInvoice = async () => {
+      const { data } = await supabase
+        .from('einvoices')
+        .select('einvoice_details')
+        .eq('status', 'validated')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if ((data as any)?.einvoice_details) {
+        const details = (data as any).einvoice_details
+        if (details.tin && details.id_no) {
+          setEinvoiceDetails({
+            tin: details.tin,
+            id_type: details.id_type || 'NRIC',
+            id_no: details.id_no,
+            classification_code: details.classification_code || '022'
+          })
+          setHasPrefilled(true)
+        }
+      }
+    }
+
+    fetchLastInvoice()
+  }, [user?.id, hasPrefilled])
 
   const { data: order, isLoading, refetch } = useQuery({
     queryKey: ['order', orderId],
     queryFn:  () => ordersService.getById(orderId),
-    refetchInterval: 30_000, // poll every 30s for live updates
+    refetchInterval: 30_000, 
+  })
+
+  const { data: einvoice } = useQuery({
+    queryKey: ['einvoice', orderId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('einvoices')
+        .select('*')
+        .eq('order_id', orderId)
+        .maybeSingle()
+      return data
+    },
+    enabled: !!orderId,
   })
 
   const handleRequestInvoice = async () => {
-    if (!einvoiceDetails.tin || !einvoiceDetails.id_no) {
-       Toast.show({ type: 'error', text1: 'Missing fields', text2: 'Please fill in TIN and ID number' })
-       return
+    const cleanTin = einvoiceDetails.tin.replace(/[\s-]/g, '').toUpperCase()
+    const cleanId = einvoiceDetails.id_no.replace(/[\s-]/g, '').toUpperCase()
+
+    if (!TIN_REGEX.test(cleanTin)) {
+        Toast.show({ type: 'error', text1: 'Invalid TIN', text2: 'Please follow the format (e.g. C1234567890)' })
+        return
     }
+
+    if (einvoiceDetails.id_type === 'NRIC' && !NRIC_REGEX.test(cleanId)) {
+        Toast.show({ type: 'error', text1: 'Invalid NRIC', text2: 'NRIC must be 12 digits' })
+        return
+    }
+
     setIsSubmitting(true)
     const { error } = await supabase.from('orders').update({
        einvoice_status: 'needs_einvoice_now',
        einvoice_details: {
-         tin: einvoiceDetails.tin,
-         id_no: einvoiceDetails.id_no,
-         name: (order?.delivery_address as any)?.name || 'Order Customer'
+         tin: cleanTin,
+         id_type: einvoiceDetails.id_type,
+         id_no: cleanId,
+         classification_code: einvoiceDetails.classification_code || '022',
+         name: (order?.delivery_address as any)?.recipient_name || (order?.delivery_address as any)?.name || 'Order Customer',
+         email: (order as any)?.customer?.email || '',
+         phone: (order?.delivery_address as any)?.phone || '',
+         address_line1: (order?.delivery_address as any)?.address_line1 || '',
+         address_line2: (order?.delivery_address as any)?.address_line2 || null,
+         city: (order?.delivery_address as any)?.city || '',
+         state: (order?.delivery_address as any)?.state || '',
+         postcode: (order?.delivery_address as any)?.postcode || ''
        }
     }).eq('id', orderId)
     setIsSubmitting(false)
@@ -600,24 +669,39 @@ export default function OrderDetailScreen() {
         </SectionCard>
 
         {/* E-Invoice Section */}
-        {order.einvoice_status && (
+        {(order.einvoice_status || einvoice) && (
           <SectionCard title="🧾  LHDN e-Invoice">
-             {order.einvoice_status === 'pending_buyer_request' ? (
+             {order.einvoice_status === 'pending_buyer_request' && !einvoice ? (
                 showInvoiceForm ? (
-                  <View className="gap-2">
-                    <Text className="text-gray-500 text-xs mb-2">Request an individual e-Invoice for tax purposes.</Text>
+                  <View className="gap-3">
+                    <Text className="text-gray-500 text-xs mb-1">Fill in the details below to request your individual e-invoice (LHDN compliant).</Text>
+
                     <Input
-                      label="Tax Identification Number (TIN)"
+                      label="Taxpayer TIN"
                       placeholder="e.g. IG12345678"
                       value={einvoiceDetails.tin}
-                      onChangeText={(val) => setEinvoiceDetails(p => ({...p, tin: val}))}
+                      onChangeText={(val) => setEinvoiceDetails(p => ({...p, tin: val.toUpperCase()}))}
+                      autoCapitalize="characters"
                     />
-                    <Input
-                      label="IC Number / Passport / BRN"
-                      placeholder="e.g. 900101-01-1234"
-                      value={einvoiceDetails.id_no}
-                      onChangeText={(val) => setEinvoiceDetails(p => ({...p, id_no: val}))}
-                    />
+                    
+                    <View className="flex-row gap-3">
+                       <View className="flex-1">
+                          <Text className="text-gray-400 text-[10px] ml-1 mb-1 font-bold uppercase tracking-widest">ID Type</Text>
+                          <View className="border border-gray-100 bg-gray-50 rounded-xl px-2 h-10 justify-center">
+                             <Text className="text-sm font-bold text-gray-700">{einvoiceDetails.id_type}</Text>
+                          </View>
+                       </View>
+                       <View className="flex-[2]">
+                          <Input
+                            label="ID Number"
+                            placeholder="e.g. 900101011234"
+                            value={einvoiceDetails.id_no}
+                            onChangeText={(val) => setEinvoiceDetails(p => ({...p, id_no: val.toUpperCase()}))}
+                            autoCapitalize="characters"
+                          />
+                       </View>
+                    </View>
+
                     <View className="flex-row gap-2 mt-2">
                        <View className="flex-1">
                           <Button variant="outline" onPress={() => setShowInvoiceForm(false)}>Cancel</Button>
@@ -630,20 +714,61 @@ export default function OrderDetailScreen() {
                 ) : (
                   <View className="flex-row items-center justify-between">
                      <View className="flex-1 mr-2">
-                        <Text className="text-gray-500 text-xs">You have not requested an e-Invoice. You can request one before the month ends.</Text>
+                        <Text className="text-gray-500 text-xs">Individual e-invoice is available for this order.</Text>
                      </View>
                      <Button size="sm" onPress={() => setShowInvoiceForm(true)}>Request</Button>
                   </View>
                 )
              ) : (
-                <View className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex-row items-center gap-3">
-                   <Ionicons name="document-text" size={20} color="#2563eb" />
-                   <View className="flex-1">
-                      <Text className="text-blue-900 font-medium text-sm">Status</Text>
-                      <Text className="text-blue-700 text-xs capitalize">
-                        {order.einvoice_status.replace(/_/g, ' ')}
-                      </Text>
+                <View className="gap-3">
+                   <View className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex-row items-center gap-3">
+                      <Ionicons name="document-text" size={20} color="#2563eb" />
+                      <View className="flex-1">
+                         <Text className="text-blue-900 font-medium text-xs">E-Invoice Status</Text>
+                         <Text className="text-blue-700 text-xs font-bold capitalize">
+                            {(einvoice?.status || order.einvoice_status || 'Processing').replace(/_/g, ' ')}
+                         </Text>
+                      </View>
+                      {einvoice?.status === 'validated' && (
+                         <Ionicons name="checkmark-circle" size={24} color="#059669" />
+                      )}
                    </View>
+
+                   {einvoice?.status === 'rejected' && einvoice.error_message && (
+                      <View className="p-3 bg-red-50 rounded-xl border border-red-100">
+                         <View className="flex-row items-center gap-2 mb-1">
+                            <Ionicons name="warning-outline" size={16} color="#dc2626" />
+                            <Text className="text-red-700 font-black text-[10px] uppercase tracking-wider">LHDN Rejection</Text>
+                         </View>
+                         <Text className="text-red-600 text-[10px] leading-relaxed font-medium">
+                            {einvoice.error_message}
+                         </Text>
+                         <TouchableOpacity 
+                           onPress={() => setShowInvoiceForm(true)}
+                           className="mt-3 bg-white border border-red-200 py-1.5 rounded-lg items-center"
+                         >
+                            <Text className="text-red-600 text-[10px] font-black uppercase">Edit & Try Again</Text>
+                         </TouchableOpacity>
+                      </View>
+                   )}
+
+                   {einvoice?.lhdn_uuid && (
+                      <View className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                         <Text className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1.5 ml-1">LHDN Reference</Text>
+                         <Text className="text-gray-600 text-[10px] font-mono leading-none break-all bg-white p-2 border border-gray-100 rounded-lg">
+                            {einvoice.lhdn_uuid}
+                         </Text>
+                         {einvoice?.qr_code_url && (
+                            <TouchableOpacity 
+                               onPress={() => einvoice.qr_code_url && Linking.openURL(einvoice.qr_code_url)}
+                               className="mt-3 py-2 bg-blue-600 rounded-xl items-center flex-row justify-center gap-2"
+                            >
+                               <Ionicons name="qr-code-outline" size={16} color="white" />
+                               <Text className="text-white font-bold text-xs uppercase tracking-tight">View LHDN Portal</Text>
+                            </TouchableOpacity>
+                         )}
+                      </View>
+                   )}
                 </View>
              )}
           </SectionCard>

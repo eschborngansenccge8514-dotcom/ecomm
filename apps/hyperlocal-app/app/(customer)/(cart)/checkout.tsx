@@ -1,5 +1,5 @@
 import {
-  View, Text, ScrollView, TouchableOpacity,
+  View, Text, ScrollView, TouchableOpacity, Pressable,
   KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native'
 import { router } from 'expo-router'
@@ -17,6 +17,21 @@ import { DeliveryMethodPicker } from '@/components/customer/DeliveryMethodPicker
 import { loyaltyService } from '@/services/loyalty.service'
 import Toast from 'react-native-toast-message'
 import type { Address, DeliveryOption } from '@/types/app.types'
+
+const ID_TYPES = ['NRIC', 'BRN', 'PASSPORT'] as const
+const CLASSIFICATION_CODES = [
+  { code: '022', label: 'Others (General)' },
+  { code: '003', label: 'Tech Gadget (Tax Relief)' },
+  { code: '013', label: 'Lifestyle (Tax Relief)' },
+  { code: '044', label: 'Vouchers/Loyalty' },
+  { code: '030', label: 'Maintenance' },
+] as const
+
+const TIN_REGEX = /^(IG|C|OG|TA|NR|EI|F|SG)[0-9]{10,12}$/
+const NRIC_REGEX = /^[0-9]{12}$/
+const BRN_REGEX = /^[a-zA-Z0-9]{1,20}$/
+const PHONE_REGEX = /^\+?[0-9]{7,15}$/
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // ─── Section wrapper ───────────────────────────────────────────────────────────
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -255,8 +270,43 @@ export default function CheckoutScreen() {
   const [needsEInvoice, setNeedsEInvoice] = useState(false)
   const [einvoiceDetails, setEinvoiceDetails] = useState({
     tin: '',
+    id_type: 'NRIC' as 'NRIC' | 'BRN' | 'PASSPORT',
     id_no: '',
+    classification_code: '022'
   })
+  const [einvoiceErrors, setEinvoiceErrors] = useState<Record<string, string>>({})
+  const [hasPrefilled, setHasPrefilled] = useState(false)
+
+  // Pre-fill E-Invoice details from last order
+  useEffect(() => {
+    if (!user?.id || hasPrefilled) return
+
+    const fetchLastInvoice = async () => {
+      const { data, error } = await supabase
+        .from('einvoices')
+        .select('einvoice_details')
+        .eq('status', 'validated')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if ((data as any)?.einvoice_details) {
+        const details = (data as any).einvoice_details
+        if (details.tin && details.id_no) {
+          setEinvoiceDetails({
+            tin: details.tin,
+            id_type: details.id_type || 'NRIC',
+            id_no: details.id_no,
+            classification_code: details.classification_code || '022'
+          })
+          setNeedsEInvoice(true)
+          setHasPrefilled(true)
+        }
+      }
+    }
+
+    fetchLastInvoice()
+  }, [user?.id, hasPrefilled])
 
   // Load loyalty data
   useEffect(() => {
@@ -283,7 +333,7 @@ export default function CheckoutScreen() {
 
   const isSelfPickup   = deliveryOption?.type === 'self_pickup'
   const hasDelivery    = !!deliveryOption
-  const canPlace       = !!selectedAddress && hasDelivery && !!paymentMethod && items.length > 0
+  const canPlace       = !!selectedAddress && hasDelivery && !!paymentMethod && items.length > 0 && !!merchantId
 
   // No auto-redirect for pickup payment anymore, mandatory choice
 
@@ -328,7 +378,7 @@ export default function CheckoutScreen() {
       // ─── 2. Atomic Order Creation via RPC ─────────────────────────────────────
       const { data: orderId, error } = await supabase.rpc('create_order_v2', {
         p_order_number:      orderNumber,
-        p_merchant_id:       merchantId,
+        p_merchant_id:       merchantId!,
         p_customer_id:       user!.id,
         p_subtotal:          getTotal(),
         p_delivery_fee:      deliveryFee,
@@ -348,7 +398,19 @@ export default function CheckoutScreen() {
         },
         p_items:             orderItems,
         p_einvoice_status:   needsEInvoice ? 'needs_einvoice_now' : 'pending_buyer_request',
-        p_einvoice_details:  needsEInvoice ? { ...einvoiceDetails, name: selectedAddress!.recipient_name, email: user?.email, phone: selectedAddress!.phone } : null,
+        p_einvoice_details:  needsEInvoice ? { 
+          tin: einvoiceDetails.tin.replace(/[\s-]/g, '').toUpperCase(),
+          id_type: einvoiceDetails.id_type,
+          id_no: einvoiceDetails.id_no.replace(/[\s-]/g, '').toUpperCase(),
+          name: selectedAddress!.recipient_name, 
+          email: user?.email, 
+          phone: selectedAddress!.phone,
+          address_line1: selectedAddress!.address_line1,
+          address_line2: selectedAddress!.address_line2 || null,
+          city: selectedAddress!.city,
+          state: selectedAddress!.state,
+          postcode: selectedAddress!.postcode
+        } : null,
       })
 
       if (error) {
@@ -414,6 +476,8 @@ export default function CheckoutScreen() {
     ? 'Select a delivery method'
     : !paymentMethod
     ? 'Select a payment method'
+    : (needsEInvoice && Object.keys(einvoiceErrors).length > 0)
+    ? 'Please fix e-invoice errors'
     : null
 
   return (
@@ -488,9 +552,12 @@ export default function CheckoutScreen() {
         />
 
         {/* Step 4.5: E-Invoice */}
-        <Section title="🧾  E-Invoice (Optional)">
+        <Section title="🧾  LHDN e-Invoice (Standard)">
           <View className="flex-row items-center justify-between mb-2">
-            <Text className="text-gray-700 text-sm font-medium">Do you need an e-Invoice?</Text>
+            <View className="flex-1 mr-4">
+              <Text className="text-gray-900 text-sm font-semibold">Request Individual e-Invoice</Text>
+              <Text className="text-gray-400 text-[10px]">Collect TIN and ID for tax purposes</Text>
+            </View>
             <TouchableOpacity
               onPress={() => setNeedsEInvoice(!needsEInvoice)}
               className={`w-12 h-6 rounded-full transition-colors ${needsEInvoice ? 'bg-primary-500' : 'bg-gray-200'}`}
@@ -500,22 +567,89 @@ export default function CheckoutScreen() {
           </View>
           
           {needsEInvoice && (
-            <View className="mt-3">
-              <Text className="text-gray-500 text-xs mb-3">Please provide your details for LHDN e-Invoice validation.</Text>
-              <Input
-                label="Tax Identification Number (TIN)"
-                placeholder="e.g. IG12345678"
-                value={einvoiceDetails.tin}
-                onChangeText={(cur) => setEinvoiceDetails(p => ({ ...p, tin: cur }))}
-                hint="Required for businesses and individuals"
-              />
-              <Input
-                label="Registration No. / IC Number"
-                placeholder="e.g. 900101-01-1234 or 202101012345"
-                value={einvoiceDetails.id_no}
-                onChangeText={(cur) => setEinvoiceDetails(p => ({ ...p, id_no: cur }))}
-                hint="Your MyKad, Passport, or Business Registration Number"
-              />
+            <View className="mt-3 gap-3">
+              <View>
+                <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase tracking-wider">TIN Number</Text>
+                <Input
+                  placeholder="e.g. C1234567890"
+                  value={einvoiceDetails.tin}
+                  onChangeText={(cur) => {
+                    const val = cur.toUpperCase()
+                    const errors = { ...einvoiceErrors }
+                    if (val && !TIN_REGEX.test(val.replace(/[\s-]/g, ''))) {
+                      errors.tin = 'Invalid TIN format'
+                    } else {
+                      delete errors.tin
+                    }
+                    setEinvoiceErrors(errors)
+                    setEinvoiceDetails(p => ({ ...p, tin: val }))
+                  }}
+                  autoCapitalize="characters"
+                />
+                {einvoiceErrors.tin && <Text className="text-red-500 text-[10px] mt-1 ml-1 font-medium">{einvoiceErrors.tin}</Text>}
+              </View>
+
+                  <View className="flex-row gap-3">
+                    <View className="flex-1">
+                      <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase tracking-wider">ID Type</Text>
+                      <View className="border border-gray-100 rounded-xl bg-gray-50 overflow-hidden">
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 4, gap: 4 }}>
+                          {ID_TYPES.map(type => (
+                            <Pressable 
+                              key={type}
+                              onPress={() => setEinvoiceDetails(p => ({ ...p, id_type: type }))}
+                              className={`px-3 py-1.5 rounded-lg ${einvoiceDetails.id_type === type ? 'bg-white shadow-sm' : ''}`}
+                            >
+                              <Text className={`text-[10px] font-bold ${einvoiceDetails.id_type === type ? 'text-primary-600' : 'text-gray-400'}`}>
+                                {type}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    </View>
+                    <View className="flex-[2]">
+                      <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase tracking-wider">ID Number</Text>
+                      <Input
+                        placeholder={einvoiceDetails.id_type === 'NRIC' ? '900101015555' : '202101012345'}
+                        value={einvoiceDetails.id_no}
+                        onChangeText={(cur) => {
+                          const val = cur.toUpperCase()
+                          const errors = { ...einvoiceErrors }
+                          const clean = val.replace(/[\s-]/g, '')
+                          if (einvoiceDetails.id_type === 'NRIC' && clean && !NRIC_REGEX.test(clean)) {
+                            errors.id_no = 'NRIC must be 12 digits'
+                          } else if (einvoiceDetails.id_type === 'BRN' && clean && !BRN_REGEX.test(clean)) {
+                            errors.id_no = 'Invalid BRN format'
+                          } else {
+                            delete errors.id_no
+                          }
+                          setEinvoiceErrors(errors)
+                          setEinvoiceDetails(p => ({ ...p, id_no: val }))
+                        }}
+                        autoCapitalize="characters"
+                      />
+                      {einvoiceErrors.id_no && <Text className="text-red-500 text-[10px] mt-1 ml-1 font-medium">{einvoiceErrors.id_no}</Text>}
+                    </View>
+                  </View>
+                  <View>
+                    <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase tracking-wider">Classification Code</Text>
+                    <View className="border border-gray-100 rounded-xl bg-gray-50 overflow-hidden">
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 4, gap: 4 }}>
+                        {CLASSIFICATION_CODES.map(c => (
+                          <Pressable 
+                            key={c.code}
+                            onPress={() => setEinvoiceDetails(p => ({ ...p, classification_code: c.code }))}
+                            className={`px-3 py-1.5 rounded-lg ${einvoiceDetails.classification_code === c.code ? 'bg-white shadow-sm' : ''}`}
+                          >
+                            <Text className={`text-[10px] font-bold ${einvoiceDetails.classification_code === c.code ? 'text-primary-600' : 'text-gray-400'}`}>
+                              {c.label} ({c.code})
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </View>
             </View>
           )}
         </Section>

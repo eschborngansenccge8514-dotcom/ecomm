@@ -41,6 +41,116 @@ async function getDocumentDetails(config: any, uuid: string, token: string) {
   return await res.json();
 }
 
+// --- Helpers ---
+const roundMYR = (val: any) => (Math.round((parseFloat(val) || 0) * 100) / 100).toFixed(2);
+const isoDate = () => new Date().toISOString().split('T')[0];
+const isoTime = () => new Date().toISOString().split('T')[1].replace(/\..+/, 'Z');
+
+function buildLhdnJson(merchant: any, config: any, buyer: any, items: any[], orderNumber: string, classificationCode = '022') {
+  const subtotal = items.reduce((s: number, i: any) => s + (Number(i.unitPrice) * Number(i.quantity)), 0);
+  const tax = 0; // Default to 0 for now
+  const total = subtotal + tax;
+
+  return {
+    "Invoice": [
+      {
+        "UBLVersionID": [{"_": "2.1"}],
+        "CustomizationID": [{"_": "urn:cert.lhdn.gov.my:invoice"}],
+        "ID": [{"_": orderNumber}],
+        "IssueDate": [{"_": isoDate()}],
+        "IssueTime": [{"_": isoTime()}],
+        "InvoiceTypeCode": [{"_": "01", "listVersionID": "1.0"}],
+        "DocumentCurrencyCode": [{"_": "MYR"}],
+        "TaxCurrencyCode": [{"_": "MYR"}],
+        "AccountingSupplierParty": [{
+          "Party": [{
+            "IndustryClassificationCode": [{"_": config.msic_code || "47910", "name": config.description || "Retail sale via internet"}],
+            "PartyIdentification": [
+              {"ID": [{"_": config.tin, "schemeID": "TIN"}]},
+              {"ID": [{"_": config.registration_no || "NA", "schemeID": "BRN"}]}
+            ],
+            "PostalAddress": [{
+              "AddressLine": [{"Line": [{"_": merchant.address_line1 || "N/A"}]}],
+              "PostalZone": [{"_": merchant.postcode || "00000"}],
+              "CityName": [{"_": merchant.city || "N/A"}],
+              "CountrySubentityCode": [{"_": merchant.state || "14"}],
+              "Country": [{"IdentificationCode": [{"_": merchant.country || "MYS", "listAgencyID": "6", "listID": "ISO3166-1"}]}]
+            }],
+            "PartyLegalEntity": [{"RegistrationName": [{"_": merchant.store_name}]}],
+            "Contact": [{
+              "Telephone": [{"_": merchant.phone || "00-00000000"}],
+              "ElectronicMail": [{"_": merchant.email || "noreply@einvoice.my"}]
+            }]
+          }]
+        }],
+        "AccountingCustomerParty": [{
+          "Party": [{
+            "PartyIdentification": [
+              {"ID": [{"_": buyer.tin || "EI00000000010", "schemeID": "TIN"}]},
+              {"ID": [{"_": buyer.id_number || "NA", "schemeID": buyer.id_type || "BRN"}]}
+            ],
+            "PostalAddress": [{
+              "AddressLine": [{"Line": [{"_": buyer.address_line1 || "N/A"}]}],
+              "PostalZone": [{"_": buyer.postcode || "00000"}],
+              "CityName": [{"_": buyer.city || "N/A"}],
+              "CountrySubentityCode": [{"_": buyer.state || "00"}],
+              "Country": [{"IdentificationCode": [{"_": buyer.country || "MYS", "listAgencyID": "6", "listID": "ISO3166-1"}]}]
+            }],
+            "PartyLegalEntity": [{"RegistrationName": [{"_": buyer.name}]}],
+            "Contact": [{
+              "Telephone": [{"_": buyer.phone || "NA"}],
+              "ElectronicMail": [{"_": buyer.email || "noreply@einvoice.my"}]
+            }]
+          }]
+        }],
+        "TaxTotal": [{
+          "TaxAmount": [{"_": roundMYR(tax), "currencyID": "MYR"}],
+          "TaxSubtotal": [{
+            "TaxableAmount": [{"_": roundMYR(subtotal), "currencyID": "MYR"}],
+            "TaxAmount": [{"_": roundMYR(tax), "currencyID": "MYR"}],
+            "TaxCategory": [{
+              "ID": [{"_": "E"}],
+              "Percent": [{"_": "0.00"}],
+              "TaxExemptionReason": [{"_": "Not Subject to SST"}],
+              "TaxScheme": [{"ID": [{"_": "OTH"}]}]
+            }]
+          }]
+        }],
+        "LegalMonetaryTotal": [{
+          "LineExtensionAmount": [{"_": roundMYR(subtotal), "currencyID": "MYR"}],
+          "TaxExclusiveAmount": [{"_": roundMYR(subtotal), "currencyID": "MYR"}],
+          "TaxInclusiveAmount": [{"_": roundMYR(total), "currencyID": "MYR"}],
+          "PayableAmount": [{"_": roundMYR(total), "currencyID": "MYR"}]
+        }],
+        "InvoiceLine": items.map((item: any, i: number) => ({
+          "ID": [{"_": String(i + 1)}],
+          "InvoicedQuantity": [{"_": Number(item.quantity).toFixed(2), "unitCode": "C62"}],
+          "LineExtensionAmount": [{"_": roundMYR(Number(item.unitPrice) * Number(item.quantity)), "currencyID": "MYR"}],
+          "Item": [{
+            // Use the classification code selected by the merchant (defaults to 022 = Others)
+            "CommodityClassification": [{"ItemClassificationCode": [{"_": classificationCode, "listID": "CLASS"}]}],
+            "Description": [{"_": item.description}]
+          }],
+          "Price": [{"PriceAmount": [{"_": roundMYR(item.unitPrice), "currencyID": "MYR"}]}],
+          "TaxTotal": [{
+            "TaxAmount": [{"_": "0.00", "currencyID": "MYR"}],
+            "TaxSubtotal": [{
+              "TaxableAmount": [{"_": roundMYR(Number(item.unitPrice) * Number(item.quantity)), "currencyID": "MYR"}],
+              "TaxAmount": [{"_": "0.00", "currencyID": "MYR"}],
+              "TaxCategory": [{
+                "ID": [{"_": "E"}],
+                "Percent": [{"_": "0.00"}],
+                "TaxExemptionReason": [{"_": "Not Subject to SST"}],
+                "TaxScheme": [{"ID": [{"_": "OTH"}]}]
+              }]
+            }]
+          }]
+        }))
+      }
+    ]
+  };
+}
+
 // --- Submit Single (Individual) ---
 einvoice.post('/submit', async (c) => {
   try {
@@ -56,6 +166,7 @@ einvoice.post('/submit', async (c) => {
     let buyer: any = {}
     let sourceTable: string = ''
     let sourceId: string = ''
+    let merchant: any = {}
 
     if (orderId) {
       // 1a. Fetch Order + Merchant Info
@@ -63,6 +174,7 @@ einvoice.post('/submit', async (c) => {
       if (!order) throw new Error('Order not found')
       
       merchantId = order.merchant_id
+      merchant = order.merchants
       orderNumber = order.order_number
       totalAmount = order.total_amount
       sourceTable = 'orders'
@@ -72,26 +184,38 @@ einvoice.post('/submit', async (c) => {
       items = (orderItems || []).map(item => ({
         description: item.product_name,
         quantity: item.quantity,
-        unitPrice: item.price,
-        totalPrice: item.total_price
+        unitPrice: item.unit_price,
+        totalPrice: item.line_total
       }))
 
       const details = order.einvoice_details || {}
+      // Merge with any admin-provided customer overrides (from the dashboard modal)
+      const adminCustomer = body.customer || {}
       buyer = {
-        name: details.name || 'Customer',
-        tin: details.tin || 'EI00000000010',
-        id_number: details.id_no || 'NA',
-        email: details.email || 'noreply@customer.com'
+        name: adminCustomer.name || details.name || order.buyer_name || order.customer_name || 'General Public',
+        tin: adminCustomer.tin || details.tin || 'EI00000000010',
+        id_number: adminCustomer.id_number || details.id_no || 'NA',
+        id_type: adminCustomer.id_type || details.id_type || 'BRN',
+        email: adminCustomer.email || details.email || order.buyer_email || 'noreply@customer.com',
+        phone: adminCustomer.phone || details.phone || order.delivery_address?.phone || 'NA',
+        // Fixed: use address_line1 not address
+        address_line1: adminCustomer.address_line1 || details.address_line1 || order.delivery_address?.line1 || order.delivery_address?.address_line1 || 'N/A',
+        postcode: adminCustomer.postcode || details.postcode || order.delivery_address?.postcode || '00000',
+        city: adminCustomer.city || details.city || order.delivery_address?.city || 'N/A',
+        state: adminCustomer.state || details.state || order.delivery_address?.state || '00',
+        country: adminCustomer.country || details.country || 'MYS',
+        classification_code: adminCustomer.classification_code || details.classification_code || '022',
       }
     } else if (posRequestId) {
       // 1b. Fetch POS Request + Transaction
       const { data: req } = await supabase.from('pos_einvoice_requests').select('*').eq('id', posRequestId).single()
       if (!req) throw new Error('POS Request not found')
 
-      const { data: txn } = await supabase.from('pos_transactions').select('*').eq('id', req.transaction_id).single()
+      const { data: txn } = await supabase.from('pos_transactions').select('*, merchants(*)').eq('id', req.transaction_id).single()
       if (!txn) throw new Error('POS Transaction not found')
 
       merchantId = txn.merchant_id
+      merchant = txn.merchants
       orderNumber = txn.receipt_number
       totalAmount = txn.total_rm
       sourceTable = 'pos_einvoice_requests'
@@ -109,7 +233,14 @@ einvoice.post('/submit', async (c) => {
         name: req.customer_name || 'POS Customer',
         tin: req.customer_tin || 'EI00000000010',
         id_number: req.customer_id_number || 'NA',
-        email: req.customer_email || 'noreply@customer.com'
+        id_type: req.customer_id_type || 'BRN',
+        email: req.customer_email || 'noreply@customer.com',
+        phone: req.customer_phone || '00-00000000',
+        address: req.customer_address || 'N/A',
+        postcode: '00000',
+        city: 'N/A',
+        state: '14',
+        country: 'MYS'
       }
     } else {
       throw new Error('Either orderId or posRequestId is required')
@@ -119,17 +250,13 @@ einvoice.post('/submit', async (c) => {
     const { data: config } = await supabase.from('merchant_einvoice_config').select('*').eq('merchant_id', merchantId).single()
     if (!config) throw new Error('E-Invoice config missing for merchant')
 
-    // 3. Map to LHDN JSON
-    const lhdnJson = {
-      orderNumber,
-      totalAmount,
-      buyer,
-      items: items.map(i => ({
-        ...i,
-        taxType: '01',
-        taxRate: 6
-      }))
-    }
+    // Also apply any merchant config overrides from the admin modal
+    const merchantOverrides = body.merchant_overrides || {}
+    if (merchantOverrides.msic_code) config.msic_code = merchantOverrides.msic_code
+    if (merchantOverrides.description) config.description = merchantOverrides.description
+
+    // 3. Map to LHDN JSON (UBL-compliant)
+    const lhdnJson = buildLhdnJson(merchant, config, buyer, items, orderNumber, buyer.classification_code || '022')
 
     // 4. Get Auth Token
     const token = await getLhdnToken(config)
@@ -149,19 +276,46 @@ einvoice.post('/submit', async (c) => {
     })
 
     const result = (await res.json()) as any
-    if (!res.ok) throw new Error(`LHDN Error: ${JSON.stringify(result)}`)
+    if (!res.ok) {
+      const errorMsg = result?.error?.message || result?.message || JSON.stringify(result)
+      throw new Error(`LHDN Submission Failed: ${errorMsg}`)
+    }
+
+    // Calculate sum correctly from the payload line extensions or items
+    const subTotal = items.reduce((s: number, i: any) => s + (Number(i.unitPrice) * Number(i.quantity)), 0);
 
     // 6. Create E-Invoice Record
-    const { data: invoice } = await supabase.from('einvoices').insert({
+    const { data: invoice } = await supabase.from('einvoices').upsert({
       merchant_id: merchantId,
       order_id: orderId || null,
+      pos_request_id: posRequestId || null,
       order_number: orderNumber,
-      submission_uid: result.submissionUid,
+      submission_uid: result.submissionUid || result.acceptedDocuments?.[0]?.uuid,
       lhdn_uuid: result.acceptedDocuments?.[0]?.uuid,
       total_amount: totalAmount,
+      tax_amount: 0,
+      buyer_name: buyer.name,
+      buyer_tin: buyer.tin,
       status: 'submitted',
+      einvoice_details: lhdnJson,
       metadata: posRequestId ? { pos_request_id: posRequestId } : {}
-    }).select().single()
+    }, { onConflict: (orderId ? 'order_id' : 'pos_request_id') }).select().single()
+
+    // 6.1 Insert Line Items for consistency (mirroring Edge function behavior)
+    if (invoice?.id) {
+       const insertLines = items.map((item: any) => ({
+          document_id: invoice.id,
+          description: item.description,
+          quantity: Number(item.quantity),
+          unit_price: Number(item.unitPrice),
+          classification_code: '022',
+          tax_type: 'E',
+          tax_rate: 0,
+          line_total_rm: Number(item.unitPrice) * Number(item.quantity)
+       }));
+       await supabase.from("einvoice_line_items").delete().eq("document_id", invoice.id);
+       await supabase.from("einvoice_line_items").insert(insertLines);
+    }
 
     // 7. Update Source Table
     if (sourceTable === 'orders') {
@@ -174,10 +328,10 @@ einvoice.post('/submit', async (c) => {
       }).eq('id', sourceId)
     }
 
-    return c.json({ success: true, invoiceId: invoice.id })
+    return c.json({ success: true, invoiceId: invoice.id, message: 'E-Invoice submitted successfully' })
   } catch (err: any) {
     console.error('[Submit Error]', err)
-    return c.json({ error: err.message }, 400)
+    return c.json({ message: err.message }, 400)
   }
 })
 
@@ -265,7 +419,7 @@ einvoice.post('/poll-status', async (c) => {
         if (!config) continue
 
         const token = await getLhdnToken(config)
-        const lhdnResult = await getDocumentDetails(config, submission.lhdn_uuid, token)
+        const lhdnResult = await getDocumentDetails(config, submission.lhdn_uuid, token) as any
         
         // Map LHDN 'Valid' to ours 'validated'
         const rawStatus = lhdnResult.status.toLowerCase()
@@ -323,6 +477,29 @@ einvoice.post('/poll-status', async (c) => {
     }
 
     return c.json({ success: true, polled: pending.length })
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400)
+  }
+})
+
+// --- Test Connection ---
+einvoice.post('/test-connection', async (c) => {
+  try {
+    const { merchantId } = await c.req.json()
+    const supabase = getSupabaseClient(c.env)
+
+    const { data: config, error: configError } = await supabase
+      .from('merchant_einvoice_config')
+      .select('*')
+      .eq('merchant_id', merchantId)
+      .single()
+
+    if (configError || !config) throw new Error('Configuration not found')
+
+    // Try to rotate token/get new one
+    await getLhdnToken(config)
+
+    return c.json({ success: true, message: 'Connection to LHDN successful' })
   } catch (err: any) {
     return c.json({ error: err.message }, 400)
   }

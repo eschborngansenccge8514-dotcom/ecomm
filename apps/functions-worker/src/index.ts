@@ -19,7 +19,12 @@ import marketplace from './routes/marketplace'
 const app = new Hono<{ Bindings: Bindings }>()
 
 // Middleware
-app.use('*', cors())
+app.use('*', cors({
+  origin: '*',
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization', 'x-client-info', 'apikey'],
+  maxAge: 600,
+}))
 
 // Root route for health check
 app.get('/', (c) => c.text('Functions Worker is running!'))
@@ -38,6 +43,16 @@ app.route('/internal', internal)
 app.route('/einvoice', einvoice)
 app.route('/marketplace', marketplace)
 
+// Fallback: If deployed as a single-purpose function (e.g., named 'einvoice'), 
+// mount critical routers at the root to handle paths like /poll-status directly.
+app.route('/', einvoice)
+app.route('/', billplz)
+
+app.notFound((c) => {
+  // Ensure CORS headers even on 404
+  return c.text('Not Found', 404)
+})
+
 export default {
   fetch: app.fetch,
   async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
@@ -48,6 +63,12 @@ export default {
     if (event.cron === '0 8 * * *') {
       // Morning Briefing example
       await fetch(`${env.APP_URL}/internal/morning-briefing`, { method: 'POST' })
+    }
+
+    if (event.cron === '*/10 * * * *') {
+      // Poll E-Invoice statuses every 10 minutes
+      const response = await app.request('/einvoice/poll-status', { method: 'POST' }, env)
+      console.log('E-Invoice Polling Status:', response.status)
     }
   }
 }

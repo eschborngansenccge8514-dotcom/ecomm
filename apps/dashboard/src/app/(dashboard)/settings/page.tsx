@@ -18,6 +18,7 @@ export default async function SettingsPage() {
     { data: easyparcelConfig }, 
     { data: razorpayConfig }, 
     { data: billplzConfig },
+    { data: einvoiceConfig },
     { data: operatingHours },
     { data: announcements }
   ] = await Promise.all([
@@ -25,6 +26,7 @@ export default async function SettingsPage() {
     supabase.from('merchant_easyparcel_config').select('*').eq('merchant_id', effectiveMerchant.id).maybeSingle(),
     supabase.from('merchant_razorpay_config').select('*').eq('merchant_id', effectiveMerchant.id).maybeSingle(),
     supabase.from('merchant_billplz_config').select('*').eq('merchant_id', effectiveMerchant.id).maybeSingle(),
+    supabase.from('merchant_einvoice_config').select('*').eq('merchant_id', effectiveMerchant.id).maybeSingle(),
     supabase.from('merchant_operating_hours').select('*').eq('merchant_id', effectiveMerchant.id),
     supabase.from('store_announcements').select('*').eq('merchant_id', effectiveMerchant.id),
   ])
@@ -36,6 +38,7 @@ export default async function SettingsPage() {
       easyparcelConfig={easyparcelConfig}
       razorpayConfig={razorpayConfig}
       billplzConfig={billplzConfig}
+      einvoiceConfig={einvoiceConfig}
       operatingHours={operatingHours || []}
       announcements={announcements || []}
     />

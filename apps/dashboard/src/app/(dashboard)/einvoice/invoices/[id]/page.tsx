@@ -19,13 +19,18 @@ import {
   XCircle,
   Ban,
   ExternalLink,
-  Building2
+  Building2,
+  Mail,
+  Phone,
+  Edit2,
+  X
 } from 'lucide-react'
 import { StatusBadge } from '@/components/einvoice/StatusBadge'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { toast } from 'react-hot-toast'
+import { invokeWorker } from '@/lib/worker'
 
 const LHDN_ERROR_GUIDE: Record<string, string> = {
   'CF302': 'LHDN couldn\'t find your buyer\'s TIN number in their database. This usually means: (1) the TIN was typed incorrectly, or (2) the buyer hasn\'t registered with LHDN yet.',
@@ -41,9 +46,157 @@ export default function InvoiceDetailPage() {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [invoice, setInvoice] = useState<any>(null)
+  const [merchant, setMerchant] = useState<any>(null)
+  const [config, setConfig] = useState<any>(null)
   const [lineItems, setLineItems] = useState<any[]>([])
   const [rawView, setRawView] = useState(false)
   const [errorGuideOpen, setErrorGuideOpen] = useState(true)
+  const [resubmitting, setResubmitting] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    tin: '',
+    email: '',
+    phone: '',
+    idType: 'BRN',
+    idNumber: '',
+    address: '',
+    postcode: '',
+    city: '',
+    state: '',
+    country: 'MYS'
+  })
+  const [checkingStatus, setCheckingStatus] = useState(false)
+
+  useEffect(() => {
+     if (invoice) {
+        // Try to get existing details from the UBL payload or the flat columns
+        const details = invoice.einvoice_details?.Invoice?.[0]?.AccountingCustomerParty?.[0]?.Party?.[0] || {}
+        setEditFormData({
+           name: invoice.buyer_name || details.PartyLegalEntity?.[0]?.RegistrationName?.[0]?._ || '',
+           tin: invoice.buyer_tin || details.PartyIdentification?.[0]?.ID?.[0]?._ || '',
+           email: invoice.buyer_email || details.Contact?.[0]?.ElectronicMail?.[0]?._ || '',
+           phone: details.Contact?.[0]?.Telephone?.[0]?._ || '',
+           idType: details.PartyIdentification?.[1]?.ID?.[0]?.schemeID || 'BRN',
+           idNumber: details.PartyIdentification?.[1]?.ID?.[0]?._ || '',
+           address: details.PostalAddress?.[0]?.AddressLine?.[0]?.Line?.[0]?._ || '',
+           postcode: details.PostalAddress?.[0]?.PostalZone?.[0]?._ || '',
+           city: details.PostalAddress?.[0]?.CityName?.[0]?._ || '',
+           state: details.PostalAddress?.[0]?.CountrySubentityCode?.[0]?._ || '14',
+           country: details.PostalAddress?.[0]?.Country?.[0]?.IdentificationCode?.[0]?._ || 'MYS'
+        })
+     }
+  }, [invoice]);
+
+  const handleUpdateAndResubmit = async (e: React.FormEvent) => {
+     e.preventDefault()
+     setResubmitting(true)
+     const tId = toast.loading('Saving and Resubmitting...')
+     try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('No active session')
+
+        const cleanTin = editFormData.tin.trim().toUpperCase().replace(/[\s-]/g, '')
+        const cleanId = editFormData.idNumber.trim().toUpperCase().replace(/[\s-]/g, '')
+
+        // Build customer override
+        const customerOverride = {
+           name: editFormData.name.trim().toUpperCase(),
+           tin: cleanTin,
+           email: editFormData.email.trim(),
+           phone: editFormData.phone.trim().replace(/[\s-]/g, ''),
+           id_type: editFormData.idType,
+           id_number: cleanId,
+           address: editFormData.address.trim(),
+           postcode: editFormData.postcode.trim(),
+           city: editFormData.city.trim(),
+           state: editFormData.state,
+           country: editFormData.country
+        }
+
+        const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/einvoice/submit`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+          },
+          body: JSON.stringify({
+            order_id: invoice.order_id,
+            pos_request_id: invoice.pos_request_id,
+            merchant_id: invoice.merchant_id,
+            customer: customerOverride // Send overrides directly
+          })
+        })
+
+        const result = await res.json()
+        if (!res.ok) throw new Error(result.error || 'Submission failed')
+
+        toast.success('Successfully submitted!', { id: tId })
+        setIsEditModalOpen(false)
+        window.location.reload()
+     } catch (err: any) {
+        toast.error(err.message, { id: tId })
+     } finally {
+        setResubmitting(false)
+     }
+  }
+
+  const handleResubmit = async () => {
+    setResubmitting(true)
+    const tId = toast.loading('Resubmitting to LHDN...')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('No active session')
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/einvoice/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+        },
+        body: JSON.stringify({
+          order_id: invoice.order_id,
+          pos_request_id: invoice.pos_request_id,
+          merchant_id: invoice.merchant_id
+        })
+      })
+
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Submission failed')
+
+      toast.success('Successfully submitted!', { id: tId })
+      window.location.reload()
+    } catch (err: any) {
+      toast.error(err.message, { id: tId })
+    } finally {
+      setResubmitting(false)
+    }
+  }
+
+  const handleCheckStatus = async () => {
+    setCheckingStatus(true)
+    const tId = toast.loading('Checking LHDN status...')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('No active session')
+
+      // Trigger a poll on the worker. Technically poll-status does a broad poll,
+      // but we call it here to ensure this specific invoice is checked and updated.
+      const { data, error } = await invokeWorker('poll-lhdn-status')
+
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+
+      toast.success('Status updated!', { id: tId })
+      window.location.reload()
+    } catch (err: any) {
+      toast.error(err.message, { id: tId })
+    } finally {
+      setCheckingStatus(false)
+    }
+  }
 
   useEffect(() => {
     async function fetchDetails() {
@@ -64,6 +217,21 @@ export default function InvoiceDetailPage() {
           .eq('document_id', data.id)
         
         if (items) setLineItems(items)
+
+        // Fetch Seller Info
+        const { data: merchantData } = await supabase
+          .from('merchants')
+          .select('*')
+          .eq('id', data.merchant_id)
+          .single()
+        if (merchantData) setMerchant(merchantData)
+
+        const { data: configData } = await supabase
+          .from('merchant_einvoice_config')
+          .select('*')
+          .eq('merchant_id', data.merchant_id)
+          .single()
+        if (configData) setConfig(configData)
       }
       setLoading(false)
     }
@@ -92,22 +260,48 @@ export default function InvoiceDetailPage() {
             <div className="flex items-center gap-3">
                <h1 className="text-3xl font-black text-gray-900 tracking-tight">Invoice #{invoice.order_number || invoice.id.slice(0, 8)}</h1>
                <StatusBadge status={invoice.status} />
+               {config?.env === 'sandbox' && (
+                  <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-widest rounded-md border border-amber-200">
+                     Sandbox
+                  </span>
+               )}
             </div>
          </div>
          
          <div className="flex items-center gap-2">
+            {!isFailed && invoice.status !== 'validated' && (
+              <button 
+                onClick={handleCheckStatus}
+                disabled={checkingStatus}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-100 rounded-xl text-xs font-bold text-amber-600 hover:bg-amber-100 transition-all shadow-sm shadow-amber-100"
+              >
+                <RefreshCw size={14} className={checkingStatus ? 'animate-spin' : ''} /> 
+                {checkingStatus ? 'Checking...' : 'Check Status'}
+              </button>
+            )}
             {!isFailed && (
               <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all">
                 <Download size={14} /> Download PDF
               </button>
             )}
             {isFailed && (
-              <button 
-                onClick={() => toast.loading('Resubmitting...')}
-                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
-              >
-                 <RefreshCw size={14} /> Fix & Resubmit
-              </button>
+              <div className="flex items-center gap-3">
+                 <button 
+                   onClick={() => setIsEditModalOpen(true)}
+                   className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-xl text-xs font-black hover:bg-black transition-all shadow-lg shadow-gray-200"
+                 >
+                    <Edit2 size={14} />
+                    Edit & Resubmit
+                 </button>
+                 <button 
+                   onClick={handleResubmit}
+                   disabled={resubmitting}
+                   className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:opacity-50"
+                 >
+                    <RefreshCw size={14} className={resubmitting ? 'animate-spin' : ''} /> 
+                    {resubmitting ? 'Submitting...' : 'Fix & Resubmit'}
+                 </button>
+              </div>
             )}
          </div>
       </div>
@@ -187,8 +381,13 @@ export default function InvoiceDetailPage() {
                            Seller Details
                         </div>
                         <div className="space-y-1">
-                           <div className="text-sm font-black text-gray-900">Your Merchant Name</div>
-                           <div className="text-xs font-bold text-gray-500">TIN: C22345678912</div>
+                           <div className="text-sm font-black text-gray-900">{merchant?.store_name || merchant?.company_name || 'Registered Merchant'}</div>
+                           <div className="text-xs font-bold text-gray-500">TIN: {config?.tin || 'Not Configured'}</div>
+                           <div className="text-xs font-bold text-gray-500">{config?.registration_no_type || 'BRN'}: {config?.registration_no || 'NA'}</div>
+                           <div className="text-[10px] font-bold text-gray-400 leading-tight pt-1">
+                              {merchant?.address_line1}<br/>
+                              {merchant?.postcode} {merchant?.city}, {merchant?.state}
+                           </div>
                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 mt-2">
                               <ShieldCheck size={12} /> Verified by MerchantMind
                            </div>
@@ -202,9 +401,29 @@ export default function InvoiceDetailPage() {
                            Buyer Details
                         </div>
                         <div className="space-y-1">
-                           <div className="text-sm font-black text-gray-900">Buyer Name or Company</div>
-                           <div className="text-xs font-bold text-gray-500">TIN: {invoice.buyer_tin || 'Pending Registration'}</div>
-                           <div className="text-xs font-bold text-gray-500">Reg No: 202301011223</div>
+                           <div className="text-sm font-black text-gray-900">{invoice.buyer_name || 'Generic Buyer'}</div>
+                           <div className="text-xs font-bold text-gray-500">TIN: {invoice.buyer_tin || 'Not Displayed'}</div>
+                           {invoice.einvoice_details?.Invoice?.[0]?.AccountingCustomerParty?.[0]?.Party?.[0]?.PartyIdentification?.[1]?.ID?.[0]?._ && (
+                              <div className="text-xs font-bold text-gray-500">
+                                 {invoice.einvoice_details.Invoice[0].AccountingCustomerParty[0].Party[0].PartyIdentification[1].ID[0].schemeID}: {invoice.einvoice_details.Invoice[0].AccountingCustomerParty[0].Party[0].PartyIdentification[1].ID[0]._}
+                              </div>
+                           )}
+                            <div className="pt-2 space-y-1">
+                               <div className="flex items-start gap-2 text-[10px] font-bold text-gray-500">
+                                  <MapPin size={12} className="text-gray-400 mt-0.5 shrink-0" />
+                                  <span className="leading-tight">
+                                     {invoice.einvoice_details?.Invoice?.[0]?.AccountingCustomerParty?.[0]?.Party?.[0]?.PostalAddress?.[0]?.AddressLine?.[0]?.Line?.[0]?._ || 'Address not provided'}
+                                  </span>
+                               </div>
+                               <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500">
+                                  <Phone size={12} className="text-gray-400 shrink-0" />
+                                  {invoice.einvoice_details?.Invoice?.[0]?.AccountingCustomerParty?.[0]?.Party?.[0]?.Contact?.[0]?.Telephone?.[0]?._ || 'N/A'}
+                               </div>
+                               <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500">
+                                  <Mail size={12} className="text-gray-400 shrink-0" />
+                                  {invoice.buyer_email || invoice.einvoice_details?.Invoice?.[0]?.AccountingCustomerParty?.[0]?.Party?.[0]?.Contact?.[0]?.ElectronicMail?.[0]?._ || 'Email not provided'}
+                               </div>
+                            </div>
                         </div>
                      </div>
                   </div>
@@ -243,12 +462,24 @@ export default function InvoiceDetailPage() {
                              )}
                            </tbody>
                            <tfoot className="bg-gray-50/30">
-                              <tr>
-                                 <td colSpan={3} className="px-6 py-4 text-right text-xs font-black text-gray-500 uppercase tracking-widest">Grand Total (MYR)</td>
-                                 <td className="px-6 py-4 text-right text-base font-black text-gray-900 tracking-tight">
-                                    RM {Number(invoice.total_amount).toFixed(2)}
-                                 </td>
-                              </tr>
+                               <tr className="border-t border-gray-100">
+                                  <td colSpan={3} className="px-6 py-2 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Subtotal (Excl. Tax)</td>
+                                  <td className="px-6 py-2 text-right text-xs font-black text-gray-900">
+                                     RM {(Number(invoice.total_amount) - Number(invoice.tax_amount || 0)).toFixed(2)}
+                                  </td>
+                               </tr>
+                               <tr>
+                                  <td colSpan={3} className="px-6 py-2 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Tax (SST 0%)</td>
+                                  <td className="px-6 py-2 text-right text-xs font-black text-gray-900">
+                                     RM {Number(invoice.tax_amount || 0).toFixed(2)}
+                                  </td>
+                               </tr>
+                               <tr className="bg-blue-50/20">
+                                  <td colSpan={3} className="px-6 py-4 text-right text-xs font-black text-gray-500 uppercase tracking-widest">Grand Total (MYR)</td>
+                                  <td className="px-6 py-4 text-right text-base font-black text-blue-600 tracking-tight">
+                                     RM {Number(invoice.total_amount).toFixed(2)}
+                                  </td>
+                               </tr>
                            </tfoot>
                         </table>
                      </div>
@@ -337,15 +568,25 @@ export default function InvoiceDetailPage() {
                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">LHDN UUID</label>
                        <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100 group">
                           <span className="text-[10px] font-mono font-bold text-gray-500 truncate flex-1">{invoice.lhdn_uuid}</span>
-                          <button className="text-gray-400 hover:text-gray-900 transition-colors">
+                          <a 
+                            href={`${config?.env === 'production' ? 'https://myinvois.hasil.gov.my' : 'https://preprod.myinvois.hasil.gov.my'}/documents/${invoice.lhdn_uuid}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-400 hover:text-gray-900 transition-colors"
+                            title="View on LHDN Portal"
+                          >
                              <ExternalLink size={14} />
-                          </button>
+                          </a>
                        </div>
                     </div>
                     {invoice.qr_code_url && (
                         <div className="p-4 bg-gray-50 rounded-[2rem] border border-gray-100 flex flex-col items-center gap-4">
                            <div className="w-32 h-32 bg-white rounded-2xl flex items-center justify-center p-2 shadow-sm border border-gray-100">
-                             <img src={invoice.qr_code_url} alt="LHDN QR" className="w-full h-full" />
+                             <img 
+                               src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(invoice.qr_code_url)}`} 
+                               alt="LHDN QR" 
+                               className="w-full h-full object-contain" 
+                             />
                            </div>
                            <p className="text-[9px] font-black text-gray-400 uppercase text-center leading-relaxed">
                               LHDN Validated QR Code.<br/>Scan to verify on MyInvois portal.
@@ -372,6 +613,121 @@ export default function InvoiceDetailPage() {
             </div>
          </div>
       </div>
-    </div>
-  )
+         {/* Edit Modal */}
+         {isEditModalOpen && (
+            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+               <div className="bg-white rounded-[2.5rem] w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                  <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
+                     <div className="space-y-0.5">
+                        <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter">Edit Buyer Details</h3>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fix rejection reasons manually</p>
+                     </div>
+                     <button onClick={() => setIsEditModalOpen(false)} className="p-2 hover:bg-gray-50 rounded-xl transition-colors">
+                        <X size={20} className="text-gray-400" />
+                     </button>
+                  </div>
+                  
+                  <form onSubmit={handleUpdateAndResubmit} className="flex-1 overflow-y-auto p-8 space-y-6">
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Buyer Name</label>
+                           <input 
+                             required
+                             type="text" 
+                             className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold"
+                             value={editFormData.name}
+                             onChange={(e) => setEditFormData({...editFormData, name: e.target.value.toUpperCase()})}
+                           />
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">TIN Number</label>
+                           <input 
+                             required
+                             type="text" 
+                             className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold"
+                             value={editFormData.tin}
+                             onChange={(e) => setEditFormData({...editFormData, tin: e.target.value.toUpperCase()})}
+                             placeholder="e.g. C1234..."
+                           />
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Phone</label>
+                           <input 
+                             type="text" 
+                             className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold"
+                             value={editFormData.phone}
+                             onChange={(e) => setEditFormData({...editFormData, phone: e.target.value})}
+                           />
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Email Address</label>
+                           <input 
+                             required
+                             type="email" 
+                             className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold"
+                             value={editFormData.email}
+                             onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
+                           />
+                        </div>
+                     </div>
+
+                     <div className="flex gap-4">
+                        <div className="w-1/3 space-y-2">
+                           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">ID Type</label>
+                           <select 
+                             className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold appearance-none"
+                             value={editFormData.idType}
+                             onChange={(e) => setEditFormData({...editFormData, idType: e.target.value})}
+                           >
+                              <option value="BRN">BRN</option>
+                              <option value="MyKad">MyKad</option>
+                              <option value="Passport">Passport</option>
+                           </select>
+                        </div>
+                        <div className="flex-1 space-y-2">
+                           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">ID Number / NRIC</label>
+                           <input 
+                             required
+                             type="text" 
+                             className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold"
+                             value={editFormData.idNumber}
+                             onChange={(e) => setEditFormData({...editFormData, idNumber: e.target.value.toUpperCase()})}
+                           />
+                        </div>
+                     </div>
+
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Address Line</label>
+                        <textarea 
+                          required
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold resize-none"
+                          rows={2}
+                          value={editFormData.address}
+                          onChange={(e) => setEditFormData({...editFormData, address: e.target.value})}
+                        />
+                     </div>
+                  </form>
+                  
+                  <div className="px-8 py-6 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
+                     <button 
+                       type="button"
+                       onClick={() => setIsEditModalOpen(false)}
+                       className="px-6 py-3 rounded-xl text-xs font-black text-gray-400 hover:text-gray-900 transition-colors uppercase tracking-widest"
+                     >
+                        Cancel
+                     </button>
+                     <button 
+                       onClick={handleUpdateAndResubmit}
+                       disabled={resubmitting}
+                       className="px-8 py-3 bg-blue-600 text-white rounded-xl text-xs font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 flex items-center gap-2 uppercase tracking-widest"
+                     >
+                        {resubmitting ? <RefreshCw className="animate-spin" size={14} /> : <CheckCircle2 size={14} />}
+                        Save & Resubmit
+                     </button>
+                  </div>
+               </div>
+            </div>
+         )}
+      </div>
+   )
 }

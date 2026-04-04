@@ -150,6 +150,7 @@ export interface StoreConfig {
   sizeGuideUrl:     string
   minOrderAmount:   number
   freeDeliveryAbove: number
+  delivery_radius_km: number
   lat:              number | null
   lng:              number | null
   // SEO
@@ -171,7 +172,7 @@ export const DEFAULT_CONFIG: StoreConfig = {
   tiktok: '', twitter: '', website: '', returnPolicy: '', shippingPolicy: '',
   privacyPolicy: '', enableAddons: false, enableBooking: false,
   showCalories: false, showSizeGuide: false, sizeGuideUrl: '',
-  minOrderAmount: 0, freeDeliveryAbove: 0, lat: null, lng: null, metaTitle: '', metaDescription: '', metaKeywords: '',
+  minOrderAmount: 0, freeDeliveryAbove: 0, delivery_radius_km: 10, lat: null, lng: null, metaTitle: '', metaDescription: '', metaKeywords: '',
 }
 
 export function cssVarsFromAppearance(a: StoreAppearance): Record<string,string> {

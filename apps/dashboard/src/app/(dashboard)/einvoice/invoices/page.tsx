@@ -97,7 +97,7 @@ export default function InvoiceListPage() {
 
   const filteredInvoices = invoices.filter(inv => {
     const isConsolidatedTab = activeTab === 'consolidated'
-    const isConsolidatedInvoice = inv.invoice_type === 'consolidated' || !inv.order_id
+    const isConsolidatedInvoice = inv.invoice_type === 'consolidated' || (!inv.order_id && !inv.pos_request_id)
     
     if (isConsolidatedTab && !isConsolidatedInvoice) return false
     if (!isConsolidatedTab && isConsolidatedInvoice) return false

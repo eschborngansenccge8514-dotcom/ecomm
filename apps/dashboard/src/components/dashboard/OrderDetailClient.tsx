@@ -33,6 +33,15 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+// ─── E-Invoice Validation ───────────────────────────────────────────────────
+
+const TIN_REGEX = /^(IG|C|OG|TA|NR|EI|F|SG)[0-9]{10,12}$/
+const NRIC_REGEX = /^[0-9]{12}$/
+const BRN_REGEX = /^[a-zA-Z0-9]{1,20}$/
+const PHONE_REGEX = /^\+?[0-9]{7,15}$/
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const MALAYSIAN_BANKS = [
@@ -467,12 +476,25 @@ function CourierSelectionModal({
     </div>
   )
 }
+// Classification codes per LHDN MyInvois specification
+const CLASSIFICATION_CODES = [
+  { code: '022', label: 'Others', desc: 'General retail goods/services with no specific category' },
+  { code: '003', label: 'Computers / Smartphones / Tablets', desc: 'Tech gadgets eligible for individual RM2,500 tax relief' },
+  { code: '001', label: 'Breastfeeding equipment', desc: 'Eligible for individual tax relief' },
+  { code: '013', label: 'Sports / Recreation / Gym', desc: 'Eligible for individual lifestyle tax relief' },
+  { code: '044', label: 'Vouchers / Gift cards / Loyalty points', desc: 'Prepaid value products' },
+  { code: '030', label: 'Repair and maintenance', desc: 'Service repairs' },
+  { code: '027', label: 'Reimbursement', desc: 'Passing on a cost originally billed to your company' },
+  { code: '018', label: 'Land and buildings', desc: 'Applicable for property-related transactions' },
+  { code: '004', label: 'Consolidated e-Invoice', desc: 'ONLY for month-end General Public batch reporting' },
+]
 
 function IssueEInvoiceModal({
   open,
   onConfirm,
   onCancel,
   order,
+  einvoice,
   merchantConfig,
   isSubmitting
 }: {
@@ -480,16 +502,36 @@ function IssueEInvoiceModal({
   onConfirm: (data: any) => void
   onCancel: () => void
   order: any
+  einvoice?: any
   merchantConfig: any
   isSubmitting: boolean
 }) {
+  const addr = order.delivery_address || {}
+  const reqDetails = order.einvoice_details || {}
+  const invoiceDetails = einvoice?.einvoice_details || {}
+
+  // Prioritize existing invoice data (if resubmitting), then requested data (if mobile app requested), then fallback to defaults.
+  const initialTin = invoiceDetails.tin || reqDetails.tin || ''
+  const initialName = invoiceDetails.name || reqDetails.name || order.buyer_name || addr.recipient_name || addr.name || ''
+  // Only default to General Public if no TIN has been previously provided and no name is available
+  const isB2C = initialTin === 'EI00000000010' || (!initialTin && !initialName)
+
   const [customer, setCustomer] = useState({
-    name: order.buyer_name || order.delivery_address?.recipient_name || 'General Public',
-    tin: 'EI00000000010',
-    id_type: 'BRN',
-    id_number: 'NA',
-    classification_code: '004'
+    name: initialName || 'General Public',
+    tin: initialTin || 'EI00000000010',
+    id_type: invoiceDetails.id_type || reqDetails.id_type || 'BRN',
+    id_number: invoiceDetails.id_no || reqDetails.id_no || (isB2C ? 'NA' : ''),
+    classification_code: isB2C ? '004' : '022',
+    email: invoiceDetails.email || reqDetails.email || order.customer?.email || '',
+    phone: invoiceDetails.phone || reqDetails.phone || addr.phone || order.customer?.phone || '',
+    address_line1: invoiceDetails.address_line1 || reqDetails.address_line1 || addr.address_line1 || '',
+    address_line2: invoiceDetails.address_line2 || reqDetails.address_line2 || addr.address_line2 || '',
+    city: invoiceDetails.city || reqDetails.city || addr.city || '',
+    state: invoiceDetails.state || reqDetails.state || addr.state || '',
+    postcode: invoiceDetails.postcode || reqDetails.postcode || addr.postcode || ''
   })
+
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   const [merchantOverrides, setMerchantOverrides] = useState({
     msic_code: merchantConfig?.msic_code === '47910' ? '47912' : (merchantConfig?.msic_code || '47912'),
@@ -502,41 +544,169 @@ function IssueEInvoiceModal({
 
   const isGeneralPublic = customer.tin === 'EI00000000010'
 
+  const handleGeneralPublic = () => {
+    setCustomer(prev => ({
+      ...prev,
+      name: 'General Public',
+      tin: 'EI00000000010',
+      id_type: 'BRN',
+      id_number: 'NA',
+      classification_code: '004',
+      address_line1: 'NA',
+      city: 'NA',
+      state: '00',
+      postcode: 'NA',
+      phone: 'NA',
+      email: ''
+    }))
+    setErrors({})
+  }
+
+  const validate = () => {
+    const newErrors: Record<string, string> = {}
+    
+    if (!customer.name.trim()) newErrors.name = 'Name is required'
+    
+    // TIN validation
+    const cleanTin = customer.tin.replace(/[\s-]/g, '').toUpperCase()
+    if (!TIN_REGEX.test(cleanTin)) {
+      newErrors.tin = 'Invalid TIN format (e.g. C1234567890)'
+    }
+
+    // ID Number validation only for non-general-public
+    if (!isGeneralPublic) {
+      const cleanId = customer.id_number.replace(/[\s-]/g, '')
+      if (customer.id_type === 'NRIC' && !NRIC_REGEX.test(cleanId)) {
+        newErrors.id_number = 'NRIC must be 12 digits with no dashes'
+      } else if (customer.id_type === 'BRN' && !BRN_REGEX.test(cleanId)) {
+        newErrors.id_number = 'Invalid BRN format'
+      } else if (!cleanId) {
+        newErrors.id_number = 'ID Number is required'
+      }
+    }
+
+    // Email validation — for individual invoices, email is required (to send them the e-invoice)
+    if (!isGeneralPublic && !customer.email) {
+      newErrors.email = 'Email is required for individual e-invoice'
+    } else if (customer.email && !EMAIL_REGEX.test(customer.email)) {
+      newErrors.email = 'Invalid email address'
+    }
+
+    // Phone validation — skip for General Public (value will be 'NA')
+    if (!isGeneralPublic && customer.phone) {
+      const cleanPhone = customer.phone.replace(/[\s-]/g, '')
+      if (!PHONE_REGEX.test(cleanPhone)) {
+        newErrors.phone = 'Invalid phone number'
+      }
+    }
+
+    // Address validation — General Public can use 'NA' placeholders; individual must have real address
+    if (!isGeneralPublic) {
+      if (!customer.address_line1.trim()) newErrors.address_line1 = 'Address line 1 is required'
+      if (!customer.city.trim()) newErrors.city = 'City is required'
+      if (!customer.state.trim()) newErrors.state = 'State is required'
+      if (!customer.postcode.trim()) newErrors.postcode = 'Postcode is required'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSubmit = () => {
+    if (validate()) {
+      // Clean data before sending
+      const cleanCustomer = {
+        ...customer,
+        tin: customer.tin.replace(/[\s-]/g, '').toUpperCase(),
+        id_number: customer.id_number.replace(/[\s-]/g, '').toUpperCase(),
+        phone: customer.phone.replace(/[\s-]/g, '')
+      }
+      onConfirm({ customer: cleanCustomer, merchantOverrides })
+    } else {
+      toast.error('Please fix the errors before submitting')
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative bg-white rounded-3xl shadow-2xl flex flex-col max-w-lg w-full max-h-[90vh] z-10 overflow-hidden border border-gray-100">
+      <div className="relative bg-white rounded-3xl shadow-2xl flex flex-col max-w-2xl w-full max-h-[90vh] z-10 overflow-hidden border border-gray-100">
         <div className="p-6 border-b border-gray-50 flex justify-between items-center sticky top-0 bg-white/80 backdrop-blur-md z-10">
           <div>
             <h3 className="text-xl font-bold text-gray-900">Issue E-Invoice</h3>
-            <p className="text-sm text-gray-400">Complete required details for LHDN compliance</p>
+            <p className="text-sm text-gray-400">LHDN MyInvois · Individual or General Public</p>
           </div>
-          <button onClick={onCancel} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
+          <div className="flex items-center gap-3">
+             <button 
+               type="button"
+               onClick={isGeneralPublic ? () => {
+                 setCustomer(prev => ({
+                   ...prev,
+                   name: '',
+                   tin: '',
+                   id_type: 'NRIC',
+                   id_number: '',
+                   classification_code: '022',
+                   address_line1: addr.address_line1 || '',
+                   city: addr.city || '',
+                   state: addr.state || '',
+                   postcode: addr.postcode || '',
+                   phone: addr.phone || '',
+                   email: order.customer?.email || '',
+                 }))
+                 setErrors({})
+               } : handleGeneralPublic}
+               className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${isGeneralPublic ? 'bg-blue-500 text-white border-blue-500 shadow-md' : 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100'}`}
+             >
+               {isGeneralPublic ? '✓ General Public (B2C)' : 'Set General Public (B2C)'}
+             </button>
+             <button onClick={onCancel} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+               <X className="w-5 h-5 text-gray-400" />
+             </button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Customer Details Section */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-blue-600 mb-2">
-              <User className="w-4 h-4" />
-              <h4 className="text-sm font-bold uppercase tracking-wider">Customer Information</h4>
+        {/* Context Banner */}
+        {isGeneralPublic ? (
+          <div className="mx-6 mt-4 p-3 bg-blue-50 border border-blue-100 rounded-2xl flex gap-3">
+            <span className="text-lg shrink-0">🗂️</span>
+            <div>
+              <p className="text-xs font-bold text-blue-800">Consolidated / General Public Mode</p>
+              <p className="text-xs text-blue-600 mt-0.5">For B2C transactions where the buyer does not need a personal e-invoice. Address and contact details are set to system defaults. This is typically used for month-end consolidated invoices.</p>
             </div>
-            
-            <div className="space-y-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-              <div className="grid gap-2">
-                <Label htmlFor="custName" className="text-xs font-semibold text-gray-500 ml-1">Registration Name</Label>
-                <Input
-                  id="custName"
-                  value={customer.name}
-                  onChange={e => setCustomer({ ...customer, name: e.target.value })}
-                  placeholder="Full name or company name"
-                  className="bg-white border-gray-200 rounded-xl focus:ring-blue-500 h-10 italic"
-                />
-              </div>
+          </div>
+        ) : (
+          <div className="mx-6 mt-4 p-3 bg-amber-50 border border-amber-100 rounded-2xl flex gap-3">
+            <span className="text-lg shrink-0">👤</span>
+            <div>
+              <p className="text-xs font-bold text-amber-800">Individual e-Invoice Mode</p>
+              <p className="text-xs text-amber-700 mt-0.5">Required when the buyer requests a personal e-invoice for tax relief or business expense claims. Must collect their TIN, NRIC/BRN, email, and full address.</p>
+            </div>
+          </div>
+        )}
 
-              <div className="grid grid-cols-2 gap-4">
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          {/* Customer Details Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-blue-600 mb-2">
+                <User className="w-4 h-4" />
+                <h4 className="text-sm font-bold uppercase tracking-wider">Identity</h4>
+              </div>
+              
+              <div className="space-y-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                <div className="grid gap-2">
+                  <Label htmlFor="custName" className="text-xs font-semibold text-gray-500 ml-1">Registration Name</Label>
+                  <Input
+                    id="custName"
+                    value={customer.name}
+                    onChange={e => setCustomer({ ...customer, name: e.target.value })}
+                    placeholder="Full name or company name"
+                    className={cn("bg-white border-gray-200 rounded-xl focus:ring-blue-500 h-10", errors.name && "border-red-500")}
+                  />
+                  {errors.name && <p className="text-[10px] text-red-500 ml-1 font-medium">{errors.name}</p>}
+                </div>
+
                 <div className="grid gap-2">
                   <Label htmlFor="custTin" className="text-xs font-semibold text-gray-500 ml-1">TIN Number</Label>
                   <Input
@@ -544,67 +714,186 @@ function IssueEInvoiceModal({
                     value={customer.tin}
                     onChange={e => {
                       const val = e.target.value.toUpperCase()
-                      setCustomer({ ...customer, tin: val, id_number: val === 'EI00000000010' ? 'NA' : customer.id_number })
+                      setCustomer({ ...customer, tin: val, id_number: (val === 'EI00000000010' || val === 'EI00000000011') ? 'NA' : customer.id_number })
                     }}
                     placeholder="e.g. C1234567890"
-                    className="bg-white border-gray-200 rounded-xl focus:ring-blue-500 h-10"
+                    className={cn("bg-white border-gray-200 rounded-xl focus:ring-blue-500 h-10", errors.tin && "border-red-500")}
                   />
-                  {isGeneralPublic && <p className="text-[10px] text-blue-500 ml-1 font-medium">Defaulting to General Public</p>}
+                  {errors.tin ? <p className="text-[10px] text-red-500 ml-1 font-medium">{errors.tin}</p> : isGeneralPublic && <p className="text-[10px] text-blue-500 ml-1 font-medium">Using generic B2C TIN</p>}
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="custClass" className="text-xs font-semibold text-gray-500 ml-1">Classification Code</Label>
-                  <Select 
-                    value={customer.classification_code} 
-                    onValueChange={v => setCustomer({...customer, classification_code: v || '004'})}
-                  >
-                    <SelectTrigger className="bg-white border-gray-200 rounded-xl focus:ring-blue-500 h-10">
-                      <SelectValue placeholder="Code" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="004">004 (Sales/Services)</SelectItem>
-                      <SelectItem value="001">001 (Consolidated)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
 
-              {!isGeneralPublic && (
-                <div className="grid grid-cols-2 gap-4 pt-1 animate-in slide-in-from-top-2 duration-300">
-                  <div className="grid gap-2">
-                    <Label htmlFor="idType" className="text-xs font-semibold text-gray-500 ml-1">ID Type</Label>
-                    <Select 
-                      value={customer.id_type} 
-                      onValueChange={v => setCustomer({...customer, id_type: v || 'BRN'})}
+                <div className="grid gap-2">
+                  <Label htmlFor="custClass" className="text-xs font-semibold text-gray-500 ml-1">
+                    Classification Code
+                    {isGeneralPublic && <span className="ml-1 text-blue-500">(Consolidated — 004)</span>}
+                  </Label>
+                  {isGeneralPublic ? (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl h-10">
+                      <span className="font-mono text-sm font-black text-blue-700">004</span>
+                      <span className="text-xs text-blue-500">Consolidated e-Invoice</span>
+                    </div>
+                  ) : (
+                    <Select
+                      value={customer.classification_code}
+                      onValueChange={v => setCustomer({...customer, classification_code: v || '022'})}
                     >
                       <SelectTrigger className="bg-white border-gray-200 rounded-xl focus:ring-blue-500 h-10">
-                        <SelectValue placeholder="Type" />
+                        <SelectValue placeholder="Select classification" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="NRIC">NRIC (Individual)</SelectItem>
-                        <SelectItem value="BRN">BRN (Company)</SelectItem>
-                        <SelectItem value="PASSPORT">Passport</SelectItem>
-                        <SelectItem value="ARMY">Army ID</SelectItem>
+                        {CLASSIFICATION_CODES.filter(c => c.code !== '004').map(c => (
+                          <SelectItem key={c.code} value={c.code}>
+                            <span className="font-mono font-bold mr-1">{c.code}</span> — {c.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
+                  )}
+                  {!isGeneralPublic && (() => {
+                    const found = CLASSIFICATION_CODES.find(c => c.code === customer.classification_code)
+                    return found ? (
+                      <p className="text-[10px] text-gray-400 ml-1">{found.desc}</p>
+                    ) : null
+                  })()}
+                </div>
+
+                {!isGeneralPublic && (
+                  <div className="grid gap-4 pt-1 animate-in slide-in-from-top-2 duration-300">
+                    <div className="grid gap-2">
+                      <Label htmlFor="idType" className="text-xs font-semibold text-gray-500 ml-1">ID Type</Label>
+                      <Select 
+                        value={customer.id_type} 
+                        onValueChange={v => setCustomer({...customer, id_type: v || 'BRN'})}
+                      >
+                        <SelectTrigger className="bg-white border-gray-200 rounded-xl focus:ring-blue-500 h-10">
+                          <SelectValue placeholder="Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="NRIC">NRIC (Individual)</SelectItem>
+                          <SelectItem value="BRN">BRN (Company)</SelectItem>
+                          <SelectItem value="PASSPORT">Passport</SelectItem>
+                          <SelectItem value="ARMY">Army ID</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="idNum" className="text-xs font-semibold text-gray-500 ml-1">ID Number</Label>
+                      <Input
+                        id="idNum"
+                        value={customer.id_number}
+                        onChange={e => setCustomer({ ...customer, id_number: e.target.value.toUpperCase() })}
+                        placeholder="e.g. 900101015555"
+                        className={cn("bg-white border-gray-200 rounded-xl focus:ring-blue-500 h-10", errors.id_number && "border-red-500")}
+                      />
+                      {errors.id_number && <p className="text-[10px] text-red-500 ml-1 font-medium">{errors.id_number}</p>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className={`flex items-center gap-2 mb-2 ${isGeneralPublic ? 'text-gray-300' : 'text-blue-600'}`}>
+                <MapPin className="w-4 h-4" />
+                <h4 className="text-sm font-bold uppercase tracking-wider">Contact &amp; Address</h4>
+                {isGeneralPublic && <span className="text-[10px] font-bold text-gray-300 ml-1">(Auto-managed)</span>}
+              </div>
+
+              <div className={`space-y-3 p-4 rounded-2xl border ${isGeneralPublic ? 'bg-gray-50/50 border-dashed border-gray-200 opacity-50 pointer-events-none select-none' : 'bg-gray-50 border-gray-100'}`}>
+                 <div className="grid gap-2">
+                  <Label htmlFor="email" className="text-xs font-semibold text-gray-500 ml-1">Email</Label>
+                  <Input
+                    id="email"
+                    value={customer.email}
+                    onChange={e => setCustomer({ ...customer, email: e.target.value })}
+                    placeholder="customer@example.com"
+                    className={cn("bg-white border-gray-200 rounded-xl focus:ring-blue-500 h-10", errors.email && "border-red-500")}
+                  />
+                  {errors.email && <p className="text-[10px] text-red-500 ml-1 font-medium">{errors.email}</p>}
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="phone" className="text-xs font-semibold text-gray-500 ml-1">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    value={customer.phone}
+                    onChange={e => setCustomer({ ...customer, phone: e.target.value })}
+                    placeholder="e.g. 0123456789"
+                    className={cn("bg-white border-gray-200 rounded-xl focus:ring-blue-500 h-10", errors.phone && "border-red-500")}
+                  />
+                  {errors.phone && <p className="text-[10px] text-red-500 ml-1 font-medium">{errors.phone}</p>}
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="addr1" className="text-xs font-semibold text-gray-500 ml-1">Address Line 1</Label>
+                  <Input
+                    id="addr1"
+                    value={customer.address_line1}
+                    onChange={e => setCustomer({ ...customer, address_line1: e.target.value })}
+                    placeholder="No. 1, Jalan Street"
+                    className={cn("bg-white border-gray-200 rounded-xl focus:ring-blue-500 h-10", errors.address_line1 && "border-red-500")}
+                  />
+                  {errors.address_line1 && <p className="text-[10px] text-red-500 ml-1 font-medium">{errors.address_line1}</p>}
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="addr2" className="text-xs font-semibold text-gray-500 ml-1">Address Line 2 (Optional)</Label>
+                  <Input
+                    id="addr2"
+                    value={customer.address_line2}
+                    onChange={e => setCustomer({ ...customer, address_line2: e.target.value })}
+                    className="bg-white border-gray-200 rounded-xl h-10"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="city" className="text-xs font-semibold text-gray-500 ml-1">City</Label>
+                    <Input
+                      id="city"
+                      value={customer.city}
+                      onChange={e => setCustomer({ ...customer, city: e.target.value })}
+                      className={cn("bg-white border-gray-200 rounded-xl h-10", errors.city && "border-red-500")}
+                    />
+                    {errors.city && <p className="text-[10px] text-red-500 ml-1 font-medium">{errors.city}</p>}
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="idNum" className="text-xs font-semibold text-gray-500 ml-1">ID Number</Label>
+                    <Label htmlFor="postcode" className="text-xs font-semibold text-gray-500 ml-1">Postcode</Label>
                     <Input
-                      id="idNum"
-                      value={customer.id_number}
-                      onChange={e => setCustomer({ ...customer, id_number: e.target.value.toUpperCase() })}
-                      placeholder="e.g. 900101015555"
-                      className="bg-white border-gray-200 rounded-xl focus:ring-blue-500 h-10"
+                      id="postcode"
+                      value={customer.postcode}
+                      onChange={e => setCustomer({ ...customer, postcode: e.target.value })}
+                      className={cn("bg-white border-gray-200 rounded-xl h-10", errors.postcode && "border-red-500")}
                     />
+                    {errors.postcode && <p className="text-[10px] text-red-500 ml-1 font-medium">{errors.postcode}</p>}
                   </div>
                 </div>
-              )}
+
+                <div className="grid gap-2">
+                  <Label htmlFor="state" className="text-xs font-semibold text-gray-500 ml-1">State</Label>
+                  <Select 
+                    value={customer.state} 
+                    onValueChange={v => setCustomer({...customer, state: v})}
+                  >
+                    <SelectTrigger className={cn("bg-white border-gray-200 rounded-xl h-10", errors.state && "border-red-500")}>
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.values(MY_STATES) as string[]).map(st => (
+                        <SelectItem key={st} value={st}>{st}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.state && <p className="text-[10px] text-red-500 ml-1 font-medium">{errors.state}</p>}
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Advanced Section Toggle */}
           <div>
             <button 
+              type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
               className="text-xs font-bold text-gray-400 hover:text-blue-500 flex items-center gap-1 transition-colors group"
             >
@@ -647,9 +936,9 @@ function IssueEInvoiceModal({
             </Button>
             <Button
               type="button"
-              onClick={() => onConfirm({ customer, merchantOverrides })}
+              onClick={handleSubmit}
               className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11 border-0 shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
-              disabled={isSubmitting || !customer.name || !customer.tin}
+              disabled={isSubmitting}
             >
               {isSubmitting ? (
                 <>
@@ -1218,7 +1507,7 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
     const tId = toast.loading('Submitting to LHDN MyInvois...')
     
     try {
-      const { data, error } = await invokeWorker('einvoice-submit', {
+      const { data, error } = await invokeWorker('einvoice/submit', {
         body: { 
           orderId: order.id, 
           merchant_id: merchantId,
@@ -1228,7 +1517,8 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
       })
 
       if (error) {
-        throw new Error(error.message || 'Failed to submit e-invoice')
+        const msg = typeof error === 'string' ? error : (error.message || error.error || 'Failed to submit e-invoice')
+        throw new Error(msg)
       }
 
       if (!data?.success) {
@@ -1281,6 +1571,7 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
         onConfirm={handleIssueEInvoice}
         onCancel={() => setShowEInvoiceModal(false)}
         order={order}
+        einvoice={eInvoice}
         merchantConfig={merchantEinvoiceConfig}
         isSubmitting={isIssuingEInvoice}
       />
@@ -1732,11 +2023,32 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
                       <span className={cn(
                         'text-xs font-bold px-2 py-0.5 rounded-full capitalize',
                         eInvoice.status === 'validated' ? 'bg-green-100 text-green-700' : 
-                        eInvoice.status === 'submitted' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
+                        eInvoice.status === 'submitted' ? 'bg-blue-100 text-blue-700' : 
+                        eInvoice.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
                       )}>
                         {eInvoice.status}
                       </span>
                     </div>
+
+                    {eInvoice.status === 'rejected' && eInvoice.error_message && (
+                      <div className="p-3 bg-red-50 border border-red-100 rounded-xl space-y-1.5">
+                        <div className="flex items-center gap-2 text-red-700">
+                          <ShieldAlert size={14} />
+                          <p className="text-xs font-bold uppercase tracking-wider">LHDN Rejection</p>
+                        </div>
+                        <p className="text-[10px] text-red-600 font-medium leading-relaxed">
+                          {eInvoice.error_message}
+                        </p>
+                        <Button 
+                          size="sm" 
+                          onClick={() => setShowEInvoiceModal(true)}
+                          className="w-full mt-2 bg-red-600 hover:bg-red-700 text-white h-8 text-[10px] font-black border-0"
+                        >
+                           Edit & Resubmit
+                        </Button>
+                      </div>
+                    )}
+
                     {eInvoice.lhdn_uuid && (
                       <div className="space-y-1">
                         <p className="text-xs text-gray-400 font-medium">LHDN UUID</p>
@@ -1751,6 +2063,15 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
                         <ExternalLink size={14} /> View on LHDN Portal
                       </a>
                     )}
+                    {eInvoice.status === 'validated' && (
+                       <button 
+                        onClick={() => printInvoice(order, merchant, merchantEinvoiceConfig, eInvoice)}
+                        className="w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm"
+                      >
+                         <Printer size={16} className="text-blue-600" />
+                         Print Tax Invoice
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -1758,7 +2079,7 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
                       Issue an official LHDN e-invoice for this order once it is confirmed and paid.
                     </p>
                     <button 
-                      onClick={() => eInvoice ? printInvoice(order, merchant, merchantEinvoiceConfig, eInvoice) : handleIssueEInvoice()}
+                      onClick={() => handleIssueEInvoice()}
                       disabled={isIssuingEInvoice || order.status === 'cancelled' || (order.payment_status !== 'paid' && !eInvoice)}
                       className={cn(
                         "w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm border-0",
@@ -1767,8 +2088,8 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
                           : "bg-gray-100 text-gray-400 cursor-not-allowed"
                       )}
                     >
-                      {isIssuingEInvoice ? <Loader2 size={16} className="animate-spin" /> : (eInvoice ? <Printer size={16} /> : <FileCheck size={16} />)}
-                      {isIssuingEInvoice ? 'Submitting to LHDN...' : (eInvoice ? 'Print Tax Invoice' : 'Issue & Print E-Invoice')}
+                      {isIssuingEInvoice ? <Loader2 size={16} className="animate-spin" /> : <FileCheck size={16} />}
+                      {isIssuingEInvoice ? 'Submitting to LHDN...' : 'Issue & Print E-Invoice'}
                     </button>
                     {order.payment_status !== 'paid' && (
                       <p className="text-[10px] text-amber-600 text-center font-medium">

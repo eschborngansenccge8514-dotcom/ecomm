@@ -7,6 +7,8 @@ import {
   Key, 
   Settings2, 
   Bell, 
+  AlertCircle,
+  Clock,
   ShieldCheck, 
   RefreshCw, 
   ArrowLeft,
@@ -68,8 +70,8 @@ export default function EinvoiceSettingsPage() {
                defaultPaymentTerms: config.default_payment_terms || '30',
                msmeCategory: config.msme_category || 'sdn_bhd',
                b2cFrequency: config.b2c_frequency || 'daily',
-               notifyOnFailure: true,
-               notifyOnExpiry: true,
+               notifyOnFailure: config.notify_on_failure ?? true,
+               notifyOnExpiry: config.notify_on_expiry ?? true,
             })
          }
       }
@@ -94,6 +96,8 @@ export default function EinvoiceSettingsPage() {
         default_payment_terms: formData.defaultPaymentTerms,
         msme_category: formData.msmeCategory,
         b2c_frequency: formData.b2cFrequency,
+        notify_on_failure: formData.notifyOnFailure,
+        notify_on_expiry: formData.notifyOnExpiry,
       }
 
       // Only update secret if changed from mask
@@ -290,9 +294,9 @@ export default function EinvoiceSettingsPage() {
              <div className="space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-gray-400">Payment Terms</label>
                 <select 
-                  value={formData.defaultPaymentTerms}
-                  onChange={(e) => setFormData({...formData, defaultPaymentTerms: e.target.value})}
-                  className="w-full px-4 py-3.5 bg-gray-50 border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-600 transition-all border appearance-none cursor-pointer"
+                   value={formData.defaultPaymentTerms}
+                   onChange={(e) => setFormData({...formData, defaultPaymentTerms: e.target.value})}
+                   className="w-full px-4 py-3.5 bg-gray-50 border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-600 transition-all border appearance-none cursor-pointer"
                 >
                    <option value="0">Cash on Receipt</option>
                    <option value="15">15 Days</option>
@@ -356,40 +360,65 @@ export default function EinvoiceSettingsPage() {
   const renderNotifications = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
        <div className="space-y-1">
-          <h3 className="text-xl font-black text-gray-900 tracking-tight">Notifications</h3>
-          <p className="text-sm text-gray-500 font-medium">Choose how you want to be alerted about LHDN events.</p>
+          <h3 className="text-xl font-black text-gray-900 tracking-tight">Notification Settings</h3>
+          <p className="text-sm text-gray-500 font-medium">Choose how you want to be alerted about e-invoice events.</p>
        </div>
 
-       <div className="bg-white border border-gray-100 rounded-3xl overflow-hidden divide-y divide-gray-50 shadow-sm">
-          {[
-            { id: 'notifyOnFailure', label: 'LHDN Validation Failure', desc: 'Urgent email when an invoice is rejected by LHDN portal.', icon: AlertCircle, color: 'text-rose-500' },
-            { id: 'notifyOnSuccess', label: 'Compliance Confirmation', desc: 'A monthly summary of all validated and compliant invoices.', icon: Check, color: 'text-emerald-500' },
-            { id: 'notifyOnExpiry', label: 'Certificate Renewal Reminder', desc: 'Alerts starting 30 days before digital certificate expiry.', icon: Bell, color: 'text-amber-500' },
-          ].map((item) => (
-             <div key={item.id} className="p-6 flex items-start justify-between gap-6 hover:bg-gray-100/30 transition-all">
-                <div className="flex items-start gap-4">
-                   <div className={cn("mt-1 shrink-0", item.color)}>
-                      <item.icon size={20} />
-                   </div>
-                   <div className="space-y-1">
-                      <h4 className="text-sm font-black text-gray-900 tracking-tight leading-none uppercase tracking-widest">{item.label}</h4>
-                      <p className="text-xs text-gray-500 font-medium leading-relaxed max-w-sm">{item.desc}</p>
-                   </div>
+       <div className="bg-white border border-gray-100 rounded-3xl p-8 space-y-6 shadow-sm">
+          <div className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-50">
+             <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center">
+                   <Bell size={20} />
                 </div>
-                <button 
-                   onClick={() => setFormData({...formData, [item.id]: !formData[item.id]})}
-                   className={cn(
-                    "w-12 h-7 rounded-full p-1 transition-colors duration-300 shrink-0",
-                    formData[item.id as keyof typeof formData] ? "bg-blue-600" : "bg-gray-200"
-                   )}
-                >
-                   <div className={cn(
-                    "w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-300",
-                    formData[item.id as keyof typeof formData] ? "translate-x-5" : "translate-x-0"
-                   )} />
-                </button>
+                <div className="space-y-0.5">
+                   <h4 className="text-sm font-black text-gray-900">Submission Failures</h4>
+                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Immediate Email Alert</p>
+                </div>
              </div>
-          ))}
+             <button 
+                onClick={() => setFormData({...formData, notifyOnFailure: !formData.notifyOnFailure})}
+                className={cn(
+                  "w-12 h-6 rounded-full p-1 transition-colors duration-300",
+                  formData.notifyOnFailure ? "bg-blue-600" : "bg-gray-200"
+                )}
+             >
+                <div className={cn(
+                  "w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-300",
+                  formData.notifyOnFailure ? "translate-x-6" : "translate-x-0"
+                )} />
+             </button>
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-50">
+             <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
+                   <Clock size={20} />
+                </div>
+                <div className="space-y-0.5">
+                   <h4 className="text-sm font-black text-gray-900">Expiry Warnings</h4>
+                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">7 Days Before Expiration</p>
+                </div>
+             </div>
+             <button 
+                onClick={() => setFormData({...formData, notifyOnExpiry: !formData.notifyOnExpiry})}
+                className={cn(
+                  "w-12 h-6 rounded-full p-1 transition-colors duration-300",
+                  formData.notifyOnExpiry ? "bg-blue-600" : "bg-gray-200"
+                )}
+             >
+                <div className={cn(
+                  "w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-300",
+                  formData.notifyOnExpiry ? "translate-x-6" : "translate-x-0"
+                )} />
+             </button>
+          </div>
+
+          <div className="p-6 bg-blue-50/30 rounded-2xl border border-blue-50">
+             <p className="text-xs text-gray-500 leading-relaxed font-medium">
+                Alerts will be sent to the primary email address listed in your merchant profile. To update your contact email, visit 
+                <a href="#" className="text-blue-600 font-bold hover:underline ml-1">Merchant Settings</a>.
+             </p>
+          </div>
        </div>
     </div>
   )

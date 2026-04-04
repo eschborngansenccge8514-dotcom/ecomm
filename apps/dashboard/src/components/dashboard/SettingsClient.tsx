@@ -21,6 +21,7 @@ import { LalamoveSettings }  from './settings/LalamoveSettings'
 import { EasyParcelSettings } from './settings/EasyParcelSettings'
 import { RazorpaySettings }   from './settings/RazorpaySettings'
 import { BillplzSettings }   from './settings/BillplzSettings'
+import { EInvoiceSettings } from './settings/EInvoiceSettings'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
@@ -136,6 +137,7 @@ export function SettingsClient({
   easyparcelConfig, 
   razorpayConfig, 
   billplzConfig,
+  einvoiceConfig,
   operatingHours: initHours = [],
   announcements: initAnn = []
 }: {
@@ -144,6 +146,7 @@ export function SettingsClient({
   easyparcelConfig: any; 
   razorpayConfig: any; 
   billplzConfig: any;
+  einvoiceConfig: any;
   operatingHours: any[];
   announcements: any[];
 }) {
@@ -151,7 +154,7 @@ export function SettingsClient({
   const supabase = createClient()
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [tab, setTab] = useState<'store'|'appearance'|'ops'|'logistics'|'payments'|'delivery'|'announcements'|'policies'>('store')
+  const [tab, setTab] = useState<'store'|'appearance'|'ops'|'logistics'|'payments'|'einvoice'|'delivery'|'announcements'|'policies'>('store')
   const [subTab, setSubTab] = useState('lalamove') // for logistics/payments
   const [saving, setSaving] = useState(false)
 
@@ -260,6 +263,7 @@ export function SettingsClient({
     { key: 'ops',          label: 'Operations',   icon: <Clock size={14} /> },
     { key: 'logistics',    label: 'Logistics',    icon: <Truck size={14} /> },
     { key: 'payments',     label: 'Payments',     icon: <CreditCard size={14} /> },
+    { key: 'einvoice',     label: 'E-Invoice',    icon: <FileText size={14} /> },
     { key: 'delivery',     label: 'Fulfillment',   icon: <ShoppingBag size={14} /> },
     { key: 'announcements', label: 'Announcements', icon: <Megaphone size={14} /> },
     { key: 'policies',     label: 'Policies',     icon: <FileText size={14} /> },
@@ -523,6 +527,13 @@ export function SettingsClient({
                   {subTab === 'razorpay' && <RazorpaySettings config={razorpayConfig} merchantId={merchant.id} />}
                   {subTab === 'billplz' && <BillplzSettings config={billplzConfig} merchantId={merchant.id} />}
                </div>
+            </div>
+          )}
+
+          {/* E-INVOICE TAB */}
+          {tab === 'einvoice' && (
+            <div className="max-w-2xl">
+              <EInvoiceSettings config={einvoiceConfig} merchantId={merchant.id} />
             </div>
           )}
 
