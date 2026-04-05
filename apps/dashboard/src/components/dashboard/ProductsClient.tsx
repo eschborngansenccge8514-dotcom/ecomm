@@ -1,5 +1,6 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import Image     from 'next/image'
 import { Button }  from '@/components/ui/button'
 import { Input }   from '@/components/ui/input'
@@ -57,37 +58,75 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
     return result
   }, [products, search, catFilter, statusFilter, stockFilter, sortBy])
 
+  // Virtualization setup
+  const parentRef = useRef<HTMLDivElement>(null)
+
+  const virtualizer = useVirtualizer({
+    count: filteredAndSorted.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => viewMode === 'table' ? 80 : 450,
+    overscan: 5,
+  })
+
+  const virtualItems = virtualizer.getVirtualItems()
+  const totalSize = virtualizer.getTotalSize()
+
   const handleBulkDelete = async () => {
     if (!selectedIds.length) return
     if (!confirm(`Delete ${selectedIds.length} products? This cannot be undone.`)) return
-    const { error } = await supabase.from('products').delete().in('id', selectedIds)
-    if (error) { toast.error(error.message); return }
+    const previousProducts = [...products]
     setProducts(prev => prev.filter(p => !selectedIds.includes(p.id)))
+    const prevSelected = [...selectedIds]
     setSelectedIds([])
-    toast.success(`${selectedIds.length} products deleted`)
+    const { error } = await supabase.from('products').delete().in('id', prevSelected)
+    if (error) {
+      setProducts(previousProducts)
+      setSelectedIds(prevSelected)
+      toast.error(error.message)
+      return
+    }
+    toast.success(`${prevSelected.length} products deleted`)
   }
 
   const handleBulkStatus = async (status: string) => {
     if (!selectedIds.length) return
-    const { error } = await supabase.from('products').update({ status }).in('id', selectedIds)
-    if (error) { toast.error(error.message); return }
+    const previousProducts = [...products]
     setProducts(prev => prev.map(p => selectedIds.includes(p.id) ? { ...p, status } : p))
+    const prevSelected = [...selectedIds]
     setSelectedIds([])
-    toast.success(`Updated ${selectedIds.length} products`)
+    const { error } = await supabase.from('products').update({ status }).in('id', prevSelected)
+    if (error) {
+      setProducts(previousProducts)
+      setSelectedIds(prevSelected)
+      toast.error(error.message)
+      return
+    }
+    toast.success(`Updated ${prevSelected.length} products`)
   }
 
   const handleToggle = async (product: any) => {
     const next = product.status === 'active' ? 'inactive' : 'active'
-    const { error } = await supabase.from('products').update({ status: next }).eq('id', product.id)
-    if (error) { toast.error(error.message); return }
+    const previousProducts = [...products]
     setProducts(prev => prev.map(p => p.id === product.id ? { ...p, status: next } : p))
+    const { error } = await supabase.from('products').update({ status: next }).eq('id', product.id)
+    if (error) {
+      setProducts(previousProducts)
+      toast.error(error.message)
+      return
+    }
+    toast.success(`Product ${next === 'active' ? 'activated' : 'deactivated'}`)
   }
 
   const handleDelete = async (product: any) => {
     if (!confirm(`Delete "${product.name}"? This cannot be undone.`)) return
-    const { error } = await supabase.from('products').delete().eq('id', product.id)
-    if (error) { toast.error(error.message); return }
+    const previousProducts = [...products]
     setProducts(prev => prev.filter(p => p.id !== product.id))
+    const { error } = await supabase.from('products').delete().eq('id', product.id)
+    if (error) {
+      setProducts(previousProducts)
+      toast.error(error.message)
+      return
+    }
     toast.success('Product deleted')
   }
 
@@ -100,7 +139,7 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 flex flex-col h-full overflow-hidden">
       {/* Advanced Toolbar */}
       <div className="bg-white/80 backdrop-blur-md sticky top-0 z-30 py-4 border-b border-gray-100 -mx-4 px-4 sm:-mx-8 sm:px-8">
         <div className="flex flex-col gap-4">
@@ -144,7 +183,6 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
                 />
               </div>
 
-              {/* Category Dropdown/Filter */}
               <select
                 value={catFilter}
                 onChange={e => setCatFilter(e.target.value)}
@@ -194,7 +232,6 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
             </div>
           </div>
 
-          {/* Selection Toolbar (Floating Style) */}
           {selectedIds.length > 0 && (
             <div className="flex items-center justify-between bg-blue-600 text-white px-4 py-2.5 rounded-2xl shadow-lg animate-in slide-in-from-top-4 duration-300">
               <div className="flex items-center gap-3">
@@ -235,273 +272,168 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
         </div>
       </div>
 
-      {/* Grid */}
-      {filteredAndSorted.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-gray-100 py-32 text-center shadow-sm">
-          <div className="bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <PackageSearch size={32} className="text-gray-300" />
-          </div>
-          <h3 className="text-lg font-bold text-gray-900">No products found</h3>
-          <p className="text-gray-400 text-sm max-w-xs mx-auto mt-1">Try adjusting your search or filters to find what you're looking for.</p>
-          <Button variant="outline" className="mt-6 rounded-xl" onClick={() => { setEditing(null); setShowForm(true) }}>
-            Add your first product
-          </Button>
-        </div>
-      ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredAndSorted.map(product => (
-            <div key={product.id}
-              className={cn("bg-white rounded-3xl border border-gray-100 overflow-hidden group hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-300 flex flex-col relative",
-                selectedIds.includes(product.id) && "ring-2 ring-blue-500")}
-            >
-              {/* Checkbox Overlay */}
-              <div
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedIds(prev => prev.includes(product.id) ? prev.filter(id => id !== product.id) : [...prev, product.id])
-                }}
-                className={cn("absolute top-3 left-3 z-10 w-6 h-6 rounded-lg border-2 cursor-pointer transition-all flex items-center justify-center",
-                  selectedIds.includes(product.id) ? "bg-blue-600 border-blue-600" : "bg-white/80 backdrop-blur-sm border-white/50 opacity-0 group-hover:opacity-100")}
-              >
-                {selectedIds.includes(product.id) && <CheckCircle2 size={14} className="text-white" />}
-              </div>
-
-              {/* Image */}
-              <div className="relative aspect-square bg-gray-50">
-                {product.images?.[0] ? (
-                  <Image src={product.images[0]} alt={product.name}
-                    fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-4xl bg-gradient-to-br from-gray-50 to-gray-100">🛍️</div>
-                )}
-                
-                {/* Status badge */}
-                <div className="absolute top-3 right-3 flex flex-col gap-2 items-end">
-                  <span className={cn('text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-sm backdrop-blur-md',
-                    product.status === 'active' ? 'bg-green-500/90 text-white' : 'bg-gray-500/90 text-white')}>
-                    {product.status}
-                  </span>
-                  {product.is_featured && (
-                    <span className="bg-amber-400 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-sm">
-                      Featured
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Info */}
-              <div className="p-4 flex flex-col flex-1">
-                <div className="flex-1">
-                  <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">
-                    {product.category?.name || 'Uncategorized'}
-                  </p>
-                  <h3 className="font-bold text-gray-900 text-base leading-snug mb-1 group-hover:text-blue-600 transition-colors">
-                    {product.name}
-                  </h3>
-                  {product.sku && <p className="text-xs text-gray-400 mb-2 font-mono">{product.sku}</p>}
-                  
-                  <div className="flex items-center gap-2 mb-3">
-                    <p className="text-gray-900 font-extrabold text-lg">
-                      RM {Number(product.price).toFixed(2)}
-                    </p>
-                    {product.compare_at_price > 0 && (
-                      <p className="text-gray-400 line-through text-xs">
-                        RM {Number(product.compare_at_price).toFixed(2)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Stock indicator */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase">Stock</span>
-                    <div className="flex items-center gap-1.5">
-                      <div className={cn("w-2 h-2 rounded-full", 
-                        product.stock_quantity <= 0 ? "bg-red-500" : 
-                        product.stock_quantity <= (product.low_stock_alert ?? 5) ? "bg-amber-500" : "bg-green-500")} />
-                      <span className={cn("text-xs font-bold", 
-                        product.stock_quantity <= 0 ? "text-red-600" : 
-                        product.stock_quantity <= (product.low_stock_alert ?? 5) ? "text-amber-600" : "text-gray-700")}>
-                        {product.stock_quantity}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase">Variants</span>
-                    <p className="text-xs font-bold text-gray-700">{product.variants?.length ?? 0}</p>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="grid grid-cols-2 gap-2 mt-auto">
-                  <Button variant="outline" size="sm" className="rounded-xl border-gray-200" onClick={() => { setEditing(product); setShowForm(true) }}>
-                    <Pencil size={14} className="mr-1.5" /> Edit
-                  </Button>
-                  <Button variant="outline" size="sm" className="rounded-xl border-gray-200 bg-blue-50/50 text-blue-600 hover:bg-blue-100" onClick={() => setAdjusting(product)}>
-                    <Boxes size={14} className="mr-1.5" /> Stock
-                  </Button>
-                </div>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <Button variant="ghost" size="sm" className="rounded-xl text-gray-500 hover:text-blue-600 hover:bg-blue-50" onClick={() => setHistorying(product)}>
-                    <History size={14} className="mr-1.5" /> Log
-                  </Button>
-                  <Button 
-                    variant={product.status === 'active' ? 'ghost' : 'outline'} 
-                    size="sm" 
-                    className={cn("rounded-xl transition-all", 
-                      product.status === 'active' ? "text-gray-500 hover:text-amber-600 hover:bg-amber-50" : "text-green-600 border-green-100 bg-green-50 hover:bg-green-100")}
-                    onClick={() => handleToggle(product)}
-                  >
-                    {product.status === 'active' ? 'Deactivate' : 'Activate'}
-                  </Button>
-                </div>
-              </div>
+      {/* Main Content Area */}
+      <div 
+        ref={parentRef}
+        className="flex-1 overflow-auto no-scrollbar scroll-smooth relative bg-gray-50/30 rounded-3xl"
+      >
+        {filteredAndSorted.length === 0 ? (
+          <div className="bg-white rounded-3xl border border-gray-100 py-32 text-center shadow-sm">
+            <div className="bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <PackageSearch size={32} className="text-gray-300" />
             </div>
-          ))}
-        </div>
-      ) : (
-        /* Table View */
-        <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50/50 border-b border-gray-100">
-                  <th className="px-6 py-4 w-10">
-                    <div 
-                      onClick={() => setSelectedIds(selectedIds.length === filteredAndSorted.length ? [] : filteredAndSorted.map(p => p.id))}
-                      className={cn("w-5 h-5 rounded-md border-2 cursor-pointer transition-all flex items-center justify-center",
-                        selectedIds.length > 0 && selectedIds.length === filteredAndSorted.length ? "bg-blue-600 border-blue-600" : 
-                        selectedIds.length > 0 ? "bg-blue-200 border-blue-400" : "bg-white border-gray-300")}
-                    >
-                      {selectedIds.length === filteredAndSorted.length && <CheckCircle2 size={12} className="text-white" />}
-                      {selectedIds.length > 0 && selectedIds.length < filteredAndSorted.length && <div className="w-2 h-0.5 bg-blue-600 rounded-full" />}
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Product</th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">SKU</th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Category</th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Stock</th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Price</th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {filteredAndSorted.map(product => (
-                  <tr key={product.id} className={cn("hover:bg-blue-50/30 transition-colors group", selectedIds.includes(product.id) && "bg-blue-50/50")}>
-                    <td className="px-6 py-4">
-                      <div 
-                        onClick={() => setSelectedIds(prev => prev.includes(product.id) ? prev.filter(id => id !== product.id) : [...prev, product.id])}
-                        className={cn("w-5 h-5 rounded-md border-2 cursor-pointer transition-all flex items-center justify-center",
-                          selectedIds.includes(product.id) ? "bg-blue-600 border-blue-600" : "bg-white border-gray-300 group-hover:border-gray-400")}
-                      >
-                        {selectedIds.includes(product.id) && <CheckCircle2 size={12} className="text-white" />}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-gray-50 shrink-0">
-                          {product.images?.[0] ? (
-                            <Image src={product.images[0]} alt="" fill sizes="48px" className="object-cover" />
-                          ) : (
-                            <div className="flex items-center justify-center h-full text-xl bg-gray-100">🛍️</div>
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-bold text-gray-900 text-sm">{product.name}</p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            {product.is_featured && <Badge className="text-[8px] h-4 bg-amber-400">Featured</Badge>}
-                            {product.variants?.length > 0 && <span className="text-[10px] text-gray-400 font-medium">{product.variants.length} variants</span>}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-xs font-mono text-gray-500">{product.sku || '-'}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
-                        {product.category?.name || 'Uncategorized'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <div className={cn("w-1.5 h-1.5 rounded-full", 
-                            product.stock_quantity <= 0 ? "bg-red-500" : 
-                            product.stock_quantity <= (product.low_stock_alert ?? 5) ? "bg-amber-500" : "bg-green-500")} />
-                          <span className={cn("text-sm font-bold", 
-                            product.stock_quantity <= 0 ? "text-red-600" : 
-                            product.stock_quantity <= (product.low_stock_alert ?? 5) ? "text-amber-600" : "text-gray-900")}>
-                            {product.stock_quantity}
-                          </span>
-                        </div>
-                        {product.stock_quantity <= (product.low_stock_alert ?? 5) && product.stock_quantity > 0 && (
-                          <span className="text-[9px] font-black text-amber-500 uppercase tracking-tighter">Low Stock</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex flex-col items-end">
-                        <span className="font-black text-gray-900 text-sm">RM {Number(product.price).toFixed(2)}</span>
-                        {product.compare_at_price > 0 && (
-                          <span className="text-[10px] text-gray-400 line-through">RM {Number(product.compare_at_price).toFixed(2)}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={cn('text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-sm',
-                        product.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600')}>
-                        {product.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => setAdjusting(product)}
-                          className="p-2 hover:bg-green-100 rounded-lg text-green-600 transition-colors"
-                          title="Adjust Inventory"
-                        >
-                          <Boxes size={16} />
-                        </button>
-                        <button
-                          onClick={() => setHistorying(product)}
-                          className="p-2 hover:bg-blue-100 rounded-lg text-blue-600 transition-colors"
-                          title="View History"
-                        >
-                          <History size={16} />
-                        </button>
-                        <button
-                          onClick={() => { setEditing(product); setShowForm(true) }}
-                          className="p-2 hover:bg-blue-100 rounded-lg text-blue-600 transition-colors"
-                        >
-                          <Pencil size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleToggle(product)}
-                          className={cn("p-2 rounded-lg transition-colors", 
-                            product.status === 'active' ? "hover:bg-amber-100 text-amber-600" : "hover:bg-green-100 text-green-600")}
-                        >
-                          {product.status === 'active' ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
-                        </button>
-                        <button
-                          onClick={() => handleDelete(product)}
-                          className="p-2 hover:bg-red-100 rounded-lg text-red-500 transition-colors"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <h3 className="text-lg font-bold text-gray-900">No products found</h3>
+            <p className="text-gray-400 text-sm max-w-xs mx-auto mt-1">Try adjusting your search or filters.</p>
+            <Button variant="outline" className="mt-6 rounded-xl" onClick={() => { setEditing(null); setShowForm(true) }}>
+              Add your first product
+            </Button>
           </div>
-        </div>
-      )}
+        ) : (
+          <div
+            style={{
+              height: `${totalSize}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {viewMode === 'grid' ? (
+              /* Grid View with Virtualization */
+              /* Note: For grid, we usually want to virtualize rows. 
+                 But since we have a simple useVirtualizer, we'll position each item.
+                 Responsive grid makes it tricky. We'll stick to a simpler list for grid virtualization here or just use a fixed number of columns for calculations.
+              */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-4">
+                {/* Fallback to normal map for grid if virtualization proves too complex for responsive layout without fixed row heights */}
+                {filteredAndSorted.map(product => (
+                  <ProductCardItem 
+                    key={product.id}
+                    product={product}
+                    isSelected={selectedIds.includes(product.id)}
+                    onSelect={(id: string) => setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])}
+                    onToggle={() => handleToggle(product)}
+                    onDelete={() => handleDelete(product)}
+                    onEdit={() => { setEditing(product); setShowForm(true) }}
+                    onAdjust={() => setAdjusting(product)}
+                    onHistory={() => setHistorying(product)}
+                  />
+                ))}
+              </div>
+            ) : (
+              /* Table View with Virtualization */
+              <div className="p-4">
+                <table className="w-full text-left border-collapse bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
+                  <thead className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm border-b border-gray-100">
+                    <tr>
+                      <th className="px-6 py-4 w-10">
+                        <div 
+                          onClick={() => setSelectedIds(selectedIds.length === filteredAndSorted.length ? [] : filteredAndSorted.map(p => p.id))}
+                          className={cn("w-5 h-5 rounded-md border-2 cursor-pointer transition-all flex items-center justify-center",
+                            selectedIds.length > 0 && selectedIds.length === filteredAndSorted.length ? "bg-blue-600 border-blue-600" : 
+                            selectedIds.length > 0 ? "bg-blue-200 border-blue-400" : "bg-white border-gray-300")}
+                        >
+                          {selectedIds.length === filteredAndSorted.length && <CheckCircle2 size={12} className="text-white" />}
+                          {selectedIds.length > 0 && selectedIds.length < filteredAndSorted.length && <div className="w-2 h-0.5 bg-blue-600 rounded-full" />}
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Product</th>
+                      <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">SKU</th>
+                      <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Category</th>
+                      <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Stock</th>
+                      <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Price</th>
+                      <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {virtualItems.map(virtualRow => {
+                      const product = filteredAndSorted[virtualRow.index]
+                      return (
+                        <tr 
+                          key={virtualRow.key}
+                          data-index={virtualRow.index}
+                          className={cn("hover:bg-blue-50/30 transition-colors group absolute w-full flex items-center border-b border-gray-50", 
+                            selectedIds.includes(product.id) && "bg-blue-50/50")}
+                          style={{
+                            height: `${virtualRow.size}px`,
+                            transform: `translateY(${virtualRow.start}px)`,
+                          }}
+                        >
+                          <td className="px-6 py-4 w-10 shrink-0">
+                            <div 
+                              onClick={() => setSelectedIds(prev => prev.includes(product.id) ? prev.filter(id => id !== product.id) : [...prev, product.id])}
+                              className={cn("w-5 h-5 rounded-md border-2 cursor-pointer transition-all flex items-center justify-center",
+                                selectedIds.includes(product.id) ? "bg-blue-600 border-blue-600" : "bg-white border-gray-300 group-hover:border-gray-400")}
+                            >
+                              {selectedIds.includes(product.id) && <CheckCircle2 size={12} className="text-white" />}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 flex-1 min-w-[200px]">
+                            <div className="flex items-center gap-3">
+                              <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-gray-50 shrink-0">
+                                {product.images?.[0] ? (
+                                  <Image src={product.images[0]} alt="" fill sizes="48px" className="object-cover" />
+                                ) : (
+                                  <div className="flex items-center justify-center h-full text-xl bg-gray-100">🛍️</div>
+                                )}
+                              </div>
+                              <div className="truncate">
+                                <p className="font-bold text-gray-900 text-sm truncate">{product.name}</p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  {product.is_featured && <Badge className="text-[8px] h-4 bg-amber-400">Featured</Badge>}
+                                  {product.variants?.length > 0 && <span className="text-[10px] text-gray-400 font-medium">{product.variants.length} variants</span>}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 w-32 shrink-0">
+                            <span className="text-xs font-mono text-gray-500 truncate">{product.sku || '-'}</span>
+                          </td>
+                          <td className="px-6 py-4 w-40 shrink-0">
+                            <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg truncate">
+                              {product.category?.name || 'Uncategorized'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 w-28 shrink-0">
+                            <StockIndicator product={product} />
+                          </td>
+                          <td className="px-6 py-4 w-32 shrink-0 text-right">
+                            <div className="flex flex-col items-end">
+                              <span className="font-black text-gray-900 text-sm">RM {Number(product.price).toFixed(2)}</span>
+                              {product.compare_at_price > 0 && (
+                                <span className="text-[10px] text-gray-400 line-through">RM {Number(product.compare_at_price).toFixed(2)}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 w-24 shrink-0">
+                            <StatusBadge status={product.status} />
+                          </td>
+                          <td className="px-6 py-4 w-40 shrink-0 text-right">
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <ActionButton icon={Boxes} onClick={() => setAdjusting(product)} color="text-green-600 hover:bg-green-100" />
+                              <ActionButton icon={History} onClick={() => setHistorying(product)} color="text-blue-600 hover:bg-blue-100" />
+                              <ActionButton icon={Pencil} onClick={() => { setEditing(product); setShowForm(true) }} color="text-blue-600 hover:bg-blue-100" />
+                              <button
+                                onClick={() => handleToggle(product)}
+                                className={cn("p-2 rounded-lg transition-colors", 
+                                  product.status === 'active' ? "hover:bg-amber-100 text-amber-600" : "hover:bg-green-100 text-green-600")}
+                              >
+                                {product.status === 'active' ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                              </button>
+                              <ActionButton icon={Trash2} onClick={() => handleDelete(product)} color="text-red-500 hover:bg-red-100" />
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
-      {/* Add/Edit modal */}
+      {/* Modals */}
       {showForm && (
         <ProductFormModal
           merchantId={merchantId}
@@ -512,7 +444,6 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
           onSaved={handleSaved}
         />
       )}
-      {/* Inventory Management Modals */}
       {adjusting && (
         <InventoryAdjustmentModal
           product={adjusting}
@@ -523,7 +454,6 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
           }}
         />
       )}
-
       {historying && (
         <InventoryHistoryModal
           product={historying}
@@ -531,5 +461,85 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
         />
       )}
     </div>
+  )
+}
+
+function ProductCardItem({ product, isSelected, onSelect, onToggle, onDelete, onEdit, onAdjust, onHistory }: any) {
+  return (
+    <div className={cn("bg-white rounded-3xl border border-gray-100 overflow-hidden group hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-300 flex flex-col relative",
+      isSelected && "ring-2 ring-blue-500")}
+    >
+      <div
+        onClick={(e) => { e.stopPropagation(); onSelect(product.id) }}
+        className={cn("absolute top-3 left-3 z-10 w-6 h-6 rounded-lg border-2 cursor-pointer transition-all flex items-center justify-center",
+          isSelected ? "bg-blue-600 border-blue-600" : "bg-white/80 backdrop-blur-sm border-white/50 opacity-0 group-hover:opacity-100")}
+      >
+        {isSelected && <CheckCircle2 size={14} className="text-white" />}
+      </div>
+      <div className="relative aspect-square bg-gray-50">
+        {product.images?.[0] ? (
+          <Image src={product.images[0]} alt={product.name} fill sizes="300px" className="object-cover group-hover:scale-105 transition-transform duration-500" />
+        ) : (
+          <div className="flex items-center justify-center h-full text-4xl bg-gradient-to-br from-gray-50 to-gray-100">🛍️</div>
+        )}
+        <div className="absolute top-3 right-3 flex flex-col gap-2 items-end font-black uppercase tracking-widest text-[10px]">
+          <StatusBadge status={product.status} className="shadow-sm backdrop-blur-md" />
+          {product.is_featured && <span className="bg-amber-400 text-white px-2.5 py-1 rounded-full shadow-sm">Featured</span>}
+        </div>
+      </div>
+      <div className="p-4 flex flex-col flex-1">
+        <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">{product.category?.name || 'Uncategorized'}</p>
+        <h3 className="font-bold text-gray-900 text-base leading-snug mb-1 group-hover:text-blue-600 transition-colors line-clamp-2">{product.name}</h3>
+        {product.sku && <p className="text-xs text-gray-400 mb-2 font-mono">{product.sku}</p>}
+        <div className="flex items-center gap-2 mb-3">
+          <p className="text-gray-900 font-extrabold text-lg">RM {Number(product.price).toFixed(2)}</p>
+          {product.compare_at_price > 0 && <p className="text-gray-400 line-through text-xs">RM {Number(product.compare_at_price).toFixed(2)}</p>}
+        </div>
+        <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-50">
+          <StockIndicator product={product} />
+          <div className="text-right">
+            <span className="text-[10px] font-bold text-gray-400 uppercase">Variants</span>
+            <p className="text-xs font-bold text-gray-700">{product.variants?.length ?? 0}</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 mt-4">
+          <Button variant="outline" size="sm" className="rounded-xl" onClick={onEdit}><Pencil size={14} className="mr-1.5" /> Edit</Button>
+          <Button variant="outline" size="sm" className="rounded-xl bg-blue-50/50 text-blue-600" onClick={onAdjust}><Boxes size={14} className="mr-1.5" /> Stock</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StockIndicator({ product }: any) {
+  const isOutOfStock = product.stock_quantity <= 0
+  const isLowStock = product.stock_quantity <= (product.low_stock_alert ?? 5)
+  return (
+    <div className="flex flex-col">
+      <span className="text-[10px] font-bold text-gray-400 uppercase">Stock</span>
+      <div className="flex items-center gap-1.5">
+        <div className={cn("w-2 h-2 rounded-full", isOutOfStock ? "bg-red-500" : isLowStock ? "bg-amber-500" : "bg-green-500")} />
+        <span className={cn("text-xs font-bold", isOutOfStock ? "text-red-600" : isLowStock ? "text-amber-600" : "text-gray-700")}>
+          {product.stock_quantity}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function StatusBadge({ status, className }: any) {
+  return (
+    <span className={cn('text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full',
+      status === 'active' ? 'bg-green-500 text-white' : 'bg-gray-500 text-white', className)}>
+      {status}
+    </span>
+  )
+}
+
+function ActionButton({ icon: Icon, onClick, color, className }: any) {
+  return (
+    <button onClick={onClick} className={cn("p-2 rounded-lg transition-colors", color, className)}>
+      <Icon size={16} />
+    </button>
   )
 }

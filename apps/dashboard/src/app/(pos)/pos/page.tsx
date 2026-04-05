@@ -24,9 +24,10 @@ export default function PosPage() {
     merchantName?: string
   }>({})
   
-  const { setSession, addItem } = usePosCart(
+  const { setSession, setTaxRate, addItem } = usePosCart(
     useShallow((s) => ({
       setSession: s.setSession,
+      setTaxRate: s.setTaxRate,
       addItem: s.addItem
     }))
   )
@@ -36,6 +37,7 @@ export default function PosPage() {
       try {
         const info = await getOrInitializeSession()
         setSession(info.outletId, info.sessionId)
+        setTaxRate(info.taxRate)
         setSessionInfo({
           outletId: info.outletId,
           sessionId: info.sessionId,

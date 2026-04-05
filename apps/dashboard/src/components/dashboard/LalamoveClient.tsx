@@ -1,6 +1,7 @@
 'use client'
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter }   from 'next/navigation'
+import Image from 'next/image'
 import { Input }       from '@/components/ui/input'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn }          from '@/lib/utils'
@@ -50,7 +51,7 @@ function DriverCard({ order }: { order: Order }) {
       <div className="flex items-center gap-4">
         <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-blue-600 shadow-inner shrink-0 overflow-hidden relative">
           {order.driver_photo_url ? (
-            <img src={order.driver_photo_url} alt={order.driver_name} className="w-full h-full object-cover" />
+            <Image src={order.driver_photo_url} alt={order.driver_name} fill className="object-cover" />
           ) : (
             <User size={24} className="text-gray-300" />
           )}

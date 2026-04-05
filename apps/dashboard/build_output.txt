@@ -1,0 +1,1153 @@
+
+> dashboard@0.1.0 build /Users/jj/Downloads/project1/apps/dashboard
+> next build
+
+▲ Next.js 16.2.1 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 60 errors:
+./apps/dashboard/src/components/dashboard/LalamoveClient.tsx:1:33
+You're importing a module that depends on `useEffect` into a React Server Component module. This API is only available in Client Components. To fix, mark the file (or its parent) with the `"use client"` directive.
+    Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+[31m[1m>[0m [90m1 |[0m ...e, useCallback, useEffect } [36mfrom[0m [32m'react'[0m
+  [90m  |[0m                    [31m[1m^^^^^^^^^[0m
+  [90m2 |[0m ...er }   [36mfrom[0m [32m'next/navigation'[0m
+  [90m3 |[0m ...[36mm[0m [32m'next/image'[0m
+  [90m4 |[0m ...       [36mfrom[0m [32m'@/components/ui/input'[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/LalamoveClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/shipping/lalamove/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/OrderDetailClient.tsx:1:20
+You're importing a module that depends on `useEffect` into a React Server Component module. This API is only available in Client Components. To fix, mark the file (or its parent) with the `"use client"` directive.
+    Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+[31m[1m>[0m [90m1 |[0m ...[36mort[0m { useState, useEffect, useCallback } [36m...[0m
+  [90m  |[0m                    [31m[1m^^^^^^^^^[0m
+  [90m2 |[0m ...[36mort[0m { useRouter } [36mfrom[0m [32m'next/navigation'[0m
+  [90m3 |[0m ...[36mort[0m [33mImage[0m [36mfrom[0m [32m'next/image'[0m
+  [90m4 |[0m ...[36mort[0m { format } [36mfrom[0m [32m'date-fns'[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/OrderDetailClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/orders/[id]/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/CustomersClient.tsx:3:10
+You're importing a module that depends on `useRouter` into a React Server Component module. This API is only available in Client Components. To fix, mark the file (or its parent) with the `"use client"` directive.
+    Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+  [90m1 |[0m [36mimport[0m dynamic [36mfrom[0m [32m'next/dynamic'[0m
+  [90m2 |[0m [36mimport[0m { useState }     [36mfrom[0m [32m'react'[0m
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { useRouter }    [36mfrom[0m [32m'next/navigation'[0m
+  [90m  |[0m          [31m[1m^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { format, parseISO, subDays, startOfM...
+  [90m5 |[0m
+  [90m6 |[0m [36mconst[0m [33mAreaChart[0m = dynamic(() => [36mimport[0m([32m'rech...[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/CustomersClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/customers/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/LalamoveClient.tsx:2:10
+You're importing a module that depends on `useRouter` into a React Server Component module. This API is only available in Client Components. To fix, mark the file (or its parent) with the `"use client"` directive.
+    Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+  [90m1 |[0m [36mimport[0m { useState, useCallback, useEffect } [36m...[0m
+[31m[1m>[0m [90m2 |[0m [36mimport[0m { useRouter }   [36mfrom[0m [32m'next/navigation'[0m
+  [90m  |[0m          [31m[1m^^^^^^^^^[0m
+  [90m3 |[0m [36mimport[0m [33mImage[0m [36mfrom[0m [32m'next/image'[0m
+  [90m4 |[0m [36mimport[0m { [33mInput[0m }       [36mfrom[0m [32m'@/components/ui...[0m
+  [90m5 |[0m [36mimport[0m { [33mButton[0m, buttonVariants } [36mfrom[0m [32m'@/co...[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/LalamoveClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/shipping/lalamove/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/OperationsClient.tsx:4:10
+You're importing a module that depends on `useRouter` into a React Server Component module. This API is only available in Client Components. To fix, mark the file (or its parent) with the `"use client"` directive.
+    Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+  [90m2 |[0m [36mimport[0m [33mImage[0m [36mfrom[0m [32m'next/image'[0m
+  [90m3 |[0m [36mimport[0m { useState }    [36mfrom[0m [32m'react'[0m
+[31m[1m>[0m [90m4 |[0m [36mimport[0m { useRouter }   [36mfrom[0m [32m'next/navigation'[0m
+  [90m  |[0m          [31m[1m^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m { format, subDays } [36mfrom[0m [32m'date-fns'[0m
+  [90m6 |[0m
+  [90m7 |[0m [36mconst[0m [33mBarChart[0m = dynamic(() => [36mimport[0m([32m'recha...[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/OperationsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/operations/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/OrderDetailClient.tsx:2:10
+You're importing a module that depends on `useRouter` into a React Server Component module. This API is only available in Client Components. To fix, mark the file (or its parent) with the `"use client"` directive.
+    Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+  [90m1 |[0m [36mimport[0m { useState, useEffect, useCallback } [36m...[0m
+[31m[1m>[0m [90m2 |[0m [36mimport[0m { useRouter } [36mfrom[0m [32m'next/navigation'[0m
+  [90m  |[0m          [31m[1m^^^^^^^^^[0m
+  [90m3 |[0m [36mimport[0m [33mImage[0m [36mfrom[0m [32m'next/image'[0m
+  [90m4 |[0m [36mimport[0m { format } [36mfrom[0m [32m'date-fns'[0m
+  [90m5 |[0m [36mimport[0m {
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/OrderDetailClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/orders/[id]/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:4:10
+You're importing a module that depends on `useRouter` into a React Server Component module. This API is only available in Client Components. To fix, mark the file (or its parent) with the `"use client"` directive.
+    Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+  [90m2 |[0m [36mimport[0m [33mImage[0m [36mfrom[0m [32m'next/image'[0m
+  [90m3 |[0m [36mimport[0m { useState }    [36mfrom[0m [32m'react'[0m
+[31m[1m>[0m [90m4 |[0m [36mimport[0m { useRouter }   [36mfrom[0m [32m'next/navigation'[0m
+  [90m  |[0m          [31m[1m^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m { format, subDays } [36mfrom[0m [32m'date-fns'[0m
+  [90m6 |[0m
+  [90m7 |[0m [36mconst[0m [33mBarChart[0m = dynamic(() => [36mimport[0m([32m'recha...[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/products/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ReportsClient.tsx:3:10
+You're importing a module that depends on `useRouter` into a React Server Component module. This API is only available in Client Components. To fix, mark the file (or its parent) with the `"use client"` directive.
+    Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+  [90m1 |[0m [36mimport[0m dynamic [36mfrom[0m [32m'next/dynamic'[0m
+  [90m2 |[0m [36mimport[0m { useState, useCallback } [36mfrom[0m [32m'react'[0m
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { useRouter }   [36mfrom[0m [32m'next/navigation'[0m
+  [90m  |[0m          [31m[1m^^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { format, parseISO, subDays, startOfM...
+  [90m5 |[0m
+  [90m6 |[0m [36mconst[0m [33mAreaChart[0m = dynamic(() => [36mimport[0m([32m'rech...[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ReportsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/SettingsClient.tsx:2:10
+You're importing a module that depends on `useRouter` into a React Server Component module. This API is only available in Client Components. To fix, mark the file (or its parent) with the `"use client"` directive.
+    Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+  [90m1 |[0m [36mimport[0m { useState } [36mfrom[0m [32m'react'[0m
+[31m[1m>[0m [90m2 |[0m [36mimport[0m { useRouter }   [36mfrom[0m [32m'next/navigation'[0m
+  [90m  |[0m          [31m[1m^^^^^^^^^[0m
+  [90m3 |[0m [36mimport[0m [33mImage[0m [36mfrom[0m [32m'next/image'[0m
+  [90m4 |[0m [36mimport[0m { createClient } [36mfrom[0m [32m'@/lib/supabase...[0m
+  [90m5 |[0m [36mimport[0m { [33mButton[0m }   [36mfrom[0m [32m'@/components/ui/bu...[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/SettingsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/settings/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/CustomersClient.tsx:2:10
+You're importing a module that depends on `useState` into a React Server Component module. This API is only available in Client Components. To fix, mark the file (or its parent) with the `"use client"` directive.
+    Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+  [90m1 |[0m [36mimport[0m dynamic [36mfrom[0m [32m'next/dynamic'[0m
+[31m[1m>[0m [90m2 |[0m [36mimport[0m { useState }     [36mfrom[0m [32m'react'[0m
+  [90m  |[0m          [31m[1m^^^^^^^^[0m
+  [90m3 |[0m [36mimport[0m { useRouter }    [36mfrom[0m [32m'next/navigation'[0m
+  [90m4 |[0m [36mimport[0m { format, parseISO, subDays, startOfM...
+  [90m5 |[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/CustomersClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/customers/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/LalamoveClient.tsx:1:10
+You're importing a module that depends on `useState` into a React Server Component module. This API is only available in Client Components. To fix, mark the file (or its parent) with the `"use client"` directive.
+    Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+[31m[1m>[0m [90m1 |[0m [36mimport[0m { useState, useCallback, useEffect } [36m...[0m
+  [90m  |[0m          [31m[1m^^^^^^^^[0m
+  [90m2 |[0m [36mimport[0m { useRouter }   [36mfrom[0m [32m'next/navigation'[0m
+  [90m3 |[0m [36mimport[0m [33mImage[0m [36mfrom[0m [32m'next/image'[0m
+  [90m4 |[0m [36mimport[0m { [33mInput[0m }       [36mfrom[0m [32m'@/components/ui...[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/LalamoveClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/shipping/lalamove/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/OperationsClient.tsx:3:10
+You're importing a module that depends on `useState` into a React Server Component module. This API is only available in Client Components. To fix, mark the file (or its parent) with the `"use client"` directive.
+    Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+  [90m1 |[0m [36mimport[0m dynamic [36mfrom[0m [32m'next/dynamic'[0m
+  [90m2 |[0m [36mimport[0m [33mImage[0m [36mfrom[0m [32m'next/image'[0m
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { useState }    [36mfrom[0m [32m'react'[0m
+  [90m  |[0m          [31m[1m^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { useRouter }   [36mfrom[0m [32m'next/navigation'[0m
+  [90m5 |[0m [36mimport[0m { format, subDays } [36mfrom[0m [32m'date-fns'[0m
+  [90m6 |[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/OperationsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/operations/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/OrderDetailClient.tsx:1:10
+You're importing a module that depends on `useState` into a React Server Component module. This API is only available in Client Components. To fix, mark the file (or its parent) with the `"use client"` directive.
+    Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+[31m[1m>[0m [90m1 |[0m [36mimport[0m { useState, useEffect, useCallback } [36m...[0m
+  [90m  |[0m          [31m[1m^^^^^^^^[0m
+  [90m2 |[0m [36mimport[0m { useRouter } [36mfrom[0m [32m'next/navigation'[0m
+  [90m3 |[0m [36mimport[0m [33mImage[0m [36mfrom[0m [32m'next/image'[0m
+  [90m4 |[0m [36mimport[0m { format } [36mfrom[0m [32m'date-fns'[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/OrderDetailClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/orders/[id]/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:3:10
+You're importing a module that depends on `useState` into a React Server Component module. This API is only available in Client Components. To fix, mark the file (or its parent) with the `"use client"` directive.
+    Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+  [90m1 |[0m [36mimport[0m dynamic [36mfrom[0m [32m'next/dynamic'[0m
+  [90m2 |[0m [36mimport[0m [33mImage[0m [36mfrom[0m [32m'next/image'[0m
+[31m[1m>[0m [90m3 |[0m [36mimport[0m { useState }    [36mfrom[0m [32m'react'[0m
+  [90m  |[0m          [31m[1m^^^^^^^^[0m
+  [90m4 |[0m [36mimport[0m { useRouter }   [36mfrom[0m [32m'next/navigation'[0m
+  [90m5 |[0m [36mimport[0m { format, subDays } [36mfrom[0m [32m'date-fns'[0m
+  [90m6 |[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/products/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ReportsClient.tsx:2:10
+You're importing a module that depends on `useState` into a React Server Component module. This API is only available in Client Components. To fix, mark the file (or its parent) with the `"use client"` directive.
+    Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+  [90m1 |[0m [36mimport[0m dynamic [36mfrom[0m [32m'next/dynamic'[0m
+[31m[1m>[0m [90m2 |[0m [36mimport[0m { useState, useCallback } [36mfrom[0m [32m'react'[0m
+  [90m  |[0m          [31m[1m^^^^^^^^[0m
+  [90m3 |[0m [36mimport[0m { useRouter }   [36mfrom[0m [32m'next/navigation'[0m
+  [90m4 |[0m [36mimport[0m { format, parseISO, subDays, startOfM...
+  [90m5 |[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ReportsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/SettingsClient.tsx:1:10
+You're importing a module that depends on `useState` into a React Server Component module. This API is only available in Client Components. To fix, mark the file (or its parent) with the `"use client"` directive.
+    Learn more: https://nextjs.org/docs/app/api-reference/directives/use-client
+[31m[1m>[0m [90m1 |[0m [36mimport[0m { useState } [36mfrom[0m [32m'react'[0m
+  [90m  |[0m          [31m[1m^^^^^^^^[0m
+  [90m2 |[0m [36mimport[0m { useRouter }   [36mfrom[0m [32m'next/navigation'[0m
+  [90m3 |[0m [36mimport[0m [33mImage[0m [36mfrom[0m [32m'next/image'[0m
+  [90m4 |[0m [36mimport[0m { createClient } [36mfrom[0m [32m'@/lib/supabase...[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/SettingsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/settings/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/CustomersClient.tsx:6:19
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m4 |[0m ...startOfMonth, endOfMonth, subMonths } [36mfro.[0m.[32m.[0m
+  [90m5 |[0m ...
+[31m[1m>[0m [90m6 |[0m ...[36mrt[0m([32m'recharts'[0m).then(mod => mod.[33mAreaChart[0m)...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m ...[32mecharts'[0m).then(mod => mod.[33mArea[0m), { ssr: [36mf...[0m
+  [90m8 |[0m ...[36mt[0m([32m'recharts'[0m).then(mod => mod.[33mBarChart[0m), ...
+  [90m9 |[0m ...[32mcharts'[0m).then(mod => mod.[33mBar[0m), { ssr: [36mfal..[0m.
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/CustomersClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/customers/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/CustomersClient.tsx:7:14
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 5 |[0m ...
+  [90m 6 |[0m ... => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mA...[0m
+[31m[1m>[0m [90m 7 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mArea[0m),...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m ...=> [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mBa...[0m
+  [90m 9 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mBar[0m), {...
+  [90m10 |[0m ...=> [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mPi...[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/CustomersClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/customers/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/CustomersClient.tsx:8:18
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 6 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mAreaCha..[0m.
+  [90m 7 |[0m ...[32m'recharts'[0m).then(mod => mod.[33mArea[0m), { ssr..[36m.[0m
+[31m[1m>[0m [90m 8 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mBarChart[0m...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m ...[32mrecharts'[0m).then(mod => mod.[33mBar[0m), { ssr: [36m...[0m
+  [90m10 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mPieChart[0m...
+  [90m11 |[0m ...[32mrecharts'[0m).then(mod => mod.[33mPie[0m), { ssr: [36m...[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/CustomersClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/customers/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/CustomersClient.tsx:9:13
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 7 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mArea[0m)...
+  [90m 8 |[0m ... => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mB...[0m
+[31m[1m>[0m [90m 9 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mBar[0m), ...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m10 |[0m ... => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mP...[0m
+  [90m11 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mPie[0m), ...
+  [90m12 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mCell[0m)...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/CustomersClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/customers/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/CustomersClient.tsx:10:18
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 8 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mBarChart[0m...
+  [90m 9 |[0m ...[32mrecharts'[0m).then(mod => mod.[33mBar[0m), { ssr: [36m...[0m
+[31m[1m>[0m [90m10 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mPieChart[0m...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m11 |[0m ...[32mrecharts'[0m).then(mod => mod.[33mPie[0m), { ssr: [36m...[0m
+  [90m12 |[0m ...[32m'recharts'[0m).then(mod => mod.[33mCell[0m), { ssr..[36m.[0m
+  [90m13 |[0m ...([32m'recharts'[0m).then(mod => mod.[33mXAxis[0m), { s...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/CustomersClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/customers/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/CustomersClient.tsx:11:13
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 9 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mBar[0m), ...
+  [90m10 |[0m ... => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mP...[0m
+[31m[1m>[0m [90m11 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mPie[0m), ...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m12 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mCell[0m)...
+  [90m13 |[0m ... [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mXAxi.[0m..
+  [90m14 |[0m ... [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mYAxi.[0m..
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/CustomersClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/customers/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/CustomersClient.tsx:12:14
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m10 |[0m ...=> [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mPi...[0m
+  [90m11 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mPie[0m), {...
+[31m[1m>[0m [90m12 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mCell[0m),...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m13 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mXAxis[0m...
+  [90m14 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mYAxis[0m...
+  [90m15 |[0m ...c(() => [36mimport[0m([32m'recharts'[0m).then(mod => m...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/CustomersClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/customers/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/CustomersClient.tsx:13:15
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m11 |[0m ...[36mrt[0m([32m'recharts'[0m).then(mod => mod.[33mPie[0m), { s...
+  [90m12 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mCell[0m), {...
+[31m[1m>[0m [90m13 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mXAxis[0m),...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m14 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mYAxis[0m),...
+  [90m15 |[0m ...() => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33m..[0m
+  [90m16 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mToolt..[0m.
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/CustomersClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/customers/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/CustomersClient.tsx:14:15
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m12 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mCell[0m), {...
+  [90m13 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mXAxis[0m),...
+[31m[1m>[0m [90m14 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mYAxis[0m),...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m15 |[0m ...() => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33m..[0m
+  [90m16 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mToolt..[0m.
+  [90m17 |[0m ...namic(() => [36mimport[0m([32m'recharts'[0m).then(mod ...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/CustomersClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/customers/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/CustomersClient.tsx:15:23
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m13 |[0m ...[32mts'[0m).then(mod => mod.[33mXAxis[0m), { ssr: [36mfals.[0m..
+  [90m14 |[0m ...[32mts'[0m).then(mod => mod.[33mYAxis[0m), { ssr: [36mfals.[0m..
+[31m[1m>[0m [90m15 |[0m ...([32m'recharts'[0m).then(mod => mod.[33mCartesianGr..[0m.
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m16 |[0m ...[32marts'[0m).then(mod => mod.[33mTooltip[0m), { ssr: [36m...[0m
+  [90m17 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mRespo...[0m
+  [90m18 |[0m ...[32mrts'[0m).then(mod => mod.[33mLegend[0m), { ssr: [36mfa...[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/CustomersClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/customers/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/CustomersClient.tsx:16:17
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m14 |[0m ...[36mt[0m([32m'recharts'[0m).then(mod => mod.[33mYAxis[0m), { ...
+  [90m15 |[0m ...=> [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mCa...[0m
+[31m[1m>[0m [90m16 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mTooltip[0m)...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m17 |[0m ...ic(() => [36mimport[0m([32m'recharts'[0m).then(mod => ...
+  [90m18 |[0m ...[36mrt[0m([32m'recharts'[0m).then(mod => mod.[33mLegend[0m), ...
+  [90m19 |[0m ...[32ments/ui/button'[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/CustomersClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/customers/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/CustomersClient.tsx:17:29
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m15 |[0m ...[32ms'[0m).then(mod => mod.[33mCartesianGrid[0m), { ss...
+  [90m16 |[0m ...en(mod => mod.[33mTooltip[0m), { ssr: [36mfalse[0m })
+[31m[1m>[0m [90m17 |[0m ...[32mecharts'[0m).then(mod => mod.[33mResponsiveCont...[0m
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m18 |[0m ...n(mod => mod.[33mLegend[0m), { ssr: [36mfalse[0m })
+  [90m19 |[0m ...
+  [90m20 |[0m ...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/CustomersClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/customers/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/CustomersClient.tsx:18:16
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m16 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mToolti.[0m..
+  [90m17 |[0m ...amic(() => [36mimport[0m([32m'recharts'[0m).then(mod =...
+[31m[1m>[0m [90m18 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mLegend[0m)...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m19 |[0m ...[32monents/ui/button'[0m
+  [90m20 |[0m ...[32monents/ui/input'[0m
+  [90m21 |[0m ...[32monents/ui/badge'[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/CustomersClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/customers/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/OperationsClient.tsx:7:18
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 5 |[0m ...[32mate-fns'[0m
+  [90m 6 |[0m ...
+[31m[1m>[0m [90m 7 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mBarChart[0m...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m ...[32mrecharts'[0m).then(mod => mod.[33mBar[0m), { ssr: [36m...[0m
+  [90m 9 |[0m ...([32m'recharts'[0m).then(mod => mod.[33mXAxis[0m), { s...
+  [90m10 |[0m ...([32m'recharts'[0m).then(mod => mod.[33mYAxis[0m), { s...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/OperationsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/operations/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/OperationsClient.tsx:8:13
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 6 |[0m ...
+  [90m 7 |[0m ... => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mB...[0m
+[31m[1m>[0m [90m 8 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mBar[0m), ...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m ... [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mXAxi.[0m..
+  [90m10 |[0m ... [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mYAxi.[0m..
+  [90m11 |[0m ...ic(() => [36mimport[0m([32m'recharts'[0m).then(mod => ...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/OperationsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/operations/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/OperationsClient.tsx:9:15
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 7 |[0m ... [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mBarC...[0m
+  [90m 8 |[0m ...[36mrt[0m([32m'recharts'[0m).then(mod => mod.[33mBar[0m), { s...
+[31m[1m>[0m [90m 9 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mXAxis[0m),...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m10 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mYAxis[0m),...
+  [90m11 |[0m ...() => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33m..[0m
+  [90m12 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mToolt..[0m.
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/OperationsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/operations/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/OperationsClient.tsx:10:15
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 8 |[0m ...[36mrt[0m([32m'recharts'[0m).then(mod => mod.[33mBar[0m), { s...
+  [90m 9 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mXAxis[0m),...
+[31m[1m>[0m [90m10 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mYAxis[0m),...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m11 |[0m ...() => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33m..[0m
+  [90m12 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mToolt..[0m.
+  [90m13 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mCell[0m), {...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/OperationsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/operations/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/OperationsClient.tsx:11:23
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 9 |[0m ...[32mts'[0m).then(mod => mod.[33mXAxis[0m), { ssr: [36mfals.[0m..
+  [90m10 |[0m ...[32mts'[0m).then(mod => mod.[33mYAxis[0m), { ssr: [36mfals.[0m..
+[31m[1m>[0m [90m11 |[0m ...([32m'recharts'[0m).then(mod => mod.[33mCartesianGr..[0m.
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m12 |[0m ...[32marts'[0m).then(mod => mod.[33mTooltip[0m), { ssr: [36m...[0m
+  [90m13 |[0m ...[32ms'[0m).then(mod => mod.[33mCell[0m), { ssr: [36mfalse[0m })
+  [90m14 |[0m ...[32mharts'[0m).then(mod => mod.[33mPieChart[0m), { ssr...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/OperationsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/operations/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/OperationsClient.tsx:12:17
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m10 |[0m ...[36mt[0m([32m'recharts'[0m).then(mod => mod.[33mYAxis[0m), { ...
+  [90m11 |[0m ...=> [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mCa...[0m
+[31m[1m>[0m [90m12 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mTooltip[0m)...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m13 |[0m ...([32m'recharts'[0m).then(mod => mod.[33mCell[0m), { ss...
+  [90m14 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mPieChar.[0m..
+  [90m15 |[0m ...[32m'recharts'[0m).then(mod => mod.[33mPie[0m), { ssr:.[36m..[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/OperationsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/operations/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/OperationsClient.tsx:13:14
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m11 |[0m ...c(() => [36mimport[0m([32m'recharts'[0m).then(mod => m...
+  [90m12 |[0m ...> [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mToo...[0m
+[31m[1m>[0m [90m13 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mCell[0m),...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m14 |[0m ...=> [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mPi...[0m
+  [90m15 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mPie[0m), {...
+  [90m16 |[0m ...dynamic(() => [36mimport[0m([32m'recharts'[0m).then(mo...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/OperationsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/operations/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/OperationsClient.tsx:14:18
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m12 |[0m ...[36mrt[0m([32m'recharts'[0m).then(mod => mod.[33mTooltip[0m),...
+  [90m13 |[0m ...[32m'recharts'[0m).then(mod => mod.[33mCell[0m), { ssr..[36m.[0m
+[31m[1m>[0m [90m14 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mPieChart[0m...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m15 |[0m ...[32mrecharts'[0m).then(mod => mod.[33mPie[0m), { ssr: [36m...[0m
+  [90m16 |[0m ...c(() => [36mimport[0m([32m'recharts'[0m).then(mod => m...
+  [90m17 |[0m ...[32mnts/ui/button'[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/OperationsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/operations/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/OperationsClient.tsx:15:13
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m13 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mCell[0m)...
+  [90m14 |[0m ... => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mP...[0m
+[31m[1m>[0m [90m15 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mPie[0m), ...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m16 |[0m ... dynamic(() => [36mimport[0m([32m'recharts'[0m).then(m...
+  [90m17 |[0m ...[32mcomponents/ui/button'[0m
+  [90m18 |[0m ...[32mcomponents/ui/input'[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/OperationsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/operations/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/OperationsClient.tsx:16:29
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m14 |[0m ...hen(mod => mod.[33mPieChart[0m), { ssr: [36mfalse[0m })
+  [90m15 |[0m ...od => mod.[33mPie[0m), { ssr: [36mfalse[0m })
+[31m[1m>[0m [90m16 |[0m ...[32mecharts'[0m).then(mod => mod.[33mResponsiveCont...[0m
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m17 |[0m ...
+  [90m18 |[0m ...
+  [90m19 |[0m ...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/OperationsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/operations/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:7:18
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 5 |[0m ...[32mate-fns'[0m
+  [90m 6 |[0m ...
+[31m[1m>[0m [90m 7 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mBarChart[0m...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m ...[32mrecharts'[0m).then(mod => mod.[33mBar[0m), { ssr: [36m...[0m
+  [90m 9 |[0m ...([32m'recharts'[0m).then(mod => mod.[33mXAxis[0m), { s...
+  [90m10 |[0m ...([32m'recharts'[0m).then(mod => mod.[33mYAxis[0m), { s...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/products/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:8:13
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 6 |[0m ...
+  [90m 7 |[0m ... => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mB...[0m
+[31m[1m>[0m [90m 8 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mBar[0m), ...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m ... [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mXAxi.[0m..
+  [90m10 |[0m ... [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mYAxi.[0m..
+  [90m11 |[0m ...ic(() => [36mimport[0m([32m'recharts'[0m).then(mod => ...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/products/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:9:15
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 7 |[0m ... [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mBarC...[0m
+  [90m 8 |[0m ...[36mrt[0m([32m'recharts'[0m).then(mod => mod.[33mBar[0m), { s...
+[31m[1m>[0m [90m 9 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mXAxis[0m),...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m10 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mYAxis[0m),...
+  [90m11 |[0m ...() => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33m..[0m
+  [90m12 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mToolt..[0m.
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/products/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:10:15
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 8 |[0m ...[36mrt[0m([32m'recharts'[0m).then(mod => mod.[33mBar[0m), { s...
+  [90m 9 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mXAxis[0m),...
+[31m[1m>[0m [90m10 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mYAxis[0m),...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m11 |[0m ...() => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33m..[0m
+  [90m12 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mToolt..[0m.
+  [90m13 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mCell[0m), {...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/products/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:11:23
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 9 |[0m ...[32mts'[0m).then(mod => mod.[33mXAxis[0m), { ssr: [36mfals.[0m..
+  [90m10 |[0m ...[32mts'[0m).then(mod => mod.[33mYAxis[0m), { ssr: [36mfals.[0m..
+[31m[1m>[0m [90m11 |[0m ...([32m'recharts'[0m).then(mod => mod.[33mCartesianGr..[0m.
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m12 |[0m ...[32marts'[0m).then(mod => mod.[33mTooltip[0m), { ssr: [36m...[0m
+  [90m13 |[0m ...[32ms'[0m).then(mod => mod.[33mCell[0m), { ssr: [36mfalse[0m })
+  [90m14 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mRespo...[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/products/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:12:17
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m10 |[0m ...[36mt[0m([32m'recharts'[0m).then(mod => mod.[33mYAxis[0m), { ...
+  [90m11 |[0m ...=> [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mCa...[0m
+[31m[1m>[0m [90m12 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mTooltip[0m)...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m13 |[0m ...([32m'recharts'[0m).then(mod => mod.[33mCell[0m), { ss...
+  [90m14 |[0m ...ic(() => [36mimport[0m([32m'recharts'[0m).then(mod => ...
+  [90m15 |[0m ...[32ments/ui/button'[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/products/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:13:14
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m11 |[0m ...c(() => [36mimport[0m([32m'recharts'[0m).then(mod => m...
+  [90m12 |[0m ...> [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mToo...[0m
+[31m[1m>[0m [90m13 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mCell[0m),...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m14 |[0m ...dynamic(() => [36mimport[0m([32m'recharts'[0m).then(mo...
+  [90m15 |[0m ...[32momponents/ui/button'[0m
+  [90m16 |[0m ...[32momponents/ui/input'[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/products/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:14:29
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m12 |[0m ...en(mod => mod.[33mTooltip[0m), { ssr: [36mfalse[0m })
+  [90m13 |[0m ...mod => mod.[33mCell[0m), { ssr: [36mfalse[0m })
+[31m[1m>[0m [90m14 |[0m ...[32mecharts'[0m).then(mod => mod.[33mResponsiveCont...[0m
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m15 |[0m ...
+  [90m16 |[0m ...
+  [90m17 |[0m ...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/products/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ReportsClient.tsx:6:19
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m4 |[0m ...startOfMonth, endOfMonth, subMonths } [36mfro.[0m.[32m.[0m
+  [90m5 |[0m ...
+[31m[1m>[0m [90m6 |[0m ...[36mrt[0m([32m'recharts'[0m).then(mod => mod.[33mAreaChart[0m)...
+  [90m  |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m7 |[0m ...[32mecharts'[0m).then(mod => mod.[33mArea[0m), { ssr: [36mf...[0m
+  [90m8 |[0m ...[36mt[0m([32m'recharts'[0m).then(mod => mod.[33mBarChart[0m), ...
+  [90m9 |[0m ...[32mcharts'[0m).then(mod => mod.[33mBar[0m), { ssr: [36mfal..[0m.
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ReportsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ReportsClient.tsx:7:14
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 5 |[0m ...
+  [90m 6 |[0m ... => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mA...[0m
+[31m[1m>[0m [90m 7 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mArea[0m),...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 8 |[0m ...=> [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mBa...[0m
+  [90m 9 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mBar[0m), {...
+  [90m10 |[0m ...=> [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mPi...[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ReportsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ReportsClient.tsx:8:18
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 6 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mAreaCha..[0m.
+  [90m 7 |[0m ...[32m'recharts'[0m).then(mod => mod.[33mArea[0m), { ssr..[36m.[0m
+[31m[1m>[0m [90m 8 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mBarChart[0m...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m 9 |[0m ...[32mrecharts'[0m).then(mod => mod.[33mBar[0m), { ssr: [36m...[0m
+  [90m10 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mPieChart[0m...
+  [90m11 |[0m ...[32mrecharts'[0m).then(mod => mod.[33mPie[0m), { ssr: [36m...[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ReportsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ReportsClient.tsx:9:13
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 7 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mArea[0m)...
+  [90m 8 |[0m ... => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mB...[0m
+[31m[1m>[0m [90m 9 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mBar[0m), ...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m10 |[0m ... => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mP...[0m
+  [90m11 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mPie[0m), ...
+  [90m12 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mCell[0m)...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ReportsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ReportsClient.tsx:10:18
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 8 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mBarChart[0m...
+  [90m 9 |[0m ...[32mrecharts'[0m).then(mod => mod.[33mBar[0m), { ssr: [36m...[0m
+[31m[1m>[0m [90m10 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mPieChart[0m...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m11 |[0m ...[32mrecharts'[0m).then(mod => mod.[33mPie[0m), { ssr: [36m...[0m
+  [90m12 |[0m ...[32m'recharts'[0m).then(mod => mod.[33mCell[0m), { ssr..[36m.[0m
+  [90m13 |[0m ...([32m'recharts'[0m).then(mod => mod.[33mXAxis[0m), { s...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ReportsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ReportsClient.tsx:11:13
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m 9 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mBar[0m), ...
+  [90m10 |[0m ... => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mP...[0m
+[31m[1m>[0m [90m11 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mPie[0m), ...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m12 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mCell[0m)...
+  [90m13 |[0m ... [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mXAxi.[0m..
+  [90m14 |[0m ... [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mYAxi.[0m..
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ReportsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ReportsClient.tsx:12:14
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m10 |[0m ...=> [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mPi...[0m
+  [90m11 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mPie[0m), {...
+[31m[1m>[0m [90m12 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mCell[0m),...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m13 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mXAxis[0m...
+  [90m14 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mYAxis[0m...
+  [90m15 |[0m ...c(() => [36mimport[0m([32m'recharts'[0m).then(mod => m...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ReportsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ReportsClient.tsx:13:15
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m11 |[0m ...[36mrt[0m([32m'recharts'[0m).then(mod => mod.[33mPie[0m), { s...
+  [90m12 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mCell[0m), {...
+[31m[1m>[0m [90m13 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mXAxis[0m),...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m14 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mYAxis[0m),...
+  [90m15 |[0m ...() => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33m..[0m
+  [90m16 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mToolt..[0m.
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ReportsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ReportsClient.tsx:14:15
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m12 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mCell[0m), {...
+  [90m13 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mXAxis[0m),...
+[31m[1m>[0m [90m14 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mYAxis[0m),...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m15 |[0m ...() => [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33m..[0m
+  [90m16 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mToolt..[0m.
+  [90m17 |[0m ...namic(() => [36mimport[0m([32m'recharts'[0m).then(mod ...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ReportsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ReportsClient.tsx:15:23
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m13 |[0m ...[32mts'[0m).then(mod => mod.[33mXAxis[0m), { ssr: [36mfals.[0m..
+  [90m14 |[0m ...[32mts'[0m).then(mod => mod.[33mYAxis[0m), { ssr: [36mfals.[0m..
+[31m[1m>[0m [90m15 |[0m ...([32m'recharts'[0m).then(mod => mod.[33mCartesianGr..[0m.
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m16 |[0m ...[32marts'[0m).then(mod => mod.[33mTooltip[0m), { ssr: [36m...[0m
+  [90m17 |[0m ...[36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mRespo...[0m
+  [90m18 |[0m ...[32mrts'[0m).then(mod => mod.[33mLegend[0m), { ssr: [36mfa...[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ReportsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ReportsClient.tsx:16:17
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m14 |[0m ...[36mt[0m([32m'recharts'[0m).then(mod => mod.[33mYAxis[0m), { ...
+  [90m15 |[0m ...=> [36mimport[0m([32m'recharts'[0m).then(mod => mod.[33mCa...[0m
+[31m[1m>[0m [90m16 |[0m ...[36mort[0m([32m'recharts'[0m).then(mod => mod.[33mTooltip[0m)...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m17 |[0m ...ic(() => [36mimport[0m([32m'recharts'[0m).then(mod => ...
+  [90m18 |[0m ...[36mrt[0m([32m'recharts'[0m).then(mod => mod.[33mLegend[0m), ...
+  [90m19 |[0m ...[32mnents/ui/button'[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ReportsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ReportsClient.tsx:17:29
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m15 |[0m ...[32ms'[0m).then(mod => mod.[33mCartesianGrid[0m), { ss...
+  [90m16 |[0m ...en(mod => mod.[33mTooltip[0m), { ssr: [36mfalse[0m })
+[31m[1m>[0m [90m17 |[0m ...[32mecharts'[0m).then(mod => mod.[33mResponsiveCont...[0m
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m18 |[0m ...n(mod => mod.[33mLegend[0m), { ssr: [36mfalse[0m })
+  [90m19 |[0m ...
+  [90m20 |[0m ...
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ReportsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/page.tsx
+
+
+./apps/dashboard/src/components/dashboard/ReportsClient.tsx:18:16
+`ssr: false` is not allowed with `next/dynamic` in Server Components. Please move it into a Client Component.
+  [90m16 |[0m ...[36mmport[0m([32m'recharts'[0m).then(mod => mod.[33mToolti.[0m..
+  [90m17 |[0m ...amic(() => [36mimport[0m([32m'recharts'[0m).then(mod =...
+[31m[1m>[0m [90m18 |[0m ...[36mport[0m([32m'recharts'[0m).then(mod => mod.[33mLegend[0m)...
+  [90m   |[0m    [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m19 |[0m ...[32mponents/ui/button'[0m
+  [90m20 |[0m ...[32mponents/ui/input'[0m
+  [90m21 |[0m ...[32m/lib/supabase/client'[0m
+
+Ecmascript file had an error
+
+Import trace:
+  Server Component:
+    ./apps/dashboard/src/components/dashboard/ReportsClient.tsx
+    ./apps/dashboard/src/app/(dashboard)/reports/page.tsx
+
+
+    at <unknown> (./apps/dashboard/src/components/dashboard/LalamoveClient.tsx:1:33)
+    at <unknown> (./apps/dashboard/src/components/dashboard/OrderDetailClient.tsx:1:20)
+    at <unknown> (./apps/dashboard/src/components/dashboard/CustomersClient.tsx:3:10)
+    at <unknown> (./apps/dashboard/src/components/dashboard/LalamoveClient.tsx:2:10)
+    at <unknown> (./apps/dashboard/src/components/dashboard/OperationsClient.tsx:4:10)
+    at <unknown> (./apps/dashboard/src/components/dashboard/OrderDetailClient.tsx:2:10)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:4:10)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ReportsClient.tsx:3:10)
+    at <unknown> (./apps/dashboard/src/components/dashboard/SettingsClient.tsx:2:10)
+    at <unknown> (./apps/dashboard/src/components/dashboard/CustomersClient.tsx:2:10)
+    at <unknown> (./apps/dashboard/src/components/dashboard/LalamoveClient.tsx:1:10)
+    at <unknown> (./apps/dashboard/src/components/dashboard/OperationsClient.tsx:3:10)
+    at <unknown> (./apps/dashboard/src/components/dashboard/OrderDetailClient.tsx:1:10)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:3:10)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ReportsClient.tsx:2:10)
+    at <unknown> (./apps/dashboard/src/components/dashboard/SettingsClient.tsx:1:10)
+    at <unknown> (./apps/dashboard/src/components/dashboard/CustomersClient.tsx:6:19)
+    at <unknown> (./apps/dashboard/src/components/dashboard/CustomersClient.tsx:7:14)
+    at <unknown> (./apps/dashboard/src/components/dashboard/CustomersClient.tsx:8:18)
+    at <unknown> (./apps/dashboard/src/components/dashboard/CustomersClient.tsx:9:13)
+    at <unknown> (./apps/dashboard/src/components/dashboard/CustomersClient.tsx:10:18)
+    at <unknown> (./apps/dashboard/src/components/dashboard/CustomersClient.tsx:11:13)
+    at <unknown> (./apps/dashboard/src/components/dashboard/CustomersClient.tsx:12:14)
+    at <unknown> (./apps/dashboard/src/components/dashboard/CustomersClient.tsx:13:15)
+    at <unknown> (./apps/dashboard/src/components/dashboard/CustomersClient.tsx:14:15)
+    at <unknown> (./apps/dashboard/src/components/dashboard/CustomersClient.tsx:15:23)
+    at <unknown> (./apps/dashboard/src/components/dashboard/CustomersClient.tsx:16:17)
+    at <unknown> (./apps/dashboard/src/components/dashboard/CustomersClient.tsx:17:29)
+    at <unknown> (./apps/dashboard/src/components/dashboard/CustomersClient.tsx:18:16)
+    at <unknown> (./apps/dashboard/src/components/dashboard/OperationsClient.tsx:7:18)
+    at <unknown> (./apps/dashboard/src/components/dashboard/OperationsClient.tsx:8:13)
+    at <unknown> (./apps/dashboard/src/components/dashboard/OperationsClient.tsx:9:15)
+    at <unknown> (./apps/dashboard/src/components/dashboard/OperationsClient.tsx:10:15)
+    at <unknown> (./apps/dashboard/src/components/dashboard/OperationsClient.tsx:11:23)
+    at <unknown> (./apps/dashboard/src/components/dashboard/OperationsClient.tsx:12:17)
+    at <unknown> (./apps/dashboard/src/components/dashboard/OperationsClient.tsx:13:14)
+    at <unknown> (./apps/dashboard/src/components/dashboard/OperationsClient.tsx:14:18)
+    at <unknown> (./apps/dashboard/src/components/dashboard/OperationsClient.tsx:15:13)
+    at <unknown> (./apps/dashboard/src/components/dashboard/OperationsClient.tsx:16:29)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:7:18)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:8:13)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:9:15)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:10:15)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:11:23)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:12:17)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:13:14)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ProductsAnalyticsClient.tsx:14:29)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ReportsClient.tsx:6:19)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ReportsClient.tsx:7:14)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ReportsClient.tsx:8:18)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ReportsClient.tsx:9:13)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ReportsClient.tsx:10:18)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ReportsClient.tsx:11:13)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ReportsClient.tsx:12:14)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ReportsClient.tsx:13:15)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ReportsClient.tsx:14:15)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ReportsClient.tsx:15:23)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ReportsClient.tsx:16:17)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ReportsClient.tsx:17:29)
+    at <unknown> (./apps/dashboard/src/components/dashboard/ReportsClient.tsx:18:16)
+ ELIFECYCLE  Command failed with exit code 1.

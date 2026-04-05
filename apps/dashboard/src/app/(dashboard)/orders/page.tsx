@@ -54,7 +54,14 @@ export default async function OrdersPage({
 
   let query = supabase
     .from('orders')
-    .select('*, items:order_items(product_name, quantity, variant_name, line_total, unit_price)', { count: 'exact' })
+    .select(`
+      id, order_number, status, payment_method, delivery_type, 
+      delivery_provider, driver_name, tracking_number, created_at, 
+      buyer_name, delivery_address, total_amount, delivery_status, 
+      delivery_tracking_url,
+      items:order_items(product_name, quantity, variant_name, line_total, unit_price),
+      einvoices!einvoices_order_id_fkey(status, lhdn_long_id, submission_uid)
+    `, { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1)
 

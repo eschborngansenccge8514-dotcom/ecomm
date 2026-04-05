@@ -2,7 +2,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-export type MovementType = 'sale' | 'restock' | 'return' | 'adjustment' | 'damaged' | 'lost'
+export type MovementType = 'sale' | 'restock' | 'return' | 'adjustment' | 'damaged' | 'lost' | 'transfer_out' | 'transfer_in' | 'po_receive'
 
 export async function adjustInventory(params: {
   productId: string
@@ -89,6 +89,98 @@ export async function getLowStockAlerts() {
     .eq('merchant_id', merchant.id)
     .lte('stock_quantity', 5) // Default threshold
     .order('stock_quantity', { ascending: true })
+
+  if (error) throw error
+  return data
+}
+
+export async function getInventoryDashboard(days: number = 30) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data: merchant } = await supabase
+    .from('merchants')
+    .select('id')
+    .eq('owner_id', user.id)
+    .single()
+
+  if (!merchant) throw new Error('Merchant not found')
+
+  const { data, error } = await supabase.rpc('get_inventory_dashboard', {
+    p_merchant_id: merchant.id,
+    p_days: days
+  })
+
+  if (error) throw error
+  return data
+}
+
+export async function getReorderSuggestions(thresholdDays: number = 14) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data: merchant } = await supabase
+    .from('merchants')
+    .select('id')
+    .eq('owner_id', user.id)
+    .single()
+
+  if (!merchant) throw new Error('Merchant not found')
+
+  const { data, error } = await supabase.rpc('get_reorder_suggestions', {
+    p_merchant_id: merchant.id,
+    p_threshold_days: thresholdDays
+  })
+
+  if (error) throw error
+  return data
+}
+
+
+export async function searchProducts(query: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data: merchant } = await supabase
+    .from('merchants')
+    .select('id')
+    .eq('owner_id', user.id)
+    .single()
+
+  if (!merchant) throw new Error('Merchant not found')
+
+  const { data, error } = await supabase
+    .from('products')
+    .select('id, name, sku, stock_quantity, product_variants(id, name, sku, stock_quantity)')
+    .eq('merchant_id', merchant.id)
+    .or(`name.ilike.%${query}%,sku.ilike.%${query}%`)
+    .limit(10)
+
+  if (error) throw error
+  return data
+}
+
+export async function getOutlets() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data: merchant } = await supabase
+    .from('merchants')
+    .select('id')
+    .eq('owner_id', user.id)
+    .single()
+
+  if (!merchant) throw new Error('Merchant not found')
+
+  const { data, error } = await supabase
+    .from('pos_outlets')
+    .select('id, name')
+    .eq('merchant_id', merchant.id)
+    .order('name', { ascending: true })
 
   if (error) throw error
   return data

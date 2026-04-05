@@ -10,6 +10,7 @@ import { paymentService } from '@/services/payment.service'
 import { useAuthStore } from '@/stores/authStore'
 import Toast from 'react-native-toast-message'
 import { useQueryClient } from '@tanstack/react-query'
+import { WORKER_URL } from '@/lib/worker'
 
 // ─── Razorpay HTML ──────────────────────────────────────────────────────────────
 function buildRazorpayHTML(opts: {
@@ -33,7 +34,7 @@ function buildRazorpayHTML(opts: {
       name:    opts.customerName,
       contact: opts.customerPhone,
     },
-    callback_url: 'https://dgafjyrittkskxlgswvf.supabase.co/functions/v1/razorpay-redirect',
+    callback_url: `${WORKER_URL}/razorpay/redirect`,
     redirect:     true,
   })
 

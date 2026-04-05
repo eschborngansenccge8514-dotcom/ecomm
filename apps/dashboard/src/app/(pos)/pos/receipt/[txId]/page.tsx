@@ -2,25 +2,31 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { CheckCircle2, Home, Printer, Copy, Share2, Receipt, QrCode, User } from 'lucide-react'
+import Image from 'next/image'
+import { CheckCircle2, Home, Printer, Copy, Share2, Receipt, QrCode, User, Loader2, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'react-hot-toast'
 import { format } from 'date-fns'
 
 import { usePosOffline } from '@/stores/pos-offline'
+import { usePosCart } from '@/stores/pos-cart'
 
 export default function ReceiptPage() {
   const params = useParams()
   const txId = params.txId as string
   const [txn, setTxn] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadingStatus, setLoadingStatus] = useState('Verifying transaction...')
   const { pendingTransactions } = usePosOffline()
+  const lastCompletedTxn  = usePosCart(state => state.lastCompletedTxn)
 
   useEffect(() => {
     async function load() {
       try {
+        setLoadingStatus('Searching records...')
         if (txId.startsWith('OFF-')) {
+          setLoadingStatus('Loading offline receipt...')
           const localTx = pendingTransactions.find(t => t.id === txId || t.payload.id === txId)
           if (localTx) {
             setTxn({
@@ -47,27 +53,64 @@ export default function ReceiptPage() {
           return
         }
 
-        const supabase = createClient()
-        const { data, error } = await supabase
-          .from('pos_transactions')
-          .select(`
-            *,
-            pos_transaction_items (*),
-            merchants (*),
-            pos_sessions (
-              profiles (full_name)
-            )
-          `)
-          .eq('id', txId)
-          .single()
-        
-        if (error) {
-          console.error('Receipt Fetch Error:', error)
-          toast.error("Could not load receipt data")
+        // 1. Try Zustand cache (Instant)
+        if (lastCompletedTxn && lastCompletedTxn.id === txId) {
+          setTxn(lastCompletedTxn)
+          setIsLoading(false)
+          return
         }
-        
-        if (data) {
-          setTxn(data)
+
+        // 2. Try sessionStorage fallback (Fast)
+        if (typeof window !== 'undefined') {
+          const stored = sessionStorage.getItem('last_pos_receipt')
+          if (stored) {
+            try {
+              const parsed = JSON.parse(stored)
+              if (parsed.id === txId) {
+                setTxn(parsed)
+                setIsLoading(false)
+                return
+              }
+            } catch (e) {}
+          }
+        }
+
+        // 3. Supabase Fetch with Smart Retries
+        setLoadingStatus('Downloading from cloud...')
+        const supabase = createClient()
+        let retries = 5;
+        let fetchedData = null;
+        let delay = 200; // Start with fast retries for low latency
+
+        while (retries > 0 && !fetchedData) {
+          const { data } = await supabase
+            .from('pos_transactions')
+            .select(`
+              *,
+              pos_transaction_items (*),
+              merchants (*),
+              pos_sessions (
+                profiles (full_name)
+              )
+            `)
+            .eq('id', txId)
+            .single()
+            
+          if (data) {
+            fetchedData = data;
+            break;
+          }
+          
+          setLoadingStatus(`Syncing... (${6 - retries}/5)`)
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay = Math.min(delay + 500, 2000); // Exponential backoff for network jitter
+          retries--;
+        }
+
+        if (fetchedData) {
+          setTxn(fetchedData)
+        } else {
+          toast.error("Could not find record. It may still be syncing.")
         }
       } catch (err) {
         console.error('Fatal Receipt Error:', err)
@@ -76,13 +119,19 @@ export default function ReceiptPage() {
       }
     }
     load()
-  }, [txId, pendingTransactions])
+  }, [txId, pendingTransactions, lastCompletedTxn])
 
   if (isLoading) return (
-    <div className="h-full flex items-center justify-center bg-slate-50">
-      <div className="animate-pulse space-y-4 text-center">
-        <div className="w-16 h-16 bg-slate-200 rounded-full mx-auto" />
-        <div className="h-4 w-48 bg-slate-200 rounded mx-auto" />
+    <div className="h-full flex flex-col items-center justify-center bg-slate-50 space-y-8 p-12">
+      <div className="relative">
+        <div className="w-24 h-24 bg-slate-200/50 rounded-full animate-pulse" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Loader2 className="animate-spin text-slate-400" size={32} />
+        </div>
+      </div>
+      <div className="text-center space-y-2">
+         <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">{loadingStatus}</h3>
+         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Finalizing your receipt details</p>
       </div>
     </div>
   )
@@ -96,9 +145,18 @@ export default function ReceiptPage() {
         <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Transaction Not Found</h2>
         <p className="text-sm text-slate-400 font-medium mt-2">The receipt ID provided is invalid or has been moved.</p>
       </div>
-      <Link href="/pos" className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all">
-        Return to POS
-      </Link>
+      <div className="flex gap-4">
+        <button 
+          onClick={() => window.location.reload()}
+          className="flex items-center gap-2 px-8 py-3 bg-white border-2 border-slate-900 text-slate-900 rounded-2xl font-bold hover:bg-slate-50 transition-all"
+        >
+          <RefreshCw size={18} />
+          Try Again
+        </button>
+        <Link href="/pos" className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all">
+          Return to POS
+        </Link>
+      </div>
     </div>
   )
 
@@ -225,11 +283,12 @@ export default function ReceiptPage() {
           <div className="flex flex-col items-center text-center space-y-4">
              {txn.metadata?.lhdn_validation_url ? (
                <div className="space-y-2">
-                 <div className="w-24 h-24 bg-slate-50 rounded-xl p-2 mx-auto border border-slate-100 flex items-center justify-center">
-                    <img 
+                 <div className="w-24 h-24 bg-slate-50 rounded-xl p-2 mx-auto border border-slate-100 flex items-center justify-center relative overflow-hidden">
+                    <Image 
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(txn.metadata.lhdn_validation_url)}`}
                       alt="LHDN Validation QR"
-                      className="w-full h-full"
+                      fill
+                      className="object-contain p-2"
                     />
                  </div>
                  <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">
@@ -238,11 +297,12 @@ export default function ReceiptPage() {
                </div>
              ) : (
                <div className="space-y-4 w-full">
-                 <div className="w-28 h-28 bg-white border-2 border-slate-900 rounded-3xl p-3 mx-auto flex items-center justify-center shadow-xl shadow-slate-200/50">
-                    <img 
+                 <div className="w-28 h-28 bg-white border-2 border-slate-900 rounded-3xl p-3 mx-auto flex items-center justify-center shadow-xl shadow-slate-200/50 relative overflow-hidden">
+                    <Image 
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : ''}/einvoice/request/${txId}`)}`}
                       alt="Request e-Invoice QR"
-                      className="w-full h-full"
+                      fill
+                      className="object-contain p-3"
                     />
                  </div>
                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">

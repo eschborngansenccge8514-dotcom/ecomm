@@ -1,0 +1,27 @@
+NEXT_PUBLIC_SUPABASE_URL=https://loicwawqjiboyjysljcv.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvaWN3YXdxamlib3lqeXNsamN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2OTY2NjYsImV4cCI6MjA4ODI3MjY2Nn0.fL9Xz852rBJMDNJtqSrJmIDyxM4pMHamohyb3vP42F4
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvaWN3YXdxamlib3lqeXNsamN2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY5NjY2NiwiZXhwIjoyMDg4MjcyNjY2fQ.R4cX4EwtPmlE-41ctGH_pNv7f95hCQn7DRSmzPZhc-Y
+CURLEC_KEY_ID=rzp_test_SV1rM4mU9DdHe3
+CURLEC_KEY_SECRET=UvB05KeIiIXzBGydRsyTy7s5
+CURLEC_WEBHOOK_SECRET=123098
+
+INTERNAL_SECRET=dfe7d8b2-2631-46ca-8495-7a2e4ff11088
+BILLPLZ_API_KEY=b4fe0843-856e-4ff1-a8ed-be4d671c7f89
+BILLPLZ_COLLECTION_ID=fxma23c1
+BILLPLZ_X_SIGNATURE_KEY=c733cd51df870cd23622570a78d142e4fdaffb0d4b14c935e4f3edfe6d4cf8c901b05532bfd1038ded11129f16ac7f86e45df796bad6e26d631f4f753166e6d8
+BILLPLZ_SANDBOX=true
+LALAMOVE_API_KEY=pk_test_0549396cb9bf5258a5bd3961e05575de
+LALAMOVE_API_SECRET=sk_test_9zmDUg8GK6sKOZkBPLE74HJ7QtOWvqCS7ITIp//nApcWhwew+h5hvJsf3mBqoO0c
+LALAMOVE_SANDBOX=true
+EASYPARCEL_API_KEY=EP-UzHVr7uUh
+EASYPARCEL_AUTH_KEY=XJq2e4OPF7
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+GEOCODE_MAPS_API_KEY=69c4be39d4a18134167435vsy19376a
+
+# ─── Domain configuration ───────────────────────────────────────────────────
+NEXT_PUBLIC_ROOT_DOMAIN=localhost          # Local root domain for testing
+
+# ─── Vercel API (for programmatic custom domain registration) ────────────────
+VERCEL_ACCESS_TOKEN=your_vercel_token_here
+VERCEL_PROJECT_ID=your_vercel_project_id
+VERCEL_TEAM_ID=your_vercel_team_id            # optional, for team projects

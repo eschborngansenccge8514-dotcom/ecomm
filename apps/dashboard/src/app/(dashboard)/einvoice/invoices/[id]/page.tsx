@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { 
   ArrowLeft, 
   Download, 
@@ -72,19 +73,36 @@ export default function InvoiceDetailPage() {
      if (invoice) {
         // Try to get existing details from the UBL payload or the flat columns
         const details = invoice.einvoice_details?.Invoice?.[0]?.AccountingCustomerParty?.[0]?.Party?.[0] || {}
-        setEditFormData({
-           name: invoice.buyer_name || details.PartyLegalEntity?.[0]?.RegistrationName?.[0]?._ || '',
-           tin: invoice.buyer_tin || details.PartyIdentification?.[0]?.ID?.[0]?._ || '',
-           email: invoice.buyer_email || details.Contact?.[0]?.ElectronicMail?.[0]?._ || '',
-           phone: details.Contact?.[0]?.Telephone?.[0]?._ || '',
-           idType: details.PartyIdentification?.[1]?.ID?.[0]?.schemeID || 'BRN',
-           idNumber: details.PartyIdentification?.[1]?.ID?.[0]?._ || '',
-           address: details.PostalAddress?.[0]?.AddressLine?.[0]?.Line?.[0]?._ || '',
-           postcode: details.PostalAddress?.[0]?.PostalZone?.[0]?._ || '',
-           city: details.PostalAddress?.[0]?.CityName?.[0]?._ || '',
-           state: details.PostalAddress?.[0]?.CountrySubentityCode?.[0]?._ || '14',
-           country: details.PostalAddress?.[0]?.Country?.[0]?.IdentificationCode?.[0]?._ || 'MYS'
-        })
+        
+        if (invoice.is_request) {
+           setEditFormData({
+              name: (invoice.buyer_name || '').toUpperCase(),
+              tin: (invoice.buyer_tin || 'EI00000000010').toUpperCase(),
+              email: invoice.buyer_email || '',
+              phone: invoice.buyer_phone || '0123456789',
+              idType: invoice.buyer_id_type || 'BRN',
+              idNumber: (invoice.buyer_id_number || 'NA').toUpperCase(),
+              address: invoice.buyer_address || 'N/A',
+              postcode: invoice.buyer_postcode || '00000',
+              city: invoice.buyer_city || 'N/A',
+              state: invoice.buyer_state || '14',
+              country: invoice.buyer_country || 'MYS'
+           })
+        } else {
+           setEditFormData({
+              name: (invoice.buyer_name || details.PartyLegalEntity?.[0]?.RegistrationName?.[0]?._ || '').toUpperCase(),
+              tin: (invoice.buyer_tin || details.PartyIdentification?.[0]?.ID?.[0]?._ || 'EI00000000010').toUpperCase(),
+              email: invoice.buyer_email || details.Contact?.[0]?.ElectronicMail?.[0]?._ || '',
+              phone: invoice.buyer_phone || details.Contact?.[0]?.Telephone?.[0]?._ || '0123456789',
+              idType: details.PartyIdentification?.[1]?.ID?.[0]?.schemeID || 'BRN',
+              idNumber: (details.PartyIdentification?.[1]?.ID?.[0]?._ || '').toUpperCase(),
+              address: details.PostalAddress?.[0]?.AddressLine?.[0]?.Line?.[0]?._ || 'N/A',
+              postcode: details.PostalAddress?.[0]?.PostalZone?.[0]?._ || '00000',
+              city: details.PostalAddress?.[0]?.CityName?.[0]?._ || 'N/A',
+              state: details.PostalAddress?.[0]?.CountrySubentityCode?.[0]?._ || '14',
+              country: details.PostalAddress?.[0]?.Country?.[0]?.IdentificationCode?.[0]?._ || 'MYS'
+           })
+        }
      }
   }, [invoice]);
 
@@ -114,6 +132,14 @@ export default function InvoiceDetailPage() {
            country: editFormData.country
         }
 
+        const body = {
+            order_id: invoice.order_id,
+            pos_request_id: invoice.pos_request_id,
+            merchant_id: invoice.merchant_id,
+            customer: customerOverride
+        }
+
+        console.log('[E-Invoice Submit] Payload:', JSON.stringify(body, null, 2));
         const res = await fetch(`${process.env.NEXT_PUBLIC_WORKER_URL}/einvoice/submit`, {
           method: 'POST',
           headers: {
@@ -121,21 +147,21 @@ export default function InvoiceDetailPage() {
             'Authorization': `Bearer ${session.access_token}`,
             'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
           },
-          body: JSON.stringify({
-            order_id: invoice.order_id,
-            pos_request_id: invoice.pos_request_id,
-            merchant_id: invoice.merchant_id,
-            customer: customerOverride // Send overrides directly
-          })
+          body: JSON.stringify(body)
         })
 
         const result = await res.json()
-        if (!res.ok) throw new Error(result.error || 'Submission failed')
-
+        if (!res.ok) {
+           console.error('[E-Invoice Submit Error] Worker Response:', result);
+           throw new Error(result.error || 'Submission failed')
+        }
+        
+        console.log('[E-Invoice Submit Success] Result:', result);
         toast.success('Successfully submitted!', { id: tId })
         setIsEditModalOpen(false)
         window.location.reload()
      } catch (err: any) {
+        console.error('[E-Invoice Submit Caught Error]:', err);
         toast.error(err.message, { id: tId })
      } finally {
         setResubmitting(false)
@@ -201,43 +227,85 @@ export default function InvoiceDetailPage() {
   }
 
   useEffect(() => {
-    async function fetchDetails() {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('einvoices')
-        .select('*')
-        .eq('id', params.id)
-        .single()
+     async function fetchDetails() {
+       setLoading(true)
+       let { data, error } = await supabase
+         .from('einvoices')
+         .select(`
+           id, status, buyer_name, buyer_tin,
+           order_id, pos_request_id, merchant_id, lhdn_long_id, 
+           submission_uid, error_code, error_message, created_at, 
+           submitted_at, validated_at, lhdn_uuid, qr_code_url, 
+           einvoice_details, order_number, tax_amount, total_amount
+         `)
+         .eq('id', params.id)
+         .single()
+   
+       if (!data) {
+          // Check if it's a pending request
+          const { data: request } = await supabase
+            .from('pos_einvoice_requests')
+            .select('*, pos_transactions(receipt_number, total_rm, created_at, merchant_id)')
+            .eq('id', params.id)
+            .single()
+          
+          if (request) {
+             data = {
+                id: request.id,
+                status: 'requested',
+                buyer_name: request.customer_name,
+                buyer_tin: request.customer_tin,
+                buyer_email: request.customer_email,
+                buyer_id_type: request.customer_id_type,
+                buyer_id_number: request.customer_id_number,
+                buyer_phone: request.customer_phone,
+                buyer_address: request.customer_address,
+                // Select reasonable defaults for missing structured fields
+                buyer_postcode: '00000',
+                buyer_city: 'N/A',
+                buyer_state: '14',
+                buyer_country: 'MYS',
+                pos_request_id: request.id,
+                merchant_id: (request.pos_transactions as any)?.merchant_id,
+                total_amount: (request.pos_transactions as any)?.total_rm,
+                order_number: (request.pos_transactions as any)?.receipt_number,
+                created_at: request.created_at,
+                is_request: true
+             } as any
+          }
+       }
 
-      if (data) {
-        setInvoice(data)
-        
-        // Fetch line items
-        const { data: items } = await supabase
-          .from('einvoice_line_items')
-          .select('*')
-          .eq('document_id', data.id)
-        
-        if (items) setLineItems(items)
-
-        // Fetch Seller Info
-        const { data: merchantData } = await supabase
-          .from('merchants')
-          .select('*')
-          .eq('id', data.merchant_id)
-          .single()
-        if (merchantData) setMerchant(merchantData)
-
-        const { data: configData } = await supabase
-          .from('merchant_einvoice_config')
-          .select('*')
-          .eq('merchant_id', data.merchant_id)
-          .single()
-        if (configData) setConfig(configData)
-      }
-      setLoading(false)
-    }
-    fetchDetails()
+       if (data) {
+         setInvoice(data)
+         
+         // Fetch line items (if any for invoices)
+         if (!(data as any).is_request) {
+            const { data: items } = await supabase
+              .from('einvoice_line_items')
+              .select('id, description, classification_code, quantity, unit_price, line_total_rm')
+              .eq('document_id', data.id)
+            
+            if (items) setLineItems(items)
+         }
+   
+         // Fetch Seller Info
+         const { data: merchantData } = await supabase
+           .from('merchants')
+           .select('id, store_name, company_name, address_line1, postcode, city, state')
+           .eq('id', data.merchant_id)
+           .single()
+         if (merchantData) setMerchant(merchantData)
+   
+         const { data: configData } = await supabase
+           .from('merchant_einvoice_config')
+           .select('merchant_id, tin, registration_no_type, registration_no, env')
+           .eq('merchant_id', data.merchant_id)
+           .single()
+         if (configData) setConfig(configData)
+       }
+       setLoading(false)
+     }
+     fetchDetails()
   }, [params.id])
 
   if (loading) {
@@ -250,7 +318,7 @@ export default function InvoiceDetailPage() {
 
   if (!invoice) return <div>Not found</div>
 
-  const isFailed = ['invalid', 'rejected', 'failed'].includes(invoice.status)
+  const isFailed = ['invalid', 'rejected', 'failed', 'error'].includes(invoice.status)
   
   return (
     <div className="space-y-8 pb-32 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -281,7 +349,16 @@ export default function InvoiceDetailPage() {
                 {checkingStatus ? 'Checking...' : 'Check Status'}
               </button>
             )}
-            {!isFailed && (
+             {invoice.status === 'requested' && (
+               <button 
+                 onClick={() => setIsEditModalOpen(true)}
+                 className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+               >
+                  <CheckCircle2 size={14} />
+                  Issue E-Invoice
+               </button>
+             )}
+             {!isFailed && (
               <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all">
                 <Download size={14} /> Download PDF
               </button>
@@ -370,7 +447,9 @@ export default function InvoiceDetailPage() {
                <div className="p-8 border-b border-gray-50 flex items-center justify-between">
                   <h3 className="text-xl font-black text-gray-900 tracking-tight">Invoice Details</h3>
                   <div className="flex items-center gap-2">
-                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Type: B2B Invoice</span>
+                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                       Type: {invoice.pos_request_id ? 'POS B2C Request' : 'B2B Invoice'}
+                     </span>
                   </div>
                </div>
                
@@ -471,7 +550,7 @@ export default function InvoiceDetailPage() {
                                   </td>
                                </tr>
                                <tr>
-                                  <td colSpan={3} className="px-6 py-2 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Tax (SST 0%)</td>
+                                  <td colSpan={3} className="px-6 py-2 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Tax (SST {Math.round((Number(invoice?.tax_amount || 0) / (Number(invoice?.total_amount || 0) - Number(invoice?.tax_amount || 0) || 1)) * 100)}%)</td>
                                   <td className="px-6 py-2 text-right text-xs font-black text-gray-900">
                                      RM {Number(invoice.tax_amount || 0).toFixed(2)}
                                   </td>
@@ -535,34 +614,47 @@ export default function InvoiceDetailPage() {
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">Real-time interaction story</p>
                </div>
 
-               <div className="relative pl-8 space-y-8">
-                  <div className="absolute left-3.5 top-0 bottom-0 w-0.5 bg-gray-100" />
-                  
-                  {[
-                    { label: 'MerchantMind Draft', time: invoice.created_at, icon: FileText, color: 'text-gray-400 bg-gray-50' },
-                    { label: 'Submitted to LHDN', time: invoice.submitted_at || invoice.created_at, icon: RefreshCw, color: 'text-blue-500 bg-blue-50' },
-                    { 
-                      label: invoice.status === 'validated' ? 'Validated by LHDN' : isFailed ? 'Rejected by LHDN' : 'Validation in Progress',
-                      time: invoice.validated_at || 'Pending',
-                      icon: invoice.status === 'validated' ? CheckCircle2 : isFailed ? XCircle : Clock,
-                      color: invoice.status === 'validated' ? 'text-emerald-500 bg-emerald-50' : isFailed ? 'text-rose-500 bg-rose-50' : 'text-amber-500 bg-amber-50'
-                    }
-                  ].map((event, idx) => (
-                    <div key={idx} className="relative z-10 flex flex-col gap-1">
-                       <div className={cn(
-                         "absolute -left-[27px] top-0 w-4 h-4 rounded-full border-4 border-white shadow-sm ring-2 ring-inset",
-                         event.color.replace('text-', 'ring-').replace('bg-', 'bg-')
-                       )} />
-                       <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                          <event.icon size={14} className={event.color.split(' ')[0]} />
-                          {event.label}
-                       </h4>
-                       <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
-                          {event.time === 'Pending' ? 'Waiting...' : format(new Date(event.time), 'MMM d, h:mm a')}
-                       </span>
-                    </div>
-                  ))}
-               </div>
+                <div className="relative pl-8 space-y-8">
+                   <div className="absolute left-3.5 top-0 bottom-0 w-0.5 bg-gray-100" />
+                   
+                   {[
+                     { 
+                       label: (invoice as any).is_request ? 'Receipt Created' : 'MerchantMind Draft', 
+                       time: invoice.created_at, 
+                       icon: FileText, 
+                       color: 'text-gray-400 bg-gray-50' 
+                     },
+                     { 
+                       label: (invoice as any).is_request ? 'Customer Request Received' : 'Submitted to LHDN', 
+                       time: (invoice as any).is_request ? invoice.created_at : (invoice.submitted_at || invoice.created_at), 
+                       icon: (invoice as any).is_request ? Clock : RefreshCw, 
+                       color: 'text-blue-500 bg-blue-50' 
+                     },
+                     { 
+                       label: invoice.status === 'validated' ? 'Validated by LHDN' : 
+                              isFailed ? 'Rejected by LHDN' : 
+                              (invoice as any).is_request ? 'Pending Merchant Action' : 'Validation in Progress',
+                       time: invoice.validated_at || 'Pending',
+                       icon: invoice.status === 'validated' ? CheckCircle2 : isFailed ? XCircle : Clock,
+                       color: invoice.status === 'validated' ? 'text-emerald-500 bg-emerald-50' : 
+                              isFailed ? 'text-rose-500 bg-rose-50' : 'text-amber-500 bg-amber-50'
+                     }
+                   ].map((event, idx) => (
+                     <div key={idx} className="relative z-10 flex flex-col gap-1">
+                        <div className={cn(
+                          "absolute -left-[27px] top-0 w-4 h-4 rounded-full border-4 border-white shadow-sm ring-2 ring-inset",
+                          event.color.replace('text-', 'ring-').replace('bg-', 'bg-')
+                        )} />
+                        <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                           <event.icon size={14} className={event.color.split(' ')[0]} />
+                           {event.label}
+                        </h4>
+                        <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
+                           {event.time === 'Pending' ? 'Waiting...' : format(new Date(event.time), 'MMM d, h:mm a')}
+                        </span>
+                     </div>
+                   ))}
+                </div>
 
                {invoice.lhdn_uuid && (
                  <div className="pt-4 border-t border-gray-50 space-y-4">
@@ -583,11 +675,12 @@ export default function InvoiceDetailPage() {
                     </div>
                     {invoice.qr_code_url && (
                         <div className="p-4 bg-gray-50 rounded-[2rem] border border-gray-100 flex flex-col items-center gap-4">
-                           <div className="w-32 h-32 bg-white rounded-2xl flex items-center justify-center p-2 shadow-sm border border-gray-100">
-                             <img 
+                           <div className="w-32 h-32 bg-white rounded-2xl flex items-center justify-center p-2 shadow-sm border border-gray-100 relative overflow-hidden">
+                             <Image 
                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(invoice.qr_code_url)}`} 
                                alt="LHDN QR" 
-                               className="w-full h-full object-contain" 
+                               fill
+                               className="object-contain p-2" 
                              />
                            </div>
                            <p className="text-[9px] font-black text-gray-400 uppercase text-center leading-relaxed">

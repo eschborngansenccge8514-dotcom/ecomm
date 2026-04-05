@@ -15,10 +15,17 @@ export interface PosCartState extends Cart {
   setPoints: (points: number) => void
   setNote: (note: string) => void
   setSession: (outletId: string, sessionId: string) => void
+  setTaxRate: (rate: number) => void
   clearCart: () => void
   
   // Computed
   getTotals: () => CartTotals
+
+  // Cache for instantly rendering receipts
+  lastCompletedTxn: any | null
+  lastCompletedTxnId: string | null
+  taxRate: number
+  setLastCompletedTxn: (txn: any) => void
 }
 
 export const usePosCart = create<PosCartState>()(
@@ -30,6 +37,14 @@ export const usePosCart = create<PosCartState>()(
       note: '',
       outletId: '',
       sessionId: '',
+      taxRate: 8,
+      lastCompletedTxn: null,
+      lastCompletedTxnId: null,
+
+      setLastCompletedTxn: (txn: any) => set({ 
+        lastCompletedTxn: txn,
+        lastCompletedTxnId: txn?.id || null 
+      }),
 
       addItem: (product: PosProduct) => {
         set((state: PosCartState) => {
@@ -82,11 +97,12 @@ export const usePosCart = create<PosCartState>()(
       setPoints: (points: number) => set({ pointsToRedeem: points }),
       setNote: (note: string) => set({ note }),
       setSession: (outletId: string, sessionId: string) => set({ outletId, sessionId }),
+      setTaxRate: (taxRate: number) => set({ taxRate }),
       clearCart: () => set({ items: [], globalDiscountRm: 0, pointsToRedeem: 0, note: '', customerId: undefined, customerName: undefined, customerPhone: undefined }),
 
       getTotals: () => {
         const state = get()
-        return calcCartTotals(state)
+        return calcCartTotals(state, 1, state.taxRate)
       }
     })),
     {

@@ -22,13 +22,14 @@ export async function getOrInitializeSession() {
   // 2. Get merchant
   const { data: merchant } = await supabase
     .from('merchants')
-    .select('id, store_name')
+    .select('id, store_name, store_config')
     .eq('owner_id', user.id)
     .single()
   
   if (!merchant) throw new Error('Merchant not found')
   const merchantId = merchant.id
   const merchantName = merchant.store_name
+  const taxRate = Number(merchant.store_config?.taxRate ?? 8)
 
   // 3. Get or Create primary outlet
   let outletId: string
@@ -87,7 +88,7 @@ export async function getOrInitializeSession() {
     sessionId = newSession.id
   }
 
-  return { outletId, sessionId, outletName, userName, merchantName }
+  return { outletId, sessionId, outletName, userName, merchantName, taxRate }
 }
 
 export async function submitTransaction(payload: PosTransactionPayload) {
@@ -168,7 +169,27 @@ export async function submitTransaction(payload: PosTransactionPayload) {
 
   if (itemsError) throw itemsError
 
-  return { success: true, txnId: txn.id, receiptNumber }
+  // Hydrate full transaction for instant UI render
+  let fullTxn = null
+  try {
+    const { data } = await supabase
+      .from('pos_transactions')
+      .select(`
+        *,
+        pos_transaction_items (*),
+        merchants (*),
+        pos_sessions (
+          profiles (full_name)
+        )
+      `)
+      .eq('id', txn.id)
+      .single()
+    fullTxn = data
+  } catch (err) {
+    console.error('Hydration Fetch Error (Non-Fatal):', err)
+  }
+
+  return { success: true, txnId: txn.id, receiptNumber, fullTxn }
 }
 
 export async function closePosSession(sessionId: string, closingCash: number) {

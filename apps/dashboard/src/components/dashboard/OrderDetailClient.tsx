@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { format } from 'date-fns'
 import {
   ArrowLeft, Phone, Mail, User, MapPin, Package,
@@ -447,8 +448,8 @@ function CourierSelectionModal({
                 className="w-full text-left p-4 bg-white border border-gray-100 rounded-2xl hover:border-blue-500 hover:shadow-md transition-all group flex items-center justify-between gap-4"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center p-2 shrink-0 group-hover:bg-blue-50 transition-colors">
-                    <img src={c.courierLogo} alt={c.courierName} className="w-full h-full object-contain" />
+                  <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center p-2 shrink-0 group-hover:bg-blue-50 transition-colors relative overflow-hidden">
+                    <Image src={c.courierLogo} alt={c.courierName} fill className="object-contain" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -2160,11 +2161,12 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
                     
                     <div className="flex items-center gap-3">
                       {order.driver_photo_url && (
-                        <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-white shadow-sm shrink-0">
-                          <img 
+                        <div className="relative w-12 h-12 rounded-xl overflow-hidden border-2 border-white shadow-sm shrink-0">
+                          <Image 
                             src={order.driver_photo_url} 
                             alt={order.driver_name} 
-                            className="w-full h-full object-cover"
+                            fill
+                            className="object-cover"
                           />
                         </div>
                       )}

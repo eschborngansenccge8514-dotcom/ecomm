@@ -15,6 +15,7 @@ import internal from './routes/internal'
 import einvoice from './routes/einvoice'
 import storage from './routes/storage'
 import marketplace from './routes/marketplace'
+import logistics from './routes/logistics'
 
 const app = new Hono<{ Bindings: Bindings }>()
 
@@ -24,7 +25,7 @@ app.use('*', cors({
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'x-client-info', 'apikey'],
   maxAge: 600,
-}))
+}) as any)
 
 app.use('*', async (c, next) => {
   console.log(`[Request] ${c.req.method} ${c.req.path}`)
@@ -47,6 +48,7 @@ app.route('/razorpay', razorpay)
 app.route('/internal', internal)
 app.route('/einvoice', einvoice)
 app.route('/marketplace', marketplace)
+app.route('/logistics', logistics)
 
 // Explicit Fallbacks: When this worker is deployed as a single-purpose function 
 // (e.g., named 'einvoice'), Supabase calls it with paths like '/consolidate' 
@@ -63,6 +65,112 @@ app.all('/consolidate', delegateToEinvoice)
 app.all('/submit', delegateToEinvoice)
 app.all('/poll-status', delegateToEinvoice)
 app.all('/test-connection', delegateToEinvoice)
+
+// Logistics legacy fallbacks (for get-delivery-quotes)
+const delegateToLogistics = async (c: any) => {
+  try {
+    return await logistics.fetch(c.req.raw, c.env, c.executionCtx)
+  } catch (err: any) {
+    return c.json({ error: `Delegation Failed: ${err.message}` }, 500)
+  }
+}
+app.all('/get-delivery-quotes', delegateToLogistics)
+app.all('/easyparcel-create-order', async (c) => {
+  try {
+    const req = new Request(`${new URL(c.req.url).origin}/easyparcel/create-order`, c.req.raw)
+    return await easyparcel.fetch(req, c.env, c.executionCtx)
+  } catch (err: any) {
+    return c.json({ error: `Delegation Failed: ${err.message}` }, 500)
+  }
+})
+app.all('/easyparcel-sync-status', async (c) => {
+  try {
+    const req = new Request(`${new URL(c.req.url).origin}/easyparcel/sync-status`, c.req.raw)
+    return await easyparcel.fetch(req, c.env, c.executionCtx)
+  } catch (err: any) {
+    return c.json({ error: `Delegation Failed: ${err.message}` }, 500)
+  }
+})
+app.all('/easyparcel-sync-order-status', async (c) => {
+  try {
+    const req = new Request(`${new URL(c.req.url).origin}/easyparcel/sync-status`, c.req.raw)
+    return await easyparcel.fetch(req, c.env, c.executionCtx)
+  } catch (err: any) {
+    return c.json({ error: `Delegation Failed: ${err.message}` }, 500)
+  }
+})
+app.all('/lalamove-create-order', async (c) => {
+  try {
+    const req = new Request(`${new URL(c.req.url).origin}/lalamove/create-order`, c.req.raw)
+    return await lalamove.fetch(req, c.env, c.executionCtx)
+  } catch (err: any) {
+    return c.json({ error: `Delegation Failed: ${err.message}` }, 500)
+  }
+})
+app.all('/lalamove-get-order-status', async (c) => {
+  try {
+    const req = new Request(`${new URL(c.req.url).origin}/lalamove/status`, c.req.raw)
+    return await lalamove.fetch(req, c.env, c.executionCtx)
+  } catch (err: any) {
+    return c.json({ error: `Delegation Failed: ${err.message}` }, 500)
+  }
+})
+app.all('/lalamove-cancel', async (c) => {
+  try {
+    const req = new Request(`${new URL(c.req.url).origin}/lalamove/cancel`, c.req.raw)
+    return await lalamove.fetch(req, c.env, c.executionCtx)
+  } catch (err: any) {
+    return c.json({ error: `Delegation Failed: ${err.message}` }, 500)
+  }
+})
+app.all('/lalamove-test-connection', async (c) => {
+  try {
+    const req = new Request(`${new URL(c.req.url).origin}/lalamove/test-connection`, c.req.raw)
+    return await lalamove.fetch(req, c.env, c.executionCtx)
+  } catch (err: any) {
+    return c.json({ error: `Delegation Failed: ${err.message}` }, 500)
+  }
+})
+app.all('/lalamove-retry-order', async (c) => {
+  try {
+    const req = new Request(`${new URL(c.req.url).origin}/lalamove/retry-order`, c.req.raw)
+    return await lalamove.fetch(req, c.env, c.executionCtx)
+  } catch (err: any) {
+    return c.json({ error: `Delegation Failed: ${err.message}` }, 500)
+  }
+})
+app.all('/lalamove-add-priority-fee', async (c) => {
+  try {
+    const req = new Request(`${new URL(c.req.url).origin}/lalamove/add-priority-fee`, c.req.raw)
+    return await lalamove.fetch(req, c.env, c.executionCtx)
+  } catch (err: any) {
+    return c.json({ error: `Delegation Failed: ${err.message}` }, 500)
+  }
+})
+app.all('/award-loyalty-points', async (c) => {
+  try {
+    const req = new Request(`${new URL(c.req.url).origin}/internal/loyalty/award`, c.req.raw)
+    return await internal.fetch(req, c.env, c.executionCtx)
+  } catch (err: any) {
+    return c.json({ error: `Delegation Failed: ${err.message}` }, 500)
+  }
+})
+app.all('/razorpay-refund', async (c) => {
+  try {
+    const req = new Request(`${new URL(c.req.url).origin}/razorpay/refund`, c.req.raw)
+    return await razorpay.fetch(req, c.env, c.executionCtx)
+  } catch (err: any) {
+    return c.json({ error: `Delegation Failed: ${err.message}` }, 500)
+  }
+})
+app.all('/billplz-refund', async (c) => {
+  try {
+    const req = new Request(`${new URL(c.req.url).origin}/billplz/refund`, c.req.raw)
+    return await billplz.fetch(req, c.env, c.executionCtx)
+  } catch (err: any) {
+    return c.json({ error: `Delegation Failed: ${err.message}` }, 500)
+  }
+})
 
 app.notFound((c) => {
   // Ensure CORS headers even on 404

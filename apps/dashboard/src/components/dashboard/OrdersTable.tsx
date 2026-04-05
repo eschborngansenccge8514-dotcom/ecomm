@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -102,6 +103,19 @@ export function OrdersTable({
   const [isPending, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
+  
+  const parentRef = useRef<HTMLDivElement>(null)
+
+  const virtualizer = useVirtualizer({
+    count: orders.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 100, // Balanced estimate for order rows
+    overscan: 5,
+  })
+
+  const virtualItems = virtualizer.getVirtualItems()
+  const totalSize = virtualizer.getTotalSize()
+  
   
   const totalPages = Math.ceil(total / pageSize)
 
@@ -298,11 +312,14 @@ export function OrdersTable({
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-50/50">
+      <div 
+        ref={parentRef}
+        className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-auto max-h-[850px] no-scrollbar scroll-smooth"
+      >
+        <div className="w-full min-w-[800px]">
+          <table className="w-full border-collapse relative">
+            <thead className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm shadow-sm group-hover:z-20">
+              <tr className="border-b border-gray-100">
                 <th className="px-6 py-4 text-left w-12">
                   <Checkbox 
                     checked={selectedIds.length === orders.length && orders.length > 0}
@@ -318,9 +335,15 @@ export function OrdersTable({
                 <th className="px-5 py-4 text-right"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody 
+              style={{
+                height: `${totalSize}px`,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
               {orders.length === 0 ? (
-                <tr>
+                <tr className="absolute w-full">
                   <td colSpan={7} className="text-center py-20">
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center text-gray-300">
@@ -334,7 +357,8 @@ export function OrdersTable({
                   </td>
                 </tr>
               ) : (
-                orders.map(order => {
+                virtualItems.map(virtualRow => {
+                  const order = orders[virtualRow.index]
                   const statusInfo = ORDER_STATUS_CONFIG[order.status] || { 
                     label: order.status, 
                     color: 'bg-gray-100 text-gray-700 border-gray-200' 
@@ -353,15 +377,23 @@ export function OrdersTable({
                                       : statusInfo.color
 
                   return (
-                    <tr key={order.id} className="group hover:bg-gray-50/80 transition-all duration-200">
-                      <td className="px-6 py-5">
+                    <tr 
+                      key={virtualRow.key} 
+                      data-index={virtualRow.index}
+                      className="group hover:bg-gray-50/80 transition-all duration-200 absolute w-full flex items-center border-b border-gray-50"
+                      style={{
+                        height: `${virtualRow.size}px`,
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      <td className="px-6 py-5 w-12 shrink-0">
                         <Checkbox 
                           checked={selectedIds.includes(order.id)}
                           onCheckedChange={() => toggleSelect(order.id)}
                           className="rounded-md border-gray-300"
                         />
                       </td>
-                      <td className="px-5 py-5">
+                      <td className="px-5 py-5 flex-1 min-w-[120px]">
                         <div className="flex flex-col">
                           <span className="font-black text-gray-900 text-sm tracking-tight">#{order.order_number}</span>
                           <span className="text-[11px] text-gray-400 font-bold flex items-center gap-1 mt-0.5">
@@ -370,22 +402,22 @@ export function OrdersTable({
                           </span>
                         </div>
                       </td>
-                      <td className="px-5 py-5">
+                      <td className="px-5 py-5 flex-1 min-w-[180px]">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-500 font-black text-xs shadow-inner">
+                          <div className="w-10 h-10 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-500 font-black text-xs shadow-inner shrink-0">
                             {(order.buyer_name || (order.delivery_address as any)?.recipient_name || 'Guest').charAt(0)}
                           </div>
-                          <div className="flex flex-col">
-                            <span className="font-bold text-gray-900 text-sm">
+                          <div className="flex flex-col truncate">
+                            <span className="font-bold text-gray-900 text-sm truncate">
                               {order.buyer_name || (order.delivery_address as any)?.recipient_name || 'Guest Customer'}
                             </span>
-                            <span className="text-[11px] text-gray-400 font-bold uppercase tracking-tighter">
+                            <span className="text-[11px] text-gray-400 font-bold uppercase tracking-tighter truncate">
                               {order.delivery_address ? `📍 ${(order.delivery_address as any).city}` : 'No Address'}
                             </span>
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-5">
+                      <td className="px-5 py-5 w-40 shrink-0">
                         <div className="flex flex-col gap-1.5">
                            <div className="flex items-center gap-2">
                              <delInfo.icon size={14} className="text-gray-400" />
@@ -405,7 +437,7 @@ export function OrdersTable({
                            )}
                         </div>
                       </td>
-                      <td className="px-5 py-5">
+                      <td className="px-5 py-5 w-32 shrink-0">
                         <div className="flex flex-col">
                           <span className="font-black text-gray-900 text-sm">RM {Number(order.total_amount).toFixed(2)}</span>
                           <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1 mt-0.5">
@@ -414,7 +446,7 @@ export function OrdersTable({
                           </span>
                         </div>
                       </td>
-                      <td className="px-5 py-5">
+                      <td className="px-5 py-5 flex-1 min-w-[150px]">
                         <div className="flex flex-col gap-3">
                           <Badge variant="outline" className={cn(
                             'px-3 py-1 rounded-xl border text-[10px] font-black uppercase tracking-widest w-fit shadow-sm',
@@ -443,7 +475,7 @@ export function OrdersTable({
                           )}
                         </div>
                       </td>
-                      <td className="px-5 py-5 text-right">
+                      <td className="px-5 py-5 text-right w-16 shrink-0">
                         <OrderActionMenu 
                           order={order} 
                           merchant={merchant} 
@@ -457,6 +489,7 @@ export function OrdersTable({
             </tbody>
           </table>
         </div>
+
 
         {/* Pagination */}
         {totalPages > 1 && (

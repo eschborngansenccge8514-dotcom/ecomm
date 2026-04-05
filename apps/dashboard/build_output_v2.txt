@@ -1,0 +1,116 @@
+
+> dashboard@0.1.0 build /Users/jj/Downloads/project1/apps/dashboard
+> next build
+
+▲ Next.js 16.2.1 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 10.3s
+  Skipping validation of types
+  Finished TypeScript config validation in 39ms ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/69) ...
+  Generating static pages using 7 workers (17/69) 
+  Generating static pages using 7 workers (34/69) 
+  Generating static pages using 7 workers (51/69) 
+Error fetching applications: {
+  message: "Could not find a relationship between 'merchant_applications' and 'profiles' in the schema cache",
+  details: "Searched for a foreign key relationship between 'merchant_applications' and 'profiles' using the hint 'user_id' in the schema 'public', but no matches were found.",
+  hint: "Perhaps you meant 'merchant_operating_hours' instead of 'merchant_applications'.",
+  code: 'PGRST200'
+}
+✓ Generating static pages using 7 workers (69/69) in 1591ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /admin
+├ ƒ /admin/agent-health
+├ ƒ /admin/applications
+├ ƒ /admin/merchants
+├ ƒ /agent
+├ ƒ /agent/approvals
+├ ƒ /agent/playbooks
+├ ƒ /api/admin/applications/[id]/review
+├ ƒ /api/admin/merchants/[id]/status
+├ ƒ /api/agent/approvals/[id]
+├ ƒ /api/agent/chat
+├ ƒ /api/agent/feedback
+├ ƒ /api/agent/playbooks
+├ ƒ /api/agent/playbooks/[id]/run
+├ ƒ /api/agent/pos-chat
+├ ƒ /api/agent/sessions
+├ ƒ /api/agent/sessions/[id]/close
+├ ƒ /api/agent/sessions/[id]/messages
+├ ƒ /api/crm/segment-counts
+├ ƒ /api/dashboard/marketplace/health
+├ ƒ /api/easyparcel/balance
+├ ƒ /api/easyparcel/book
+├ ƒ /api/easyparcel/order-status
+├ ƒ /api/easyparcel/rates
+├ ƒ /api/easyparcel/settings
+├ ƒ /api/easyparcel/status
+├ ƒ /api/easyparcel/track
+├ ƒ /api/einvoice/consolidate
+├ ƒ /api/einvoice/staged
+├ ƒ /api/lalamove/add-priority-fee
+├ ƒ /api/lalamove/cancel
+├ ƒ /api/lalamove/retry
+├ ƒ /api/merchant/apply
+├ ƒ /api/support/chat
+├ ƒ /api/support/session
+├ ƒ /api/support/session/[id]/messages
+├ ƒ /apply
+├ ○ /apply/pending
+├ ƒ /categories
+├ ƒ /customers
+├ ƒ /einvoice
+├ ƒ /einvoice/invoices
+├ ƒ /einvoice/invoices/[id]
+├ ƒ /einvoice/learn
+├ ƒ /einvoice/request/[txId]
+├ ƒ /einvoice/settings
+├ ƒ /einvoice/setup
+├ ○ /login
+├ ƒ /loyalty
+├ ƒ /marketplace
+├ ƒ /marketplace/google_merchant
+├ ƒ /marketplace/google_merchant/[accountId]
+├ ƒ /marketplace/google_merchant/[accountId]/feed
+├ ƒ /marketplace/google_merchant/connect
+├ ƒ /marketplace/lazada
+├ ƒ /marketplace/lazada/connect
+├ ƒ /marketplace/shopee/callback
+├ ƒ /marketplace/shopee/connect
+├ ƒ /marketplace/tiktok
+├ ƒ /marketplace/tiktok/[accountId]
+├ ƒ /marketplace/tiktok/connect
+├ ƒ /operations
+├ ƒ /orders
+├ ƒ /orders/[id]
+├ ƒ /payment-exceptions
+├ ○ /pos
+├ ○ /pos/checkout
+├ ƒ /pos/receipt/[txId]
+├ ƒ /products
+├ ƒ /profile
+├ ○ /register
+├ ƒ /reports
+├ ƒ /reports/products
+├ ƒ /settings
+├ ƒ /settings/integrations
+├ ƒ /shipping/easyparcel
+├ ƒ /shipping/lalamove
+├ ƒ /store/[slug]
+├ ƒ /support/inbox
+├ ƒ /support/settings
+└ ƒ /support/test
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

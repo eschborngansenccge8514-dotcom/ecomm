@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
 
   const { orderId, merchantId } = await req.json()
   
-  const { data, error } = await invokeWorkerServer('lalamove-cancel', {
+  const { data, error } = await invokeWorkerServer('lalamove/cancel', {
     body: { orderId, merchantId }
   })
 

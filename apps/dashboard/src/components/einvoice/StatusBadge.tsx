@@ -8,11 +8,12 @@ import {
   AlertCircle, 
   Ban, 
   FileText, 
-  Layers 
+  Layers,
+  Info
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type EinvoiceStatus = 'validated' | 'pending' | 'invalid' | 'rejected' | 'failed' | 'cancelled' | 'draft' | 'consolidated' | 'submitted'
+export type EinvoiceStatus = 'validated' | 'pending' | 'invalid' | 'rejected' | 'failed' | 'error' | 'cancelled' | 'draft' | 'consolidated' | 'submitted' | 'requested'
 
 interface StatusBadgeProps {
   status: EinvoiceStatus | string
@@ -41,6 +42,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
       case 'invalid':
       case 'rejected':
       case 'failed':
+      case 'error':
         return {
           label: s.charAt(0).toUpperCase() + s.slice(1),
           icon: XCircle,
@@ -63,6 +65,12 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
           label: 'Consolidated',
           icon: Layers,
           colors: 'bg-indigo-100 text-indigo-700 ring-indigo-200',
+        }
+      case 'requested':
+        return {
+          label: 'Requested',
+          icon: Info,
+          colors: 'bg-blue-100 text-blue-700 ring-blue-200',
         }
       default:
         return {

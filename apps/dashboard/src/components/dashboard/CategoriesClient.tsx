@@ -21,6 +21,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { CategoryFormModal } from './CategoryFormModal'
 import { 
   DropdownMenu, 
@@ -88,13 +89,21 @@ export function CategoriesClient({ categories: initial, merchantId }: {
 
   const toggleStatus = async (category: any) => {
     const newStatus = !category.is_active
+    
+    // Optimistic update
+    const previousCats = [...cats]
+    setCats(prev => prev.map(c => c.id === category.id ? { ...c, is_active: newStatus } : c))
+    
     const { error } = await supabase
       .from('categories')
       .update({ is_active: newStatus })
       .eq('id', category.id)
     
-    if (error) { toast.error(error.message); return }
-    setCats(prev => prev.map(c => c.id === category.id ? { ...c, is_active: newStatus } : c))
+    if (error) {
+      setCats(previousCats)
+      toast.error(error.message)
+      return
+    }
     toast.success(`Category ${newStatus ? 'activated' : 'hidden'}`)
   }
 
@@ -102,10 +111,16 @@ export function CategoriesClient({ categories: initial, merchantId }: {
     const count = category.product_count?.[0]?.count ?? 0
     if (count > 0 && !confirm(`This category has ${count} products. They will become uncategorized. Continue?`)) return
     
-    const { error } = await supabase.from('categories').delete().eq('id', category.id)
-    if (error) { toast.error(error.message); return }
-    
+    // Optimistic update
+    const previousCats = [...cats]
     setCats(prev => prev.filter(c => c.id !== category.id))
+    
+    const { error } = await supabase.from('categories').delete().eq('id', category.id)
+    if (error) {
+      setCats(previousCats)
+      toast.error(error.message)
+      return
+    }
     toast.success('Category deleted')
   }
 
@@ -199,7 +214,9 @@ export function CategoriesClient({ categories: initial, merchantId }: {
                 <div className="flex items-start justify-between">
                   <div className="w-14 h-14 bg-gray-50 rounded-2xl overflow-hidden flex items-center justify-center group-hover:scale-105 transition-transform duration-300 border border-gray-50">
                     {cat.image_url ? (
-                      <img src={cat.image_url} alt={cat.name} className="w-full h-full object-cover" />
+                      <div className="relative w-full h-full">
+                        <Image src={cat.image_url} alt={cat.name} fill className="object-cover" />
+                      </div>
                     ) : (
                       <ImageIcon className="text-gray-300" size={24} />
                     )}

@@ -254,7 +254,7 @@ import { invokeWorker } from './worker'
  * Invokes Lalamove order creation
  */
 export async function bookLalamoveOrder(orderId: string) {
-  const { data, error } = await invokeWorker('lalamove-create-order', {
+  const { data, error } = await invokeWorker('lalamove/create-order', {
     body: { orderId }
   })
   if (error) throw error
@@ -265,7 +265,7 @@ export async function bookLalamoveOrder(orderId: string) {
  * Invokes Lalamove order cancellation
  */
 export async function cancelLalamoveOrder(orderId: string) {
-  const { data, error } = await invokeWorker('lalamove-cancel', {
+  const { data, error } = await invokeWorker('lalamove/cancel', {
     body: { orderId }
   })
   if (error) throw error
@@ -276,7 +276,7 @@ export async function cancelLalamoveOrder(orderId: string) {
  * Syncs Lalamove status
  */
 export async function syncLalamoveStatus(orderId: string) {
-  const { data, error } = await invokeWorker('lalamove-get-order-status', {
+  const { data, error } = await invokeWorker('lalamove/status', {
     body: { orderId }
   })
   if (error) throw error

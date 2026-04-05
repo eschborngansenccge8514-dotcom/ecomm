@@ -24,7 +24,7 @@ export const buildSupportTools = (
     parameters: z.object({
       order_id: z.string().describe('The order number (e.g., ORD-2026-01063 or just 01063)')
     }),
-    execute: async ({ order_id }: any) => {
+    execute: async ({ order_id }: { order_id: string }) => {
       if (!order_id) return { error: 'Missing order_id' }
       
       const supabase = getSupabase()
@@ -64,7 +64,7 @@ export const buildSupportTools = (
     parameters: z.object({
       order_id: z.string().describe('The order number')
     }),
-    execute: async ({ order_id }: any) => {
+    execute: async ({ order_id }: { order_id: string }) => {
       if (!order_id) return { error: 'Missing order_id' }
       const supabase = getSupabase()
       let query = supabase
@@ -98,7 +98,7 @@ export const buildSupportTools = (
     parameters: z.object({
       query: z.string().describe('The question or topic to search for')
     }),
-    execute: async ({ query }: any) => {
+    execute: async ({ query }: { query: string }) => {
       const supabase = getSupabase()
       const { data, error } = await supabase
         .from('support_configs')
@@ -156,7 +156,7 @@ export const buildSupportTools = (
       order_id: z.string().describe('The order number'),
       reason: z.string().describe('Reason for the return')
     }),
-    execute: async ({ order_id, reason }: any) => {
+    execute: async ({ order_id, reason }: { order_id: string; reason: string }) => {
       if (!order_id) return { error: 'Missing order_id' }
 
       const supabase = getSupabase()
@@ -194,7 +194,7 @@ export const buildSupportTools = (
     parameters: z.object({
       reason: z.string().describe('A brief explanation of why escalation is needed')
     }),
-    execute: async ({ reason }: any) => {
+    execute: async ({ reason }: { reason: string }) => {
       const supabase = getSupabase()
       
       const { error: escError } = await supabase.from('support_escalations').insert({
@@ -228,7 +228,7 @@ export const buildSupportTools = (
       name: z.string().describe('The customer\'s name'),
       email: z.string().email().describe('The customer\'s email address')
     }),
-    execute: async ({ name, email }: any) => {
+    execute: async ({ name, email }: { name: string; email: string }) => {
       const supabase = getSupabase()
       const { error } = await supabase
         .from('support_sessions')

@@ -94,7 +94,19 @@ const mapCountryToLHDN = (country: string): string => {
   return c;
 };
 
-function buildLhdnJson(merchant: any, config: any, buyer: any, items: any[], orderNumber: string, classificationCode = '022') {
+const mapIdTypeToLHDN = (idType: string): string => {
+  if (!idType) return 'BRN';
+  const t = idType.trim().toUpperCase();
+  // Valid LHDN schemeIDs: TIN, BRN, PASSPORT, NRIC, ARMY
+  if (t === 'MYKAD' || t === 'NRIC') return 'NRIC';
+  if (t === 'PASSPORT') return 'PASSPORT';
+  if (t === 'BRN') return 'BRN';
+  if (t === 'ARMY') return 'ARMY';
+  if (t === 'POLICE') return 'NRIC'; // Default to NRIC for police as they are typically local
+  return 'BRN';
+};
+
+function buildLhdnJson(merchant: any, config: any, buyer: any, items: any[], orderNumber: string, totalAmount: number, classificationCode = '022') {
   const safeTin = (buyer.tin || '').trim();
   const safeId  = (buyer.id_number || '').trim();
   
@@ -103,8 +115,10 @@ function buildLhdnJson(merchant: any, config: any, buyer: any, items: any[], ord
   }
 
   const subtotal = items.reduce((s: number, i: any) => s + (Number(i.unitPrice) * Number(i.quantity)), 0);
-  const tax = 0; // Default to 0 for now
-  const total = subtotal + tax;
+  const total = Number(totalAmount) || subtotal;
+  const tax = Math.max(0, total - subtotal);
+  const hasTax = tax > 0.01;
+  const taxPercent = hasTax ? Math.round((tax / subtotal) * 100) : 0;
 
   return {
     "Invoice": [
@@ -160,7 +174,7 @@ function buildLhdnJson(merchant: any, config: any, buyer: any, items: any[], ord
           "Party": [{
             "PartyIdentification": [
               {"ID": [{"_": (buyer.tin || "EI00000000010").trim(), "schemeID": "TIN"}]},
-              {"ID": [{"_": (buyer.id_number || "NA").trim(), "schemeID": (buyer.id_type || "BRN").trim()}]}
+              {"ID": [{"_": (buyer.id_number || "NA").trim(), "schemeID": mapIdTypeToLHDN(buyer.id_type)}]}
             ],
             "PostalAddress": [{
               "AddressLine": [{"Line": [{"_": buyer.address_line1 || "N/A"}]}],
@@ -182,10 +196,10 @@ function buildLhdnJson(merchant: any, config: any, buyer: any, items: any[], ord
             "TaxableAmount": [{"_": roundMYR(subtotal), "currencyID": "MYR"}],
             "TaxAmount": [{"_": roundMYR(tax), "currencyID": "MYR"}],
             "TaxCategory": [{
-              "ID": [{"_": "06"}],
-              "Percent": [{"_": 0}],
-              "TaxExemptionReason": [{"_": "Not Subject to SST"}],
-              "TaxScheme": [{"ID": [{"_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6"}]}]
+              "ID": [{"_": hasTax ? "01" : "06"}],
+              "Percent": [{"_": taxPercent}],
+              "TaxScheme": [{"ID": [{"_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6"}]}],
+              ...(hasTax ? {} : { "TaxExemptionReason": [{"_": "Not Subject to SST"}] })
             }]
           }]
         }],
@@ -196,33 +210,37 @@ function buildLhdnJson(merchant: any, config: any, buyer: any, items: any[], ord
           "AllowanceTotalAmount": [{"_": 0, "currencyID": "MYR"}],
           "PayableAmount": [{"_": roundMYR(total), "currencyID": "MYR"}]
         }],
-        "InvoiceLine": items.map((item: any, i: number) => ({
-          "ID": [{"_": String(i + 1)}],
-          "InvoicedQuantity": [{"_": Number(item.quantity), "unitCode": "C62"}],
-          "LineExtensionAmount": [{"_": roundMYR(Number(item.unitPrice) * Number(item.quantity)), "currencyID": "MYR"}],
-          "ItemPriceExtension": [{
-            "Amount": [{"_": roundMYR(Number(item.unitPrice) * Number(item.quantity)), "currencyID": "MYR"}]
-          }],
-          "Item": [{
-            // Use the classification code selected by the merchant (defaults to 022 = Others)
-            "CommodityClassification": [{"ItemClassificationCode": [{"_": classificationCode, "listID": "CLASS"}]}],
-            "Description": [{"_": item.description}]
-          }],
-          "Price": [{"PriceAmount": [{"_": roundMYR(item.unitPrice), "currencyID": "MYR"}]}],
-          "TaxTotal": [{
-            "TaxAmount": [{"_": 0, "currencyID": "MYR"}],
-            "TaxSubtotal": [{
-              "TaxableAmount": [{"_": roundMYR(Number(item.unitPrice) * Number(item.quantity)), "currencyID": "MYR"}],
-              "TaxAmount": [{"_": 0, "currencyID": "MYR"}],
-              "TaxCategory": [{
-                "ID": [{"_": "06"}],
-                "Percent": [{"_": 0}],
-                "TaxExemptionReason": [{"_": "Not Subject to SST"}],
-                "TaxScheme": [{"ID": [{"_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6"}]}]
+        "InvoiceLine": items.map((item: any, i: number) => {
+          const itemTotal = Number(item.unitPrice) * Number(item.quantity);
+          const itemTax = hasTax ? (itemTotal / subtotal) * tax : 0;
+          
+          return {
+            "ID": [{"_": String(i + 1)}],
+            "InvoicedQuantity": [{"_": Number(item.quantity), "unitCode": "C62"}],
+            "LineExtensionAmount": [{"_": roundMYR(itemTotal), "currencyID": "MYR"}],
+            "ItemPriceExtension": [{
+              "Amount": [{"_": roundMYR(itemTotal), "currencyID": "MYR"}]
+            }],
+            "Item": [{
+              "CommodityClassification": [{"ItemClassificationCode": [{"_": classificationCode, "listID": "CLASS"}]}],
+              "Description": [{"_": item.description}]
+            }],
+            "Price": [{"PriceAmount": [{"_": roundMYR(item.unitPrice), "currencyID": "MYR"}]}],
+            "TaxTotal": [{
+              "TaxAmount": [{"_": roundMYR(itemTax), "currencyID": "MYR"}],
+              "TaxSubtotal": [{
+                "TaxableAmount": [{"_": roundMYR(itemTotal), "currencyID": "MYR"}],
+                "TaxAmount": [{"_": roundMYR(itemTax), "currencyID": "MYR"}],
+                "TaxCategory": [{
+                  "ID": [{"_": hasTax ? "01" : "06"}],
+                  "Percent": [{"_": taxPercent}],
+                  "TaxScheme": [{"ID": [{"_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6"}]}],
+                  ...(hasTax ? {} : { "TaxExemptionReason": [{"_": "Not Subject to SST"}] })
+                }]
               }]
             }]
-          }]
-        }))
+          };
+        })
       }
     ]
   };
@@ -233,7 +251,7 @@ einvoice.post('/submit', async (c) => {
   try {
     const body = await c.req.json()
     const orderId = body.orderId || body.order_id
-    const { posRequestId } = body
+    const posRequestId = body.posRequestId || body.pos_request_id
     const supabase = getSupabaseClient(c.env)
     
     let merchantId: string
@@ -306,18 +324,20 @@ einvoice.post('/submit', async (c) => {
         totalPrice: item.line_total_rm
       }))
 
+      const adminCustomer = body.customer || {}
+
       buyer = {
-        name: req.customer_name || 'POS Customer',
-        tin: req.customer_tin || 'EI00000000010',
-        id_number: req.customer_id_number || 'NA',
-        id_type: req.customer_id_type || 'BRN',
-        email: req.customer_email || 'noreply@customer.com',
-        phone: req.customer_phone || '00-00000000',
-        address: req.customer_address || 'N/A',
-        postcode: '00000',
-        city: 'N/A',
-        state: '14',
-        country: 'MYS'
+        name: (adminCustomer.name || req.customer_name || 'POS Customer').toUpperCase(),
+        tin: (adminCustomer.tin || req.customer_tin || 'EI00000000010').toUpperCase(),
+        id_number: (adminCustomer.id_number || req.customer_id_number || 'NA').toUpperCase(),
+        id_type: adminCustomer.id_type || req.customer_id_type || 'BRN',
+        email: adminCustomer.email || req.customer_email || 'noreply@customer.com',
+        phone: (adminCustomer.phone || req.customer_phone || '').trim().replace(/[\s-]/g, '') || '0123456789',
+        address_line1: (adminCustomer.address || adminCustomer.address_line1 || req.customer_address || 'N/A').toUpperCase(),
+        postcode: adminCustomer.postcode || '00000',
+        city: adminCustomer.city || 'N/A',
+        state: adminCustomer.state || '14',
+        country: adminCustomer.country || 'MYS'
       }
     } else {
       throw new Error('Either orderId or posRequestId is required')
@@ -341,7 +361,7 @@ einvoice.post('/submit', async (c) => {
         resolvedClassificationCode = '004';
     }
 
-    const lhdnJson = buildLhdnJson(merchant, config, buyer, items, orderNumber, resolvedClassificationCode)
+    const lhdnJson = buildLhdnJson(merchant, config, buyer, items, orderNumber, totalAmount, resolvedClassificationCode)
 
     // 4. Get Auth Token
     const token = await getLhdnToken(config)
@@ -360,6 +380,10 @@ einvoice.post('/submit', async (c) => {
     const calculatedHash = Array.from(new Uint8Array(hashBuffer))
       .map(b => b.toString(16).padStart(2, "0"))
       .join("");
+
+
+    // DEBUG: Log the payload being sent to LHDN
+    console.log(`[LHDN Payload] ${docString}`);
 
     const res = await fetch(submitUrl, {
       method: 'POST',
@@ -382,6 +406,7 @@ einvoice.post('/submit', async (c) => {
     if (!res.ok) {
       const lhdnDetails = result?.error?.details?.map((d: any) => d.message).filter(Boolean).join('; ')
       const errorMsg = lhdnDetails || result?.error?.message || result?.message || JSON.stringify(result)
+      console.error(`[LHDN API Error] Status: ${res.status}`, result);
       throw new Error(`LHDN Submission Failed: ${errorMsg}`)
     }
 
@@ -389,6 +414,7 @@ einvoice.post('/submit', async (c) => {
       const rejectErr = result.rejectedDocuments[0]?.error;
       const details = rejectErr?.details?.map((d: any) => d.message).filter(Boolean).join('; ');
       const errorMsg = details || rejectErr?.message || 'Document rejected by LHDN Validation';
+      console.error('[LHDN Validation Error]', JSON.stringify(result.rejectedDocuments[0]));
       throw new Error(`LHDN Rejected: ${errorMsg}`);
     }
 
@@ -405,7 +431,7 @@ einvoice.post('/submit', async (c) => {
       submission_uid: result.submissionUid || result.acceptedDocuments?.[0]?.uuid,
       lhdn_uuid: result.acceptedDocuments?.[0]?.uuid,
       total_amount: totalAmount,
-      tax_amount: 0,
+      tax_amount: Number((totalAmount - subTotal).toFixed(2)),
       buyer_name: buyer.name,
       buyer_tin: buyer.tin,
       status: 'submitted',
@@ -415,16 +441,17 @@ einvoice.post('/submit', async (c) => {
 
     // 6.1 Insert Line Items for consistency (mirroring Edge function behavior)
     if (invoice?.id) {
-       const insertLines = items.map((item: any) => ({
-          document_id: invoice.id,
-          description: item.description,
-          quantity: Number(item.quantity),
-          unit_price: Number(item.unitPrice),
-          classification_code: resolvedClassificationCode,
-          tax_type: 'E',
-          tax_rate: 0,
-          line_total_rm: Number(item.unitPrice) * Number(item.quantity)
-       }));
+        const hasTaxLine = totalAmount > subTotal + 0.01;
+        const insertLines = items.map((item: any) => ({
+           document_id: invoice.id,
+           description: item.description,
+           quantity: Number(item.quantity),
+           unit_price: Number(item.unitPrice),
+           classification_code: resolvedClassificationCode,
+           tax_type: hasTaxLine ? '01' : '06',
+           tax_rate: hasTaxLine ? Math.round(((totalAmount - subTotal) / subTotal) * 100) : 0,
+           line_total_rm: Number(item.unitPrice) * Number(item.quantity)
+        }));
        await supabase.from("einvoice_line_items").delete().eq("document_id", invoice.id);
        await supabase.from("einvoice_line_items").insert(insertLines);
     }
@@ -555,7 +582,7 @@ einvoice.post('/consolidate', async (c) => {
       }))
 
       const batchNumber = `CON-${Date.now()}-${Math.floor(Math.random() * 1000)}`
-      const lhdnPayload = buildLhdnJson(merchant, config, buyer, items, batchNumber, "004")
+      const lhdnPayload = buildLhdnJson(merchant, config, buyer, items, batchNumber, totalAmount, "004")
 
       const docString = JSON.stringify(lhdnPayload)
       const docBytes = new TextEncoder().encode(docString)
@@ -851,6 +878,7 @@ einvoice.post('/poll-status', async (c) => {
 
     return c.json({ success: true, polled: allPending.length })
   } catch (err: any) {
+    console.error('[Submit Route Error]', err);
     return c.json({ error: err.message }, 400)
   }
 })

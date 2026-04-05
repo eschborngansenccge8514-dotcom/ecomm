@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter }  from 'next/navigation'
+import Image from 'next/image'
 import { Input }      from '@/components/ui/input'
 import { Button }     from '@/components/ui/button'
 import { cn }         from '@/lib/utils'
@@ -150,7 +151,7 @@ export function OnboardingWizard({ merchant }: { merchant: any }) {
                     <div className="flex items-start gap-4">
                        <div className="group relative w-32 h-32 rounded-3xl border-2 border-dashed border-gray-100 bg-gray-50 flex items-center justify-center overflow-hidden hover:border-blue-400 transition-all cursor-pointer">
                          {appearance.logoUrl ? (
-                           <img src={appearance.logoUrl} className="w-full h-full object-cover" />
+                           <Image src={appearance.logoUrl} alt="Logo" fill className="object-cover" />
                          ) : <Plus className="text-gray-300" />}
                          <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={async (e) => {
                             const file = e.target.files?.[0]
@@ -196,7 +197,7 @@ export function OnboardingWizard({ merchant }: { merchant: any }) {
                   <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-4">Real-time Preview</span>
                   <div className="flex-1 bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden relative group">
                     <div className="h-20 bg-gray-100 animate-pulse relative">
-                       {appearance.bannerUrl && <img src={appearance.bannerUrl} className="w-full h-full object-cover" />}
+                       {appearance.bannerUrl && <Image src={appearance.bannerUrl} alt="Banner" fill className="object-cover" />}
                        <label className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
                           <input type="file" className="hidden" onChange={async (e) => {
                              const file = e.target.files?.[0]
@@ -213,8 +214,8 @@ export function OnboardingWizard({ merchant }: { merchant: any }) {
                        </label>
                     </div>
                     <div className="p-4 flex flex-col items-center">
-                       <div className="w-16 h-16 rounded-2xl bg-white shadow-xl -mt-10 mb-3 border-2 border-white overflow-hidden">
-                          {appearance.logoUrl ? <img src={appearance.logoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-50 flex items-center justify-center"><Store size={20} className="text-gray-200" /></div>}
+                       <div className="w-16 h-16 rounded-2xl bg-white shadow-xl -mt-10 mb-3 border-2 border-white overflow-hidden relative">
+                          {appearance.logoUrl ? <Image src={appearance.logoUrl} alt="Logo" fill className="object-cover" /> : <div className="w-full h-full bg-gray-50 flex items-center justify-center"><Store size={20} className="text-gray-200" /></div>}
                        </div>
                        <div className="h-3 w-32 bg-gray-900 rounded-full mb-2" style={{ backgroundColor: appearance.primaryColor }} />
                        <div className="h-2 w-24 bg-gray-100 rounded-full" />

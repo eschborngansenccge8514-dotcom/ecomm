@@ -313,9 +313,9 @@ lalamove.post('/create-order', async (c) => {
   }
 })
 
-lalamove.get('/status/:orderId', async (c) => {
+lalamove.post('/status', async (c) => {
   try {
-    const orderId = c.req.param('orderId')
+    const { orderId } = await c.req.json()
     const supabase = getSupabaseClient(c.env)
     const { data: order } = await supabase.from('orders').select('lalamove_order_id, delivery_status').eq('id', orderId).single()
     if (!order?.lalamove_order_id) throw new Error('No Lalamove order found')
@@ -371,6 +371,273 @@ lalamove.post('/test-connection', async (c) => {
     const data = await res.json()
     if (!res.ok) throw new Error('Connection failed')
     return c.json({ success: true, data })
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400)
+  }
+})
+
+lalamove.post('/add-priority-fee', async (c) => {
+  try {
+    const { orderId, tipAmount } = await c.req.json()
+    if (!orderId || !tipAmount) throw new Error('orderId and tipAmount are required')
+
+    const tipAmountNum = parseFloat(tipAmount)
+    if (isNaN(tipAmountNum) || tipAmountNum < 1 || tipAmountNum > 50) {
+      throw new Error('Tip amount must be between RM 1 and RM 50')
+    }
+
+    const supabase = getSupabaseClient(c.env)
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('id, lalamove_order_id, priority_fee_added')
+      .eq('id', orderId)
+      .single()
+
+    if (orderError || !order) throw new Error('Order not found')
+    if (!order.lalamove_order_id) throw new Error('Lalamove order ID missing — delivery may not have been booked yet')
+
+    const apiKey = c.env.LALAMOVE_API_KEY
+    const apiSecret = c.env.LALAMOVE_API_SECRET
+    const market = 'MY'
+    const env = c.env.LALAMOVE_SANDBOX === 'true' ? 'sandbox' : 'production'
+    const baseUrl = getLalamoveBaseUrl(env)
+
+    const path = `/v3/orders/${order.lalamove_order_id}/priority-fee`
+    const body = JSON.stringify({
+      data: {
+        priorityFee: tipAmountNum.toFixed(2)
+      }
+    })
+
+    const headers = await buildLalamoveHeaders(apiKey, apiSecret, 'POST', path, body, market)
+    const res = await fetch(`${baseUrl}${path}`, { method: 'POST', headers, body })
+    const responseData = (await res.json()) as any
+
+    await logLalamoveApi(supabase, order.id, {
+      endpoint: path,
+      method: 'POST',
+      statusCode: res.status,
+      requestBody: body,
+      responseBody: responseData,
+      attempt: 1
+    })
+
+    if (!res.ok) {
+      const msg = responseData?.message ?? responseData?.error?.message ?? `Priority fee failed (${res.status})`
+      throw new Error(msg)
+    }
+
+    const newPriorityFee = (parseFloat(order.priority_fee_added as any) || 0) + tipAmountNum
+    await supabase.from('orders').update({
+      priority_fee_added: newPriorityFee
+    }).eq('id', orderId)
+
+    await supabase.from('delivery_exception_logs').insert({
+      order_id: order.id,
+      type: 'priority_fee_added',
+      message: `Added RM ${tipAmountNum.toFixed(2)} priority fee`,
+      raw_payload: responseData
+    })
+
+    return c.json({ 
+      success: true, 
+      priorityFeeAdded: tipAmountNum,
+      totalPriorityFee: newPriorityFee
+    })
+
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400)
+  }
+})
+
+lalamove.post('/retry-order', async (c) => {
+  try {
+    const { orderId, confirmPriceChange = false } = await c.req.json()
+    if (!orderId) throw new Error('orderId is required')
+
+    const supabase = getSupabaseClient(c.env)
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('*, merchant:merchant_id(*)')
+      .eq('id', orderId)
+      .single()
+
+    if (orderError || !order) throw new Error('Order not found')
+    
+    const retryCount = order.lalamove_retry_count || 0
+    if (retryCount >= 3) {
+      throw new Error('Maximum retry attempts exceeded (3)')
+    }
+
+    const { data: llConfig } = await supabase
+      .from('merchant_lalamove_config')
+      .select('*')
+      .eq('merchant_id', order.merchant_id)
+      .maybeSingle()
+
+    const deliveryAddr = order.delivery_address as any
+    const merchant     = order.merchant as any
+    const serviceType  = order.delivery_service_id || 'MOTORCYCLE'
+
+    const apiKey = c.env.LALAMOVE_API_KEY
+    const apiSecret = c.env.LALAMOVE_API_SECRET
+    const market = 'MY'
+    const env = c.env.LALAMOVE_SANDBOX === 'true' ? 'sandbox' : 'production'
+    const baseUrl = getLalamoveBaseUrl(env)
+
+    if (!apiKey || !apiSecret) {
+      throw new Error('Lalamove platform secrets are not configured.')
+    }
+
+    let custLat = deliveryAddr?.lat
+    let custLng = deliveryAddr?.lng
+
+    if (!custLat || !custLng) {
+      const { data: addrRow } = await supabase
+        .from('addresses')
+        .select('lat, lng')
+        .eq('user_id', order.customer_id)
+        .eq('postcode', deliveryAddr?.postcode)
+        .maybeSingle()
+      custLat = addrRow?.lat
+      custLng = addrRow?.lng
+    }
+
+    const merchLat = String(llConfig?.pickup_lat || merchant.lat || '5.4141')
+    const merchLng = String(llConfig?.pickup_lng || merchant.lng || '100.3288')
+    const custLatS = String(deliveryAddr?.lat || '5.4141')
+    const custLngS = String(deliveryAddr?.lng || '100.3288')
+
+    const buildAddr = (obj: any) => [obj.line1, obj.line2, obj.city, obj.state, obj.postcode, 'Malaysia']
+      .filter(Boolean).map(s => String(s).trim()).filter(s => s !== '').join(', ')
+
+    const pickupAddress  = llConfig?.pickup_address_text || buildAddr({
+      line1:    merchant.address_line1,
+      line2:    merchant.line2,
+      city:     merchant.city,
+      state:    merchant.state,
+      postcode: merchant.postcode
+    })
+    const deliveryAddressStr = buildAddr(deliveryAddr)
+
+    const quotePath = '/v3/quotations'
+    const quoteBody = JSON.stringify({
+      data: {
+        serviceType,
+        language: 'en_MY',
+        stops: [
+          { coordinates: { lat: merchLat, lng: merchLng }, address: pickupAddress },
+          { coordinates: { lat: custLatS, lng: custLngS }, address: deliveryAddressStr },
+        ]
+      },
+    })
+
+    const quoteHeaders = await buildLalamoveHeaders(apiKey, apiSecret, 'POST', quotePath, quoteBody, market)
+    const { res: quoteRes, attempts: quoteAttempts } = await fetchWithRetry(`${baseUrl}${quotePath}`, { method: 'POST', headers: quoteHeaders, body: quoteBody })
+    const quoteData = (await quoteRes.json()) as any
+
+    await logLalamoveApi(supabase, orderId, {
+      endpoint: quotePath, method: 'POST',
+      statusCode: quoteRes.status,
+      requestBody: quoteBody,
+      responseBody: quoteData,
+      attempt: quoteAttempts,
+    })
+
+    if (!quoteRes.ok) {
+      throw new Error(getLalamoveErrorMessage(quoteData, 'Failed to get fresh quote'))
+    }
+
+    const newQuotationId = quoteData.data.quotationId
+    const senderStopId    = quoteData.data.stops[0].stopId
+    const recipientStopId = quoteData.data.stops[1].stopId
+    const newPrice = parseFloat(quoteData.data.priceBreakdown.total)
+    const oldPrice = parseFloat(order.delivery_fee as any) || 0
+
+    if (oldPrice > 0 && !confirmPriceChange) {
+      const diffPct = (newPrice - oldPrice) / oldPrice
+      if (diffPct > 0.20) {
+        return c.json({ 
+          priceChanged: true, 
+          oldPrice, 
+          newPrice,
+          quotationId: newQuotationId
+        })
+      }
+    }
+
+    const createPath = '/v3/orders'
+    const sanitize = (s: string) => (s ?? '').replace(/[^\x00-\x7F]/g, '').substring(0, 50)
+    const createBody = JSON.stringify({
+      data: {
+        quotationId: newQuotationId,
+        sender: {
+          stopId: senderStopId,
+          name: sanitize(llConfig?.pickup_contact_name || merchant.store_name || 'Merchant'),
+          phone: normPhone(llConfig?.pickup_contact_phone || merchant.phone) || '+60123456789',
+        },
+        recipients: [
+          {
+            stopId: recipientStopId,
+            name: sanitize(deliveryAddr.name || 'Customer'),
+            phone: normPhone(deliveryAddr.phone) || '+60123456789',
+            remarks: `Order ${order.order_number} (Retry #${retryCount + 1})`.substring(0, 100),
+          },
+        ],
+        isPODEnabled: llConfig?.is_pod_enabled ?? false,
+      },
+    })
+
+    const createHeaders = await buildLalamoveHeaders(apiKey, apiSecret, 'POST', createPath, createBody, market)
+    const { res: createRes, attempts: createAttempts } = await fetchWithRetry(`${baseUrl}${createPath}`, { method: 'POST', headers: createHeaders, body: createBody })
+    const createData = (await createRes.json()) as any
+
+    await logLalamoveApi(supabase, orderId, {
+      endpoint: createPath, method: 'POST',
+      statusCode: createRes.status,
+      requestBody: createBody,
+      responseBody: createData,
+      attempt: createAttempts,
+    })
+
+    if (!createRes.ok) {
+      throw new Error(getLalamoveErrorMessage(createData, 'Lalamove booking failed'))
+    }
+
+    const newLalamoveOrderId = createData.data.orderId
+    const lalamoveData = createData.data
+
+    await supabase.from('orders').update({
+      lalamove_order_id: newLalamoveOrderId,
+      lalamove_retry_count: retryCount + 1,
+      delivery_fee: newPrice,
+      exception_flag: null,
+      exception_flagged_at: null,
+      status: 'confirmed',
+      delivery_status: 'finding_driver',
+      delivery_provider: 'lalamove',
+      delivery_metadata: {
+        lalamove: {
+          distance: lalamoveData?.distance,
+          priceBreakdown: lalamoveData?.priceBreakdown,
+          stops: lalamoveData?.stops
+        }
+      }
+    }).eq('id', orderId)
+
+    await supabase.from('delivery_exception_logs').insert({
+      order_id: orderId,
+      type: 'retry_success',
+      message: `Order retried successfully (Attempt ${retryCount + 1})`,
+      raw_payload: createData.data
+    })
+
+    return c.json({ 
+      success: true, 
+      lalamoveOrderId: newLalamoveOrderId,
+      attempt: retryCount + 1
+    })
+
   } catch (err: any) {
     return c.json({ error: err.message }, 400)
   }

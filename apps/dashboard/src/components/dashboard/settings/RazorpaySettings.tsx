@@ -35,6 +35,7 @@ export function RazorpaySettings({ config: initial, merchantId }: {
     key_id:         initial?.key_id         ?? '',
     key_secret:     initial?.key_secret     ?? '',
     webhook_secret: initial?.webhook_secret ?? '',
+    use_global_key: initial?.use_global_key ?? true,
   })
 
   const [showSecret,  setShowSecret]  = useState(false)
@@ -44,8 +45,8 @@ export function RazorpaySettings({ config: initial, merchantId }: {
   const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
 
   const handleSave = async () => {
-    if (!form.key_id || !form.key_secret) {
-      toast.error('Key ID and Key Secret are required')
+    if (!form.use_global_key && (!form.key_id || !form.key_secret)) {
+      toast.error('Key ID and Key Secret are required for custom configuration')
       return
     }
     setSaving(true)
@@ -54,16 +55,17 @@ export function RazorpaySettings({ config: initial, merchantId }: {
       .from('merchant_razorpay_config')
       .upsert({
         merchant_id:    merchantId,
-        key_id:         form.key_id,
-        key_secret:     form.key_secret,
+        key_id:         form.use_global_key ? null : form.key_id,
+        key_secret:     form.use_global_key ? null : form.key_secret,
         webhook_secret: form.webhook_secret || null,
+        use_global_key: form.use_global_key,
         updated_at:     new Date().toISOString(),
       }, { onConflict: 'merchant_id' })
 
     if (error) {
       toast.error(error.message)
     } else {
-      toast.success('Razorpay credentials saved!')
+      toast.success('Razorpay settings saved!')
     }
     setSaving(false)
   }
@@ -71,79 +73,94 @@ export function RazorpaySettings({ config: initial, merchantId }: {
   return (
     <div className="space-y-4">
       <Section
-        title="Razorpay API Credentials"
-        subtitle="These keys are used to process payments and handle refunds for your store."
+        title="Razorpay Configuration"
+        subtitle="Manage how Razorpay payments are processed for your store."
       >
-        <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex gap-2.5 items-start">
-          <AlertTriangle size={15} className="text-amber-600 mt-0.5 shrink-0" />
-          <p className="text-xs text-amber-700 leading-relaxed">
-            <strong>Important:</strong> Ensure you are using the correct keys for your environment (Test vs Live). 
-            Refunds will only work if the orders were placed using these keys.
-          </p>
+        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+          <div className="space-y-0.5">
+            <Label className="text-base font-bold text-gray-900">Use System Default Account</Label>
+            <p className="text-xs text-gray-500">Enable this to use the platform's global Razorpay credentials.</p>
+          </div>
+          <Switch
+            checked={form.use_global_key}
+            onCheckedChange={v => set('use_global_key', v)}
+          />
         </div>
 
-        {/* Key ID */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label>Key ID</Label>
-            <Input
-              value={form.key_id}
-              onChange={e => set('key_id', e.target.value)}
-              placeholder="rzp_test_..."
-              className="mt-1.5 font-mono text-sm"
-            />
-          </div>
+        {!form.use_global_key && (
+          <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex gap-2.5 items-start">
+              <AlertTriangle size={15} className="text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-xs text-amber-700 leading-relaxed">
+                <strong>Important:</strong> Ensure you are using the correct keys for your environment (Test vs Live). 
+                Refunds will only work if the orders were placed using these keys.
+              </p>
+            </div>
 
-          {/* Key Secret */}
-          <div>
-            <Label>Key Secret</Label>
-            <div className="relative mt-1.5">
-              <Input
-                type={showSecret ? 'text' : 'password'}
-                value={form.key_secret}
-                onChange={e => set('key_secret', e.target.value)}
-                placeholder="Your Razorpay Secret Key"
-                className="pr-10 font-mono text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => setShowSecret(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
+            {/* Key ID */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Key ID</Label>
+                <Input
+                  value={form.key_id}
+                  onChange={e => set('key_id', e.target.value)}
+                  placeholder="rzp_test_..."
+                  className="mt-1.5 font-mono text-sm"
+                />
+              </div>
+
+              {/* Key Secret */}
+              <div>
+                <Label>Key Secret</Label>
+                <div className="relative mt-1.5">
+                  <Input
+                    type={showSecret ? 'text' : 'password'}
+                    value={form.key_secret}
+                    onChange={e => set('key_secret', e.target.value)}
+                    placeholder="Your Razorpay Secret Key"
+                    className="pr-10 font-mono text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSecret(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Webhook Secret */}
+            <div>
+              <Label className="flex items-center gap-1.5">
+                Webhook Secret
+                <span className="text-[10px] font-normal text-gray-400 font-sans italic ml-auto">(Optional - for signature verification)</span>
+              </Label>
+              <div className="relative mt-1.5">
+                <Input
+                  type={showWebhook ? 'text' : 'password'}
+                  value={form.webhook_secret}
+                  onChange={e => set('webhook_secret', e.target.value)}
+                  placeholder="Your Webhook Secret"
+                  className="pr-10 font-mono text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowWebhook(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showWebhook ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Webhook Secret */}
-        <div>
-          <Label className="flex items-center gap-1.5">
-            Webhook Secret
-            <span className="text-[10px] font-normal text-gray-400 font-sans italic ml-auto">(Optional - for signature verification)</span>
-          </Label>
-          <div className="relative mt-1.5">
-            <Input
-              type={showWebhook ? 'text' : 'password'}
-              value={form.webhook_secret}
-              onChange={e => set('webhook_secret', e.target.value)}
-              placeholder="Your Webhook Secret"
-              className="pr-10 font-mono text-sm"
-            />
-            <button
-              type="button"
-              onClick={() => setShowWebhook(v => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              {showWebhook ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-        </div>
+        )}
 
         <Button onClick={handleSave} disabled={saving} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
           {saving
             ? <><Loader2 size={15} className="animate-spin mr-2" />Saving...</>
-            : <><CreditCard size={15} className="mr-2" />Save Razorpay Credentials</>}
+            : <><CreditCard size={15} className="mr-2" />Save Razorpay Settings</>}
         </Button>
 
         <a

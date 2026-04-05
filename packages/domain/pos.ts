@@ -1,3 +1,5 @@
+export type MovementType = 'sale' | 'restock' | 'return' | 'adjustment' | 'damaged' | 'lost' | 'transfer_out' | 'transfer_in' | 'po_receive'
+
 export interface PosProduct {
   id:         string
   variantId?: string
@@ -59,13 +61,13 @@ export interface PosTransactionPayload {
   metadata?:     any
 }
 
-export function calcCartTotals(cart: Cart, pointsRate = 1): CartTotals {
+export function calcCartTotals(cart: Cart, pointsRate = 1, taxRate = 8): CartTotals {
   const subtotal      = cart.items.reduce((s, i) => s + i.lineTotal, 0)
   const lineDiscounts = cart.items.reduce((s, i) => s + i.discountRm * i.qty, 0)
   const globalDiscount = cart.globalDiscountRm
   const pointsDiscount = cart.pointsToRedeem * 0.01   // 1 pt = RM0.01
   const taxableAmount  = Math.max(0, subtotal - lineDiscounts - globalDiscount - pointsDiscount)
-  const tax            = taxableAmount * 0.08
+  const tax            = taxableAmount * (taxRate / 100)
   const total          = taxableAmount + tax
   const pointsEarned   = Math.floor(total * pointsRate)
   return { subtotal, lineDiscounts, globalDiscount, pointsDiscount,

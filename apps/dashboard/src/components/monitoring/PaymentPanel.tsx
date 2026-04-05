@@ -1,5 +1,13 @@
+'use client'
 import dynamic from 'next/dynamic'
 import { cn } from '@/lib/utils'
+import { 
+  Landmark, Smartphone, Wallet, CreditCard, 
+  TrendingUp, Clock, TrendingDown, CheckCircle2 
+} from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { useMonitoring } from '@/hooks/useMonitoring'
 
 const PieChart = dynamic(() => import('recharts').then(mod => mod.PieChart), { ssr: false })
 const Pie = dynamic(() => import('recharts').then(mod => mod.Pie), { ssr: false })

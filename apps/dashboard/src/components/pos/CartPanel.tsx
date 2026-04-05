@@ -11,14 +11,15 @@ import { DiscountModal } from './DiscountModal'
 
 export function CartPanel() {
   const [mounted, setMounted] = useState(false)
-  const { items, updateQty, removeItem, getTotals, customerName, clearCart } = usePosCart(
+  const { items, updateQty, removeItem, getTotals, customerName, clearCart, taxRate } = usePosCart(
     useShallow((s: PosCartState) => ({
       items: s.items,
       updateQty: s.updateQty,
       removeItem: s.removeItem,
       getTotals: s.getTotals,
       customerName: s.customerName,
-      clearCart: s.clearCart
+      clearCart: s.clearCart,
+      taxRate: s.taxRate
     }))
   )
   const [isDiscountOpen, setIsDiscountOpen] = useState(false)
@@ -153,7 +154,7 @@ export function CartPanel() {
             </button>
           )}
           <div className="flex justify-between text-sm text-slate-500 font-medium tracking-tight">
-            <span>SST (8%)</span>
+            <span>SST ({taxRate}%)</span>
             <span className="text-slate-900">RM {totals.tax.toFixed(2)}</span>
           </div>
           <div className="pt-4 flex justify-between items-baseline border-t border-slate-100 border-dashed">

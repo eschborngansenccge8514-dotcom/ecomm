@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { STORE_TYPES, type StoreType } from '@/lib/store-types'
+import Image from 'next/image'
 
 export default async function StorePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -26,8 +27,11 @@ export default async function StorePage({ params }: { params: Promise<{ slug: st
         <div className="w-24 h-24 rounded-3xl flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-[var(--color-primary)]/20"
           style={{ backgroundColor: 'var(--color-primary)' }}>
           {config.appearance?.logoUrl 
-            ? <img src={config.appearance.logoUrl} className="w-full h-full object-cover rounded-3xl" alt="" />
-            : config.store_name.charAt(0).toUpperCase()}
+            ? (
+              <div className="relative w-full h-full rounded-2xl overflow-hidden">
+                <Image src={config.appearance.logoUrl} fill className="object-cover" alt="" />
+              </div>
+            ) : config.store_name.charAt(0).toUpperCase()}
         </div>
         <div>
           <h1 className="text-4xl font-black text-[var(--color-text)] tracking-tight">
@@ -50,7 +54,7 @@ export default async function StorePage({ params }: { params: Promise<{ slug: st
             {/* Image */}
             <div className="aspect-square bg-gray-50 relative overflow-hidden">
                {p.images?.[0] ? (
-                  <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  <Image src={p.images[0]} alt={p.name} fill className="object-cover group-hover:scale-105 transition-transform" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-5xl opacity-20">
                     {storeMeta.icon}

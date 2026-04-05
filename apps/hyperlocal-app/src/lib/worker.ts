@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 
-const WORKER_URL = process.env.EXPO_PUBLIC_WORKER_URL || 'https://functions-worker.jjooi1707.workers.dev'
+export const WORKER_URL = process.env.EXPO_PUBLIC_WORKER_URL || 'https://functions-worker.jjooi1707.workers.dev'
 
 /**
  * Standardized utility to call the unified Cloudflare Worker from Mobile.
@@ -10,16 +10,28 @@ export async function invokeWorker<T = any>(
   functionName: string,
   options?: { body?: any; headers?: Record<string, string> }
 ): Promise<{ data: T | null; error: any }> {
-  // 1. Map functionName (e.g. 'lalamove-quote') to route (e.g. '/lalamove/quote')
-  let path = functionName.replace(/-/g, '/')
+  // 1. Determine the path
+  let path = ''
   
-  // Custom mappings for mobile-specific variants
+  // Custom mappings for mobile-specific variants take highest precedence
+  if (functionName === 'get-delivery-quotes') {
+    path = 'logistics/get-delivery-quotes'
+  } else if (functionName.includes('/')) {
+    // If it already looks like a path (has slashes), use it as is
+    path = functionName
+  } else {
+    // Legacy Supabase function name (no slashes) -> convert hyphens to slashes
+    path = functionName.replace(/-/g, '/')
+  }
+  
+  // Additional internal mappings for known legacy names
   if (functionName === 'easyparcel-rate-check') path = 'easyparcel/rates'
   if (functionName === 'geocode-address') path = 'internal/geocode'
   if (functionName === 'award-loyalty-points') path = 'internal/loyalty/award'
   if (functionName === 'redeem-loyalty-points') path = 'internal/loyalty/redeem'
   
   const url = `${WORKER_URL}/${path}`
+  console.log(`[invokeWorker] Calling: ${url}`)
 
   // 2. Get JWT Session
   const { data: { session } } = await supabase.auth.getSession()

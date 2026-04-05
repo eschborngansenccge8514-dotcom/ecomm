@@ -50,6 +50,7 @@ import { cn } from '@/lib/utils'
 interface SupportInboxClientProps {
   userId: string
   initialSessions: any[]
+  defaultSessionId?: string | null
 }
 
 const CATEGORIES = {
@@ -62,9 +63,9 @@ const CATEGORIES = {
   'other': { label: 'Other', color: 'bg-slate-50 text-slate-700 border-slate-100', dot: 'bg-slate-500' },
 } as const
 
-export function SupportInboxClient({ userId, initialSessions }: SupportInboxClientProps) {
+export function SupportInboxClient({ userId, initialSessions, defaultSessionId }: SupportInboxClientProps) {
   const [sessions, setSessions] = useState(initialSessions)
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(defaultSessionId || null)
   const [messages, setMessages] = useState<any[]>([])
   const [inputMessage, setInputMessage] = useState('')
   const [loadingMessages, setLoadingMessages] = useState(false)
@@ -76,6 +77,13 @@ export function SupportInboxClient({ userId, initialSessions }: SupportInboxClie
   
   const supabase = createClient()
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // If a default session ID is provided, ensure it's visible by showing all sessions
+  useEffect(() => {
+    if (defaultSessionId) {
+      setStatusFilter('all')
+    }
+  }, [defaultSessionId])
 
   const selectedSession = sessions.find(s => s.id === selectedSessionId)
 

@@ -253,4 +253,48 @@ easyparcel.post('/create-order', async (c) => {
   }
 })
 
+easyparcel.post('/sync-status', async (c) => {
+  try {
+    const { order_id } = await c.req.json()
+    const supabase = getSupabaseClient(c.env)
+    
+    const { data: shipment } = await supabase
+      .from('easyparcel_shipments')
+      .select('*')
+      .eq('order_id', order_id)
+      .single()
+
+    if (!shipment) throw new Error('Shipment record not found')
+
+    const { data: epConfig } = await supabase
+      .from('merchant_easyparcel_config')
+      .select('*')
+      .eq('merchant_id', shipment.merchant_id)
+      .maybeSingle()
+
+    const epCallConfig = { 
+      apiKey: epConfig?.api_key || c.env.EASYPARCEL_API_KEY, 
+      authKey: epConfig?.auth_key || c.env.EASYPARCEL_AUTH_KEY,
+      environment: epConfig?.environment || 'sandbox' 
+    }
+
+    const trackData = await callEasyParcel(supabase, order_id, 'MPTrackingBulk', {
+      bulk: [{ order_no: shipment.ep_order_number }]
+    }, epCallConfig)
+
+    const result = trackData.result?.[0]
+    if (result) {
+      await supabase.from('easyparcel_shipments').update({
+        order_status: result.status,
+        ship_status: result.status,
+        updated_at: new Date().toISOString()
+      }).eq('id', shipment.id)
+    }
+
+    return c.json(trackData)
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400)
+  }
+})
+
 export default easyparcel

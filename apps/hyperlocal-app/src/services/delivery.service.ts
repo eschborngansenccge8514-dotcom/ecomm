@@ -37,14 +37,14 @@ function check(data: any, error: any) {
 
 export const deliveryService = {
   getLalamoveQuotes: async (orderId: string): Promise<LalamoveQuote[]> => {
-    const { data, error } = await invokeWorker('lalamove-quote', {
+    const { data, error } = await invokeWorker('lalamove/quote', {
       body: { orderId },
     })
     return check(data, error).quotes ?? []
   },
 
   bookLalamove: async (orderId: string, quotationId: string, serviceType: string) => {
-    const { data, error } = await invokeWorker('lalamove-create-order', {
+    const { data, error } = await invokeWorker('lalamove/create-order', {
       body: { orderId, quotationId, serviceType },
     })
     return check(data, error) as { success: boolean; lalamoveOrderId: string }

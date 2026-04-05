@@ -91,7 +91,7 @@ export default function EinvoiceDashboardPage() {
 
       if (invoices) {
          const validated = invoices.filter(i => ['validated', 'valid'].includes(i.status?.toLowerCase())).length
-         const failed = invoices.filter(i => ['invalid', 'rejected', 'failed'].includes(i.status?.toLowerCase())).length
+         const failed = invoices.filter(i => ['invalid', 'rejected', 'failed', 'error'].includes(i.status?.toLowerCase())).length
          const processing = invoices.filter(i => ['submitted', 'pending'].includes(i.status?.toLowerCase())).length
          const requests = pendingOrders?.length || 0
          
@@ -133,7 +133,7 @@ export default function EinvoiceDashboardPage() {
                title: `${requests} Pending E-Invoice Requests`,
                description: 'Customers have paid but e-invoices are not yet issued. Review and submit now.',
                actionLabel: 'Review Requests',
-               onAction: () => router.push('/einvoice/invoices?status=pending')
+               onAction: () => router.push('/einvoice/invoices?tab=requested')
             })
          }
 
@@ -182,7 +182,7 @@ export default function EinvoiceDashboardPage() {
       <ComplianceStatusBanner 
         status={metrics.failed > 0 ? 'action_required' : 'compliant'} 
         nextDeadline="15 May 2026"
-        onAction={() => metrics.failed > 0 ? router.push('/einvoice/invoices?status=failed') : router.push('/einvoice/invoices')}
+        onAction={() => metrics.failed > 0 ? router.push('/einvoice/invoices?tab=failed') : router.push('/einvoice/invoices')}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
@@ -193,27 +193,33 @@ export default function EinvoiceDashboardPage() {
            icon={FileText} 
            variant="info"
          />
-         <KPICard 
-           label="Validated" 
-           value={metrics.validated} 
-           subtitle="Cleared by LHDN" 
-           icon={CheckCircle2} 
-           variant="success"
-         />
-         <KPICard 
-           label="Pending" 
-           value={metrics.pending} 
-           subtitle="Awaiting Response" 
-           icon={Clock} 
-           variant="warning"
-          />
-         <KPICard 
-           label="Failed" 
-           value={metrics.failed} 
-           subtitle="Needs Attention" 
-           icon={XCircle} 
-           variant="danger"
-         />
+          <button onClick={() => router.push('/einvoice/invoices?tab=validated')} className="text-left transition-transform active:scale-95">
+             <KPICard 
+               label="Validated" 
+               value={metrics.validated} 
+               subtitle="Cleared by LHDN" 
+               icon={CheckCircle2} 
+               variant="success"
+             />
+          </button>
+          <button onClick={() => router.push('/einvoice/invoices?tab=pending')} className="text-left transition-transform active:scale-95">
+             <KPICard 
+               label="Pending" 
+               value={metrics.pending} 
+               subtitle="Awaiting Response" 
+               icon={Clock} 
+               variant="warning"
+              />
+          </button>
+          <button onClick={() => router.push('/einvoice/invoices?tab=failed')} className="text-left transition-transform active:scale-95">
+             <KPICard 
+               label="Failed" 
+               value={metrics.failed} 
+               subtitle="Needs Attention" 
+               icon={XCircle} 
+               variant="danger"
+             />
+          </button>
          <KPICard 
            label="Compliance Rate" 
            value={`${Math.round(metrics.complianceRate)}%`} 

@@ -34,7 +34,8 @@ export default function CheckoutPage() {
       sessionId: s.sessionId,
       customerId: s.customerId,
       clearCart: s.clearCart,
-      note: s.note
+      note: s.note,
+      setLastCompletedTxn: s.setLastCompletedTxn
     }))
   )
 
@@ -98,6 +99,14 @@ export default function CheckoutPage() {
       }
 
       const res = await submitTransaction(payload)
+      
+      if (res.fullTxn) {
+        usePosCart.getState().setLastCompletedTxn(res.fullTxn)
+        // Store in sessionStorage as a robust fallback
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('last_pos_receipt', JSON.stringify(res.fullTxn))
+        }
+      }
       
       toast.success('Transaction Completed!')
       clearCart()

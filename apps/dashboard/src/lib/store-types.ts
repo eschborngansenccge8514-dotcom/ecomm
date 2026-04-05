@@ -157,6 +157,7 @@ export interface StoreConfig {
   metaTitle:        string
   metaDescription:  string
   metaKeywords:     string
+  taxRate:          number
 }
 
 export const DEFAULT_APPEARANCE: StoreAppearance = {
@@ -173,6 +174,7 @@ export const DEFAULT_CONFIG: StoreConfig = {
   privacyPolicy: '', enableAddons: false, enableBooking: false,
   showCalories: false, showSizeGuide: false, sizeGuideUrl: '',
   minOrderAmount: 0, freeDeliveryAbove: 0, delivery_radius_km: 10, lat: null, lng: null, metaTitle: '', metaDescription: '', metaKeywords: '',
+  taxRate: 8,
 }
 
 export function cssVarsFromAppearance(a: StoreAppearance): Record<string,string> {

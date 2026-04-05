@@ -1,4 +1,6 @@
+'use client'
 import dynamic from 'next/dynamic'
+import Image from 'next/image'
 import { useState }    from 'react'
 import { useRouter }   from 'next/navigation'
 import { format, subDays } from 'date-fns'
@@ -183,8 +185,16 @@ export function ProductsAnalyticsClient({ merchantId, dateRange, productSales, v
                     <td className="py-2.5 pr-4">
                       <div className="flex items-center gap-2">
                         {p.image_url
-                          ? <img src={p.image_url} className="w-8 h-8 rounded-lg object-cover" alt="" />
-                          : <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center"><Package size={14} className="text-gray-400" /></div>}
+                          ? (
+                            <div className="relative w-8 h-8 rounded-lg overflow-hidden shrink-0">
+                              <Image src={p.image_url} fill className="object-cover" alt="" />
+                            </div>
+                          ) : (
+                            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
+                              <Package size={14} className="text-gray-400" />
+                            </div>
+                          )
+                        }
                         <div>
                           <p className="font-semibold text-gray-800 max-w-[160px] truncate">{p.product_name}</p>
                           {p.sku && <p className="text-xs text-gray-400 font-mono">{p.sku}</p>}
@@ -271,8 +281,16 @@ export function ProductsAnalyticsClient({ merchantId, dateRange, productSales, v
                     <td className="py-2.5 pr-4">
                       <div className="flex items-center gap-2">
                         {p.image_url
-                          ? <img src={p.image_url} className="w-8 h-8 rounded-lg object-cover shrink-0" alt="" />
-                          : <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center shrink-0"><Package size={14} className="text-gray-400" /></div>}
+                          ? (
+                            <div className="relative w-8 h-8 rounded-lg overflow-hidden shrink-0">
+                              <Image src={p.image_url} fill className="object-cover" alt="" />
+                            </div>
+                          ) : (
+                            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
+                              <Package size={14} className="text-gray-400" />
+                            </div>
+                          )
+                        }
                         <div className="min-w-0">
                           <p className="font-semibold text-gray-800 truncate max-w-[140px]">{p.product_name}</p>
                           {p.sku && <p className="text-xs text-gray-400 font-mono">{p.sku}</p>}
@@ -371,8 +389,16 @@ export function ProductsAnalyticsClient({ merchantId, dateRange, productSales, v
                 <div key={p.product_id} className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
                   <span className="text-sm text-gray-400 font-bold w-5 shrink-0">#{i+1}</span>
                   {p.image_url
-                    ? <img src={p.image_url} className="w-10 h-10 rounded-xl object-cover shrink-0" alt="" />
-                    : <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center shrink-0"><Package size={16} className="text-gray-400" /></div>}
+                    ? (
+                      <div className="relative w-10 h-10 rounded-xl overflow-hidden shrink-0">
+                        <Image src={p.image_url} fill className="object-cover" alt="" />
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center shrink-0">
+                        <Package size={16} className="text-gray-400" />
+                      </div>
+                    )
+                  }
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-gray-800 truncate">{p.product_name}</p>
                     <div className="flex items-center gap-3 mt-0.5">

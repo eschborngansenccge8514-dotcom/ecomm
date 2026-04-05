@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useRouter }   from 'next/navigation'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Button }   from '@/components/ui/button'
 import { Input }    from '@/components/ui/input'
@@ -90,16 +91,22 @@ function StorePreview({ appearance, storeName, storeType }: {
       <div className="h-16 flex items-center justify-center text-2xl relative bg-gray-50"
         style={{ backgroundColor: appearance.primaryColor + '15' }}>
         {appearance.bannerUrl
-          ? <img src={appearance.bannerUrl} className="w-full h-full object-cover" alt="" />
-          : <span className="opacity-40">{meta.icon}</span>}
+          ? (
+            <div className="relative w-full h-full">
+              <Image src={appearance.bannerUrl} fill className="object-cover" alt="" />
+            </div>
+          ) : <span className="opacity-40">{meta.icon}</span>}
       </div>
       {/* Header */}
       <div className="px-4 py-3 flex items-center gap-3 border-b border-gray-100">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold shrink-0 relative overflow-hidden"
           style={{ backgroundColor: appearance.primaryColor }}>
           {appearance.logoUrl
-            ? <img src={appearance.logoUrl} className="w-full h-full object-cover" alt="" />
-            : storeName.charAt(0).toUpperCase()}
+            ? (
+              <div className="relative w-full h-full">
+                <Image src={appearance.logoUrl} fill className="object-cover" alt="" />
+              </div>
+            ) : storeName.charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0">
           <p className="font-bold text-gray-900 text-sm truncate" style={{ fontFamily: appearance.fontFamily }}>{storeName}</p>
@@ -379,6 +386,17 @@ export function SettingsClient({
                   <div className="space-y-4">
                     <Field label="Meta Title"><Input value={config.metaTitle} onChange={e => setCfg('metaTitle', e.target.value)} className="rounded-xl h-11" placeholder="Title..." /></Field>
                     <Field label="Meta Description"><Input value={config.metaDescription} onChange={e => setCfg('metaDescription', e.target.value)} className="rounded-xl h-11" placeholder="Short summary..." /></Field>
+                  </div>
+                </Section>
+
+                <Section title="Tax & POS" desc="Configure transactional settings for your Point of Sale.">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field label="SST Tax Rate (%)" hint="Current standard is 8%. Set to 0 if not registered.">
+                      <Input type="number" min="0" max="100" step="1" 
+                        value={config.taxRate ?? 8} 
+                        onChange={e => setCfg('taxRate', parseInt(e.target.value) || 0)} 
+                        className="rounded-xl h-11 font-bold" />
+                    </Field>
                   </div>
                 </Section>
               </div>

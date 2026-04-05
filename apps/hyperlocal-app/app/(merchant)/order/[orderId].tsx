@@ -115,7 +115,7 @@ export default function MerchantOrderDetailScreen() {
 
       // Auto-book Lalamove if confirmed
       if (nextStatus === 'confirmed' && order.delivery_provider === 'lalamove') {
-        invokeWorker('lalamove-create-order', {
+        invokeWorker('lalamove/create-order', {
           body: { orderId },
         }).then(({ data, error: fErr }: any) => {
           if (fErr || data?.error) {

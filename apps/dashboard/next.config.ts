@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
+  compress: true,
   transpilePackages: [
     'recharts',
     '@project1/agent',
@@ -17,6 +18,26 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/storage/v1/object/public/**',
       },
+      {
+        protocol: 'https',
+        hostname: '**.lalamove.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.easyparcel.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'api.qrserver.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 's3-ap-southeast-1.amazonaws.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'pic.easyparcel.my',
+      }
     ],
   },
   async redirects() {
@@ -34,7 +55,7 @@ const nextConfig: NextConfig = {
     ];
   },
   typescript: {
-    ignoreBuildErrors: true,
+    // ignoreBuildErrors: true, 
   },
   outputFileTracingRoot: path.resolve(__dirname, "../../"),
   turbopack: {

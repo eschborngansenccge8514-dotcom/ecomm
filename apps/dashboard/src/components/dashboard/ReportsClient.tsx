@@ -1,3 +1,4 @@
+'use client'
 import dynamic from 'next/dynamic'
 import { useState, useCallback } from 'react'
 import { useRouter }   from 'next/navigation'

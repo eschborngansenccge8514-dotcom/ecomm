@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
 
   const { orderId, merchantId, priorityFee } = await req.json()
   
-  const { data, error } = await invokeWorkerServer('lalamove-add-priority-fee', {
+  const { data, error } = await invokeWorkerServer('lalamove/add-priority-fee', {
     body: { orderId, merchantId, tipAmount: priorityFee }
   })
 
