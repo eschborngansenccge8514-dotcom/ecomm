@@ -6,9 +6,8 @@
     "lib": ["ESNext", "WebWorker"],
     "strict": true,
     "skipLibCheck": true,
-    "types": ["@cloudflare/workers-types"],
     "isolatedModules": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "worker-configuration.d.ts"]
 }

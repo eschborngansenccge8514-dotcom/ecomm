@@ -17,22 +17,22 @@ export async function POST(req: Request) {
     You can apply discounts, find products, and add customers.
     Be concise and professional.`,
     tools: {
-      applyDiscount: tool({
+      applyDiscount: {
         description: 'Apply a global discount to the current cart',
         parameters: z.object({
           amountRm: z.number().describe('Fixed amount in RM to discount'),
           reason: z.string().optional()
         }),
-        execute: async ({ amountRm }: { amountRm: number }) => ({ success: true, newDiscount: amountRm })
-      }),
-      addCustomer: tool({
+        execute: async ({ amountRm }: any) => ({ success: true, newDiscount: amountRm })
+      },
+      addCustomer: {
         description: 'Add or search for a customer to link to the sale',
         parameters: z.object({
           query: z.string().describe('Name or phone number')
         }),
-        execute: async ({ query }: { query: string }) => ({ success: true, customer: { id: 'mock-123', name: query } })
-      })
-    }
+        execute: async ({ query }: any) => ({ success: true, customer: { id: 'mock-123', name: query } })
+      }
+    } as any
   })
 
   return result.toTextStreamResponse()

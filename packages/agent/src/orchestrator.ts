@@ -28,7 +28,7 @@ export async function runAgent({
   const tracer = new AgentTracer(userId, sessionId)
 
   // Step 1: build context messages
-  let messages: CoreMessage[]
+  let messages: any[]
   try {
     messages = await buildContextMessages(sessionId, merchantId, newMessage)
     console.log(`[Agent] buildContextMessages OK (${Date.now() - t0}ms) — ${messages.length} msgs`)

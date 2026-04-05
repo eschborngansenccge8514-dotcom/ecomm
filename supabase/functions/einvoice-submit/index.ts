@@ -114,9 +114,7 @@ serve(async (req) => {
     try {
       const lhdnResponse = await submitToLhdn(config, orderNumber, payload, token);
 
-      // Save record correctly
       const totalAmount = Number(payload.Invoice[0].LegalMonetaryTotal[0].PayableAmount[0]._);
-      const subTotal = Number(payload.Invoice[0].LegalMonetaryTotal[0].TaxExclusiveAmount[0]._);
       const taxAmount = Number(payload.Invoice[0].TaxTotal[0].TaxAmount[0]._);
 
       const { data: savedRecord } = await supabase.from("einvoices").upsert({
@@ -159,6 +157,7 @@ serve(async (req) => {
       console.error("LHDN Rejection:", err.message);
       const errorMsg = err.message || "Unknown error";
 
+      // Save error state
       if (merchantId && orderNumber) {
         const { data: savedRecord } = await supabase.from("einvoices").upsert({
           merchant_id: merchantId,
@@ -201,89 +200,81 @@ serve(async (req) => {
   }
 });
 
+// ─── LHDN Helpers ─────────────────────────────────────────────────────
+
 function buildLhdnJson(config: any, merchant: any, order: any, items: any[], orderNumber: string, deliveryFee: number, discountAmount: number, customerOverride?: any, merchantOverride?: any) {
-  const tin = config.tin?.trim() || "IG25351615030";
   const stateCode = STATE_MAPPING[merchant?.state?.toLowerCase()] || "14";
   const issueDate = new Date().toISOString().split("T")[0];
   const issueTime = new Date().getUTCHours().toString().padStart(2, "0") + ":" +
                     new Date().getUTCMinutes().toString().padStart(2, "0") + ":" +
                     new Date().getUTCSeconds().toString().padStart(2, "0") + "Z";
 
-  // MSIC Fallback
-  // MSIC Fallback logic — MSMEs can use 47912
   let baseMsic = config.msic_code || "47912";
   if (baseMsic === "47910") baseMsic = "47912";
   const msicCode = merchantOverride?.msic_code || baseMsic;
   const msicName = config.description || "Retail sale of any kind of product over the Internet";
 
-  // Tax line helper — LHDN uses "E" (Exempt) for SST-exempt items
   const taxLine = (taxableAmount: number) => ({
-    "TaxAmount": [{ "_": 0.00, "currencyID": "MYR" }],
+    "TaxAmount": [{ "_": "0.00", "currencyID": "MYR" }],
     "TaxSubtotal": [{
-      "TaxableAmount": [{ "_": taxableAmount, "currencyID": "MYR" }],
-      "TaxAmount": [{ "_": 0.00, "currencyID": "MYR" }],
+      "TaxableAmount": [{ "_": taxableAmount.toFixed(2), "currencyID": "MYR" }],
+      "TaxAmount": [{ "_": "0.00", "currencyID": "MYR" }],
       "TaxCategory": [{
         "ID": [{ "_": "06" }],
-        "Percent": [{ "_": 0.00 }],
+        "Percent": [{ "_": "0.00" }],
         "TaxExemptionReason": [{ "_": "Not Subject to SST" }],
         "TaxScheme": [{ "ID": [{ "_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6" }] }]
       }]
     }]
   });
 
-  // Build invoice lines
   const ublLines = items.map((item, index) => {
     const lineTotal = roundMYR(item.total);
     return {
       "ID": [{ "_": String(index + 1) }],
-      "InvoicedQuantity": [{ "_": roundMYR(item.quantity) || 1.00, "unitCode": "C62" }],
-      "LineExtensionAmount": [{ "_": lineTotal, "currencyID": "MYR" }],
+      "InvoicedQuantity": [{ "_": roundMYR(item.quantity).toString(), "unitCode": "C62" }],
+      "LineExtensionAmount": [{ "_": lineTotal.toFixed(2), "currencyID": "MYR" }],
       "TaxTotal": [taxLine(lineTotal)],
       "Item": [{
         "CommodityClassification": [{ "ItemClassificationCode": [{ "_": (customerOverride?.classification_code || "004"), "listID": "CLASS" }] }],
         "Description": [{ "_": item.name }]
       }],
-      "Price": [{ "PriceAmount": [{ "_": roundMYR(item.unitPrice), "currencyID": "MYR" }] }],
-      "ItemPriceExtension": [{ "Amount": [{ "_": lineTotal, "currencyID": "MYR" }] }]
+      "Price": [{ "PriceAmount": [{ "_": roundMYR(item.unitPrice).toFixed(2), "currencyID": "MYR" }] }],
+      "ItemPriceExtension": [{ "Amount": [{ "_": lineTotal.toFixed(2), "currencyID": "MYR" }] }]
     };
   });
 
-  // Add Delivery Fee as a line item if applicable
   if (deliveryFee > 0) {
     const fee = roundMYR(deliveryFee);
     ublLines.push({
       "ID": [{ "_": String(ublLines.length + 1) }],
-      "InvoicedQuantity": [{ "_": 1.00, "unitCode": "C62" }],
-      "LineExtensionAmount": [{ "_": fee, "currencyID": "MYR" }],
+      "InvoicedQuantity": [{ "_": "1", "unitCode": "C62" }],
+      "LineExtensionAmount": [{ "_": fee.toFixed(2), "currencyID": "MYR" }],
       "TaxTotal": [taxLine(fee)],
       "Item": [{
         "CommodityClassification": [{ "ItemClassificationCode": [{ "_": "004", "listID": "CLASS" }] }],
         "Description": [{ "_": "Delivery Fee" }]
       }],
-      "Price": [{ "PriceAmount": [{ "_": fee, "currencyID": "MYR" }] }],
-      "ItemPriceExtension": [{ "Amount": [{ "_": fee, "currencyID": "MYR" }] }]
+      "Price": [{ "PriceAmount": [{ "_": fee.toFixed(2), "currencyID": "MYR" }] }],
+      "ItemPriceExtension": [{ "Amount": [{ "_": fee.toFixed(2), "currencyID": "MYR" }] }]
     });
   }
 
-  const totalLineExtension = roundMYR(ublLines.reduce((sum, l) => sum + parseFloat(l.LineExtensionAmount[0]._.toString()), 0));
+  const totalLineExtension = roundMYR(ublLines.reduce((sum, l) => sum + parseFloat(l.LineExtensionAmount[0]._), 0));
   const payableAmount = roundMYR(totalLineExtension - (discountAmount || 0));
 
-  // Identity Mapping
   const sellerTin = config.tin?.trim();
   const sellerId = config.registration_no || "NA";
-  const sellerIdType = config.registration_no_type || "BRN"; // Can be BRN, NRIC, PASSPORT
+  const sellerIdType = config.registration_no_type || "BRN";
 
   const isB2C = (!customerOverride?.tin || customerOverride.tin === "EI00000000010");
   const customerTin = customerOverride?.tin || "EI00000000010";
   const customerId = customerOverride?.id_number || "NA";
   const customerIdScheme = (customerOverride?.id_type || (isB2C ? "NRIC" : "BRN")).toUpperCase();
-  
   const customerName = customerOverride?.name || order?.buyer_name || order?.customer_name || (isB2C ? "General Public" : "Buyer");
   const customerEmail = customerOverride?.email || order?.buyer_email || order?.customer_email || "customer@example.com";
-  
   let rawPhone = customerOverride?.phone || order?.buyer_phone || order?.customer_phone || order?.delivery_address?.phone || "000000000";
   const customerPhone = rawPhone.replace(/[\s-]/g, '') || "000000000";
-  
   const customerAddr = customerOverride?.address || order?.customer_address || order?.delivery_address?.line1 || "N/A";
 
   const invoice: any = {
@@ -296,6 +287,8 @@ function buildLhdnJson(config: any, merchant: any, order: any, items: any[], ord
       "InvoiceTypeCode": [{ "_": "01", "listVersionID": "1.0" }],
       "DocumentCurrencyCode": [{ "_": "MYR" }],
       "TaxCurrencyCode": [{ "_": "MYR" }],
+      "UBLExtensions": [{ "UBLExtension": [{ "ExtensionURI": [{ "_": "urn:oasis:names:specification:ubl:dsig:ext:XADES" }], "ExtensionContent": [{ "UBLDocumentSignatures": [{ "SignatureInformation": [{ "ID": [{ "_": "urn:oasis:names:specification:ubl:signature:1" }], "ReferencedSignatureID": [{ "_": "urn:oasis:names:specification:ubl:signature:Invoice" }], "Signature": [{ "Id": "placeholderforid", "Object": [] }] }] }] }] }] }],
+      "Signature": [{ "ID": [{ "_": "urn:oasis:names:specification:ubl:signature:Invoice" }], "SignatureMethod": [{ "_": "urn:oasis:names:specification:ubl:dsig:ext:XADES" }] }],
       "AccountingSupplierParty": [{
         "Party": [{
           "IndustryClassificationCode": [{ "_": msicCode, "name": msicName }],
@@ -304,9 +297,7 @@ function buildLhdnJson(config: any, merchant: any, order: any, items: any[], ord
             { "ID": [{ "_": sellerId, "schemeID": sellerIdType }] }
           ],
           "PostalAddress": [{
-            "AddressLine": [
-              { "Line": [{ "_": merchant?.address_line1 || "N/A" }] }
-            ],
+            "AddressLine": [{ "Line": [{ "_": merchant?.address_line1 || "N/A" }] }],
             "PostalZone": [{ "_": merchant?.postcode || "50000" }],
             "CityName": [{ "_": merchant?.city || "Kuala Lumpur" }],
             "CountrySubentityCode": [{ "_": stateCode }],
@@ -340,35 +331,34 @@ function buildLhdnJson(config: any, merchant: any, order: any, items: any[], ord
         }]
       }],
       "TaxTotal": [{
-        "TaxAmount": [{ "_": 0.00, "currencyID": "MYR" }],
+        "TaxAmount": [{ "_": "0.00", "currencyID": "MYR" }],
         "TaxSubtotal": [{
-          "TaxableAmount": [{ "_": totalLineExtension, "currencyID": "MYR" }],
-          "TaxAmount": [{ "_": 0.00, "currencyID": "MYR" }],
+          "TaxableAmount": [{ "_": totalLineExtension.toFixed(2), "currencyID": "MYR" }],
+          "TaxAmount": [{ "_": "0.00", "currencyID": "MYR" }],
           "TaxCategory": [{
             "ID": [{ "_": "06" }],
-            "Percent": [{ "_": 0.00 }],
+            "Percent": [{ "_": "0.00" }],
             "TaxExemptionReason": [{ "_": "Not Subject to SST" }],
             "TaxScheme": [{ "ID": [{ "_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6" }] }]
           }]
         }]
       }],
       "LegalMonetaryTotal": [{
-        "LineExtensionAmount": [{ "_": totalLineExtension, "currencyID": "MYR" }],
-        "TaxExclusiveAmount": [{ "_": totalLineExtension, "currencyID": "MYR" }],
-        "TaxInclusiveAmount": [{ "_": totalLineExtension, "currencyID": "MYR" }],
-        "AllowanceTotalAmount": [{ "_": roundMYR(discountAmount), "currencyID": "MYR" }],
-        "PayableAmount": [{ "_": payableAmount, "currencyID": "MYR" }]
+        "LineExtensionAmount": [{ "_": totalLineExtension.toFixed(2), "currencyID": "MYR" }],
+        "TaxExclusiveAmount": [{ "_": totalLineExtension.toFixed(2), "currencyID": "MYR" }],
+        "TaxInclusiveAmount": [{ "_": totalLineExtension.toFixed(2), "currencyID": "MYR" }],
+        "AllowanceTotalAmount": [{ "_": roundMYR(discountAmount).toFixed(2), "currencyID": "MYR" }],
+        "PayableAmount": [{ "_": payableAmount.toFixed(2), "currencyID": "MYR" }]
       }],
       "InvoiceLine": ublLines
     }]
   };
 
-  // Only include AllowanceCharge if there is a discount
   if (discountAmount > 0) {
     invoice.Invoice[0].AllowanceCharge = [{
       "ChargeIndicator": [{ "_": false }],
       "AllowanceChargeReason": [{ "_": "Discount" }],
-      "Amount": [{ "_": roundMYR(discountAmount), "currencyID": "MYR" }]
+      "Amount": [{ "_": roundMYR(discountAmount).toFixed(2), "currencyID": "MYR" }]
     }];
   }
 
@@ -385,8 +375,8 @@ async function getLhdnToken(config: any) {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "client_credentials",
-      client_id: config.client_id,
-      client_secret: config.client_secret,
+      client_id: (config.client_id || "").trim(),
+      client_secret: (config.client_secret || "").trim(),
       scope: "InvoicingAPI",
     })
   });
@@ -409,12 +399,10 @@ async function submitToLhdn(config: any, invoiceNumber: string, payload: any, to
   const docString = JSON.stringify(payload);
   const docBytes = new TextEncoder().encode(docString);
 
-  // Base64-encode the document
   let binary = "";
   for (let i = 0; i < docBytes.byteLength; i++) binary += String.fromCharCode(docBytes[i]);
   const b64Document = btoa(binary);
 
-  // SHA-256 hash of the UTF-8 document bytes
   const hashBuffer = await crypto.subtle.digest("SHA-256", docBytes);
   const calculatedHash = Array.from(new Uint8Array(hashBuffer))
     .map(b => b.toString(16).padStart(2, "0"))
@@ -422,7 +410,7 @@ async function submitToLhdn(config: any, invoiceNumber: string, payload: any, to
 
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json", "OnBehalfOf": (config.tin || "").trim() },
     body: JSON.stringify({
       documents: [{ format: "JSON", document: b64Document, documentHash: calculatedHash, codeNumber: invoiceNumber }]
     })
@@ -432,7 +420,6 @@ async function submitToLhdn(config: any, invoiceNumber: string, payload: any, to
   console.log("[submitToLhdn] Raw Response:", JSON.stringify(data));
   
   if (!res.ok) {
-    // Surface the full LHDN error details
     const lhdnErrors = data?.error?.details
       ?.map((d: any) => d.message || d.error)
       .filter(Boolean)

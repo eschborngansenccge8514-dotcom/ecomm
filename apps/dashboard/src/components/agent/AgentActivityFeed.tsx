@@ -110,7 +110,7 @@ export function AgentActivityFeed({ limit = 10 }: { limit?: number }) {
             const config = STATUS_CONFIG[a.status] || STATUS_CONFIG.failed
             const Icon = config.icon
 
-            平衡: return (
+            return (
               <div key={a.id}
                    className="group flex items-start gap-3 p-3 rounded-2xl border border-transparent hover:border-slate-100 hover:bg-slate-50/50 transition-all dark:hover:border-slate-800 dark:hover:bg-slate-900/50">
                 <div className={`mt-0.5 shrink-0 w-8 h-8 rounded-full ${config.bg} flex items-center justify-center ${config.color}`}>

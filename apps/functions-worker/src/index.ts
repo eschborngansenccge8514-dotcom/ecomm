@@ -26,6 +26,11 @@ app.use('*', cors({
   maxAge: 600,
 }))
 
+app.use('*', async (c, next) => {
+  console.log(`[Request] ${c.req.method} ${c.req.path}`)
+  await next()
+})
+
 // Root route for health check
 app.get('/', (c) => c.text('Functions Worker is running!'))
 
@@ -43,10 +48,21 @@ app.route('/internal', internal)
 app.route('/einvoice', einvoice)
 app.route('/marketplace', marketplace)
 
-// Fallback: If deployed as a single-purpose function (e.g., named 'einvoice'), 
-// mount critical routers at the root to handle paths like /poll-status directly.
-app.route('/', einvoice)
-app.route('/', billplz)
+// Explicit Fallbacks: When this worker is deployed as a single-purpose function 
+// (e.g., named 'einvoice'), Supabase calls it with paths like '/consolidate' 
+// instead of '/einvoice/consolidate'. These fallbacks ensure proper delegation.
+const delegateToEinvoice = async (c: any) => {
+  try {
+    return await einvoice.fetch(c.req.raw, c.env, c.executionCtx)
+  } catch (err: any) {
+    return c.json({ error: `Delegation Failed: ${err.message}` }, 500)
+  }
+}
+
+app.all('/consolidate', delegateToEinvoice)
+app.all('/submit', delegateToEinvoice)
+app.all('/poll-status', delegateToEinvoice)
+app.all('/test-connection', delegateToEinvoice)
 
 app.notFound((c) => {
   // Ensure CORS headers even on 404

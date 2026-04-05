@@ -26,11 +26,9 @@ export async function POST(req: Request) {
     const year = now.getFullYear();
     const month = now.getMonth() + 1; // 1-indexed
 
-    const { data: result, error: invokeError } = await invokeWorkerServer('einvoice-consolidate', {
+    const { data: result, error: invokeError } = await invokeWorkerServer('einvoice/consolidate', {
       body: { 
-        merchant_id: merchant.id,
-        year,
-        month
+        merchantId: merchant.id
       }
     });
 

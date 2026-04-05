@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server'
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const { merchantId } = await req.json()
-  const playbookId = params.id
+  const { id: playbookId } = await params
 
   const response = await fetch(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/run-scheduled-agent`,

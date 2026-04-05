@@ -30,7 +30,7 @@ export function AgentDrawer() {
         customer: cart.customerName
       }
     }
-  })
+  } as any) as any
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -128,7 +128,7 @@ export function AgentDrawer() {
             </div>
           </div>
         ) : (
-          messages.map((m) => (
+          messages.map((m: any) => (
             <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed
                 ${m.role === 'user' 

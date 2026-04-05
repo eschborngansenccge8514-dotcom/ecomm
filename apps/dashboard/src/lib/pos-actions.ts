@@ -141,7 +141,8 @@ export async function submitTransaction(payload: PosTransactionPayload) {
       change_rm: payload.change || 0,
       loyalty_points_earned: Math.round(payload.totals.pointsEarned),
       loyalty_points_redeemed: Math.round(payload.totals.pointsDiscount * 100),
-      notes: payload.notes
+      notes: payload.notes,
+      einvoice_status: 'sent_to_consolidated_batch'
     })
     .select()
     .single()

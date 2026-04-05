@@ -114,7 +114,7 @@ export default function InvoiceDetailPage() {
            country: editFormData.country
         }
 
-        const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/einvoice/submit`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_WORKER_URL}/einvoice/submit`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -149,7 +149,7 @@ export default function InvoiceDetailPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) throw new Error('No active session')
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/einvoice/submit`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_WORKER_URL}/einvoice/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -184,7 +184,9 @@ export default function InvoiceDetailPage() {
 
       // Trigger a poll on the worker. Technically poll-status does a broad poll,
       // but we call it here to ensure this specific invoice is checked and updated.
-      const { data, error } = await invokeWorker('poll-lhdn-status')
+      const { data, error } = await invokeWorker('einvoice/poll-status', {
+        body: { invoice_id: invoice.id }
+      })
 
       if (error) throw error
       if (data?.error) throw new Error(data.error)

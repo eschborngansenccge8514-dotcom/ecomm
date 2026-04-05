@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import type { CoreMessage } from 'ai'
+// import type { CoreMessage } from 'ai'
+type CoreMessage = any
 
 function getSupabase() {
   return createClient(

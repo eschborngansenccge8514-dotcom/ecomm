@@ -1,11 +1,11 @@
 "use client"
 import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
 export default function EinvoiceStatusWidget() {
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const [submissions, setSubmissions] = useState<any[]>([])
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export default function EinvoiceStatusWidget() {
         event: '*', 
         schema: 'public', 
         table: 'einvoice_submissions' 
-      }, payload => {
+      }, (payload: any) => {
           if (payload.eventType === 'INSERT') {
               setSubmissions(prev => [payload.new, ...prev.slice(0, 4)])
           } else {

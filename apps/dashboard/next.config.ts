@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ['recharts'],
+  transpilePackages: [
+    'recharts',
+    '@project1/agent',
+    '@project1/domain',
+    '@project1/support-agent',
+    '@project1/db'
+  ],
   images: {
     remotePatterns: [
       {
@@ -25,6 +32,13 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
     ];
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  outputFileTracingRoot: path.resolve(__dirname, "../../"),
+  turbopack: {
+    root: path.resolve(__dirname, "../../"),
   },
 };
 

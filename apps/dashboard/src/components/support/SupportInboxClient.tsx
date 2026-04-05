@@ -415,12 +415,14 @@ export function SupportInboxClient({ userId, initialSessions }: SupportInboxClie
                 <div className="h-6 w-px bg-slate-200/50" />
 
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-9 rounded-xl gap-2 text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50">
-                      <Tag size={14} strokeWidth={2.5} />
-                      {selectedSession?.category ? CATEGORIES[selectedSession.category as keyof typeof CATEGORIES]?.label : 'Tag'}
-                    </Button>
-                  </DropdownMenuTrigger>
+                  <DropdownMenuTrigger 
+                    render={
+                      <Button variant="ghost" size="sm" className="h-9 rounded-xl gap-2 text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50">
+                        <Tag size={14} strokeWidth={2.5} />
+                        {selectedSession?.category ? CATEGORIES[selectedSession.category as keyof typeof CATEGORIES]?.label : 'Tag'}
+                      </Button>
+                    }
+                  />
                   <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-200">
                     <div className="px-2 py-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Category</div>
                     {Object.entries(CATEGORIES).map(([key, { label, color }]) => (
@@ -440,11 +442,13 @@ export function SupportInboxClient({ userId, initialSessions }: SupportInboxClie
                 </DropdownMenu>
 
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-slate-400 hover:bg-slate-50 outline-none">
-                      <MoreVertical size={18} strokeWidth={2.5} />
-                    </Button>
-                  </DropdownMenuTrigger>
+                  <DropdownMenuTrigger 
+                    render={
+                      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-slate-400 hover:bg-slate-50 outline-none">
+                        <MoreVertical size={18} strokeWidth={2.5} />
+                      </Button>
+                    }
+                  />
                   <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-200">
                     <div className="px-2 py-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Update Status</div>
                     <DropdownMenuItem onClick={() => updateSessionStatus('resolved')} className="rounded-xl px-3 py-2 cursor-pointer font-bold text-slate-700 focus:bg-emerald-50 focus:text-emerald-700">

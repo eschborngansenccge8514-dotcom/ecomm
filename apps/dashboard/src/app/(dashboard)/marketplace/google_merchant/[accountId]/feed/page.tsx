@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Search, ChevronRight, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
-export default async function FeedHealthPage({ params }: { params: { accountId: string } }) {
+export default async function FeedHealthPage({ params }: { params: Promise<{ accountId: string }> }) {
+  const { accountId } = await params;
   const supabase = await createClient();
 
   const { data: mappings } = await supabase
     .from("marketplace_product_mappings")
     .select("*, products(name, price, sku)")
-    .eq("account_id", params.accountId)
+    .eq("account_id", accountId)
     .order("last_synced_at", { ascending: false });
 
   const stats = mappings?.reduce((acc: any, m: any) => {

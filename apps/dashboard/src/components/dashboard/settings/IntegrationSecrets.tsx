@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, ShieldCheck, Key, ShoppingBag, CreditCard, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Badge } from '@/components/ui/badge';
 import { createClient } from '@/lib/supabase/client';
 
 const INTEGRATIONS = [

@@ -8,7 +8,9 @@ import { createClient }     from '@/lib/supabase/client'
 import { ProductFormModal } from './ProductFormModal'
 import toast  from 'react-hot-toast'
 import { type StoreType }      from '@/lib/store-types'
-import { Plus, Search, Pencil, Trash2, ToggleLeft, ToggleRight, LayoutGrid, List, Filter, ArrowUpDown, ChevronDown, CheckCircle2, AlertTriangle, PackageSearch, X } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, ToggleLeft, ToggleRight, LayoutGrid, List, Filter, ArrowUpDown, ChevronDown, CheckCircle2, AlertTriangle, PackageSearch, X, Boxes, History } from 'lucide-react'
+import { InventoryAdjustmentModal } from './InventoryAdjustmentModal'
+import { InventoryHistoryModal } from './InventoryHistoryModal'
 import { cn } from '@/lib/utils'
 
 export function ProductsClient({ products: initial, categories, merchantId, storeType }: {
@@ -24,6 +26,8 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
   const [sortBy, setSortBy] = useState('newest') // newest, price-asc, price-desc, stock-asc, stock-desc
   const [showForm, setShowForm]  = useState(false)
   const [editing, setEditing]    = useState<any>(null)
+  const [adjusting, setAdjusting] = useState<any>(null)
+  const [historying, setHistorying] = useState<any>(null)
 
   const supabase = createClient()
 
@@ -334,6 +338,14 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
                   <Button variant="outline" size="sm" className="rounded-xl border-gray-200" onClick={() => { setEditing(product); setShowForm(true) }}>
                     <Pencil size={14} className="mr-1.5" /> Edit
                   </Button>
+                  <Button variant="outline" size="sm" className="rounded-xl border-gray-200 bg-blue-50/50 text-blue-600 hover:bg-blue-100" onClick={() => setAdjusting(product)}>
+                    <Boxes size={14} className="mr-1.5" /> Stock
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <Button variant="ghost" size="sm" className="rounded-xl text-gray-500 hover:text-blue-600 hover:bg-blue-50" onClick={() => setHistorying(product)}>
+                    <History size={14} className="mr-1.5" /> Log
+                  </Button>
                   <Button 
                     variant={product.status === 'active' ? 'ghost' : 'outline'} 
                     size="sm" 
@@ -447,6 +459,20 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
+                          onClick={() => setAdjusting(product)}
+                          className="p-2 hover:bg-green-100 rounded-lg text-green-600 transition-colors"
+                          title="Adjust Inventory"
+                        >
+                          <Boxes size={16} />
+                        </button>
+                        <button
+                          onClick={() => setHistorying(product)}
+                          className="p-2 hover:bg-blue-100 rounded-lg text-blue-600 transition-colors"
+                          title="View History"
+                        >
+                          <History size={16} />
+                        </button>
+                        <button
                           onClick={() => { setEditing(product); setShowForm(true) }}
                           className="p-2 hover:bg-blue-100 rounded-lg text-blue-600 transition-colors"
                         >
@@ -484,6 +510,24 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
           storeType={storeType}
           onClose={() => { setShowForm(false); setEditing(null) }}
           onSaved={handleSaved}
+        />
+      )}
+      {/* Inventory Management Modals */}
+      {adjusting && (
+        <InventoryAdjustmentModal
+          product={adjusting}
+          onClose={() => setAdjusting(null)}
+          onSaved={(saved) => {
+            setProducts(prev => prev.map(p => p.id === saved.id ? saved : p))
+            setAdjusting(null)
+          }}
+        />
+      )}
+
+      {historying && (
+        <InventoryHistoryModal
+          product={historying}
+          onClose={() => setHistorying(null)}
         />
       )}
     </div>

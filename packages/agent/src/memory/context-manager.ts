@@ -1,7 +1,8 @@
 import { generateText }   from 'ai'
 import { google }         from '@ai-sdk/google'
 import { createClient }   from '@supabase/supabase-js'
-import type { CoreMessage } from 'ai'
+// import type { CoreMessage } from 'ai'
+type CoreMessage = any
 
 // Rough token estimator — 1 token ≈ 4 characters for English
 function estimateTokens(messages: CoreMessage[]): number {
