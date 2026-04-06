@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { Header } from '@/components/dashboard/Header'
 import { NewOrderListener } from '@/components/dashboard/NewOrderListener'
+import { MerchantMindFAB } from '@/components/agent/MerchantMindFAB'
 
 export default async function DashboardLayout({
   children,
@@ -25,10 +26,11 @@ export default async function DashboardLayout({
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header user={user} merchant={displayMerchant} profile={profile} />
         <NewOrderListener merchantId={displayMerchant.id} />
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-6 relative">
           {children}
         </main>
       </div>
+      <MerchantMindFAB />
     </div>
   )
 }

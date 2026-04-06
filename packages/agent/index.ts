@@ -5,3 +5,6 @@ export { buildContextMessages } from './src/memory/context-manager'
 export { AgentTracer } from './src/observability/tracer'
 export { checkRateLimit, RATE_LIMITS } from './src/middleware/rate-limiter'
 export { createSession, loadMessages, saveMessages, touchSession } from './src/memory/messages'
+export { extractReceiptData } from "./src/receiptExtractor";
+export { handleEmailInput } from './src/email-handler'
+export { handleMerchantWhatsApp } from './src/whatsapp-handler'

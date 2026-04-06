@@ -1,10 +1,18 @@
 name = "functions-worker"
 main = "src/index.ts"
-compatibility_date = "2026-04-04"
+compatibility_date = "2024-04-03"
+compatibility_flags = [ "nodejs_compat" ]
+
+# [build]
+# command = "npm run cf-typegen"
+# [build.upload]
+# format = "modules"
 
 [vars]
+node_env = "development"
 # Add non-sensitive variables here
 ENVIRONMENT = "development"
+RESEND_WEBHOOK_SECRET = "whsec_AoinB5jf2gdbF7ZUuFon5wL+ntb8X1F2"
 
 # Secrets should be added via `wrangler secret put NAME` or in .dev.vars for local dev
 
@@ -14,3 +22,4 @@ bucket_name = "ecomm-assets"
 
 [triggers]
 crons = [ "0 8 * * *", "*/10 * * * *" ]
+

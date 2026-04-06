@@ -321,36 +321,33 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
             ) : (
               /* Table View with Virtualization */
               <div className="p-4">
-                <table className="w-full text-left border-collapse bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
-                  <thead className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm border-b border-gray-100">
-                    <tr>
-                      <th className="px-6 py-4 w-10">
-                        <div 
-                          onClick={() => setSelectedIds(selectedIds.length === filteredAndSorted.length ? [] : filteredAndSorted.map(p => p.id))}
-                          className={cn("w-5 h-5 rounded-md border-2 cursor-pointer transition-all flex items-center justify-center",
-                            selectedIds.length > 0 && selectedIds.length === filteredAndSorted.length ? "bg-blue-600 border-blue-600" : 
-                            selectedIds.length > 0 ? "bg-blue-200 border-blue-400" : "bg-white border-gray-300")}
-                        >
-                          {selectedIds.length === filteredAndSorted.length && <CheckCircle2 size={12} className="text-white" />}
-                          {selectedIds.length > 0 && selectedIds.length < filteredAndSorted.length && <div className="w-2 h-0.5 bg-blue-600 rounded-full" />}
-                        </div>
-                      </th>
-                      <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Product</th>
-                      <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">SKU</th>
-                      <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Category</th>
-                      <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Stock</th>
-                      <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Price</th>
-                      <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <div className="w-full text-left bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
+                  <div className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm border-b border-gray-100 flex items-center">
+                    <div className="px-6 py-4 w-10 shrink-0">
+                      <div 
+                        onClick={() => setSelectedIds(selectedIds.length === filteredAndSorted.length ? [] : filteredAndSorted.map(p => p.id))}
+                        className={cn("w-5 h-5 rounded-md border-2 cursor-pointer transition-all flex items-center justify-center",
+                          selectedIds.length > 0 && selectedIds.length === filteredAndSorted.length ? "bg-blue-600 border-blue-600" : 
+                          selectedIds.length > 0 ? "bg-blue-200 border-blue-400" : "bg-white border-gray-300")}
+                      >
+                        {selectedIds.length === filteredAndSorted.length && <CheckCircle2 size={12} className="text-white" />}
+                        {selectedIds.length > 0 && selectedIds.length < filteredAndSorted.length && <div className="w-2 h-0.5 bg-blue-600 rounded-full" />}
+                      </div>
+                    </div>
+                    <div className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider flex-1 min-w-[200px]">Product</div>
+                    <div className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider w-32 shrink-0">SKU</div>
+                    <div className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider w-40 shrink-0">Category</div>
+                    <div className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider w-28 shrink-0">Stock</div>
+                    <div className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider w-32 shrink-0 text-right">Price</div>
+                    <div className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider w-24 shrink-0">Status</div>
+                    <div className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider w-40 shrink-0 text-right">Actions</div>
+                  </div>
+                  <div className="relative">
                     {virtualItems.map(virtualRow => {
                       const product = filteredAndSorted[virtualRow.index]
                       return (
-                        <tr 
+                        <div 
                           key={virtualRow.key}
-                          data-index={virtualRow.index}
                           className={cn("hover:bg-blue-50/30 transition-colors group absolute w-full flex items-center border-b border-gray-50", 
                             selectedIds.includes(product.id) && "bg-blue-50/50")}
                           style={{
@@ -358,7 +355,7 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
                             transform: `translateY(${virtualRow.start}px)`,
                           }}
                         >
-                          <td className="px-6 py-4 w-10 shrink-0">
+                          <div className="px-6 py-4 w-10 shrink-0">
                             <div 
                               onClick={() => setSelectedIds(prev => prev.includes(product.id) ? prev.filter(id => id !== product.id) : [...prev, product.id])}
                               className={cn("w-5 h-5 rounded-md border-2 cursor-pointer transition-all flex items-center justify-center",
@@ -366,8 +363,8 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
                             >
                               {selectedIds.includes(product.id) && <CheckCircle2 size={12} className="text-white" />}
                             </div>
-                          </td>
-                          <td className="px-6 py-4 flex-1 min-w-[200px]">
+                          </div>
+                          <div className="px-6 py-4 flex-1 min-w-[200px]">
                             <div className="flex items-center gap-3">
                               <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-gray-50 shrink-0">
                                 {product.images?.[0] ? (
@@ -384,30 +381,30 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
                                 </div>
                               </div>
                             </div>
-                          </td>
-                          <td className="px-6 py-4 w-32 shrink-0">
+                          </div>
+                          <div className="px-6 py-4 w-32 shrink-0">
                             <span className="text-xs font-mono text-gray-500 truncate">{product.sku || '-'}</span>
-                          </td>
-                          <td className="px-6 py-4 w-40 shrink-0">
+                          </div>
+                          <div className="px-6 py-4 w-40 shrink-0">
                             <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg truncate">
                               {product.category?.name || 'Uncategorized'}
                             </span>
-                          </td>
-                          <td className="px-6 py-4 w-28 shrink-0">
+                          </div>
+                          <div className="px-6 py-4 w-28 shrink-0">
                             <StockIndicator product={product} />
-                          </td>
-                          <td className="px-6 py-4 w-32 shrink-0 text-right">
+                          </div>
+                          <div className="px-6 py-4 w-32 shrink-0 text-right">
                             <div className="flex flex-col items-end">
                               <span className="font-black text-gray-900 text-sm">RM {Number(product.price).toFixed(2)}</span>
                               {product.compare_at_price > 0 && (
                                 <span className="text-[10px] text-gray-400 line-through">RM {Number(product.compare_at_price).toFixed(2)}</span>
                               )}
                             </div>
-                          </td>
-                          <td className="px-6 py-4 w-24 shrink-0">
+                          </div>
+                          <div className="px-6 py-4 w-24 shrink-0">
                             <StatusBadge status={product.status} />
-                          </td>
-                          <td className="px-6 py-4 w-40 shrink-0 text-right">
+                          </div>
+                          <div className="px-6 py-4 w-40 shrink-0 text-right">
                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <ActionButton icon={Boxes} onClick={() => setAdjusting(product)} color="text-green-600 hover:bg-green-100" />
                               <ActionButton icon={History} onClick={() => setHistorying(product)} color="text-blue-600 hover:bg-blue-100" />
@@ -421,12 +418,12 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
                               </button>
                               <ActionButton icon={Trash2} onClick={() => handleDelete(product)} color="text-red-500 hover:bg-red-100" />
                             </div>
-                          </td>
-                        </tr>
+                          </div>
+                        </div>
                       )
                     })}
-                  </tbody>
-                </table>
+                  </div>
+                </div>
               </div>
             )}
           </div>

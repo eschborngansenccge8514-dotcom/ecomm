@@ -22,6 +22,11 @@ import { getCustomerProfile, getCustomerSegments,
          sendLoyaltyNotification }  from './crm'
 import { savePlaybook, runPlaybook, listPlaybooks,
          pushDashboardAlert, getMerchantSnapshot }         from './automation'
+import { listPurchaseOrders, getPurchaseOrderDetails,
+         createPurchaseOrder, sendPurchaseOrder,
+         listSuppliers }            from './procurement'
+import { sendEmailTool }          from './communication'
+import { whatsappSendTextTool, whatsappCheckNumberTool } from './whatsapp'
 
 export const buildTools = (merchantId: string, sessionId: string) => ({
   // Orders (6)
@@ -84,5 +89,17 @@ export const buildTools = (merchantId: string, sessionId: string) => ({
   get_merchant_snapshot:          getMerchantSnapshot(merchantId, sessionId),
 
   // Knowledge (1)
-  search_knowledge_base:          searchKnowledgeBase
+  search_knowledge_base:          searchKnowledgeBase,
+
+  // Procurement (5)
+  list_purchase_orders:           listPurchaseOrders(merchantId, sessionId),
+  get_purchase_order_details:     getPurchaseOrderDetails(merchantId, sessionId),
+  create_purchase_order:          createPurchaseOrder(merchantId, sessionId),
+  send_purchase_order:            sendPurchaseOrder(merchantId, sessionId),
+  list_suppliers:                 listSuppliers(merchantId, sessionId),
+
+  // Communication (3)
+  send_email:                     sendEmailTool(merchantId, sessionId),
+  whatsapp_send_text:             whatsappSendTextTool(merchantId, sessionId),
+  whatsapp_check_number:          whatsappCheckNumberTool(merchantId, sessionId)
 })

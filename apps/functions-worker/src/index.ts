@@ -1,3 +1,5 @@
+import './env_shim';
+import { injectEnv } from './env_shim';
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { getSupabaseClient, Bindings } from './lib/supabase'
@@ -16,6 +18,7 @@ import einvoice from './routes/einvoice'
 import storage from './routes/storage'
 import marketplace from './routes/marketplace'
 import logistics from './routes/logistics'
+import whatsapp from './routes/whatsapp'
 
 const app = new Hono<{ Bindings: Bindings }>()
 
@@ -28,6 +31,9 @@ app.use('*', cors({
 }) as any)
 
 app.use('*', async (c, next) => {
+  // Inject Worker bindings into process.env so agent/support-agent packages can
+  // read SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GOOGLE_GENERATIVE_AI_API_KEY, etc.
+  injectEnv(c.env as any)
   console.log(`[Request] ${c.req.method} ${c.req.path}`)
   await next()
 })
@@ -49,6 +55,7 @@ app.route('/internal', internal)
 app.route('/einvoice', einvoice)
 app.route('/marketplace', marketplace)
 app.route('/logistics', logistics)
+app.route('/whatsapp', whatsapp)
 
 // Explicit Fallbacks: When this worker is deployed as a single-purpose function 
 // (e.g., named 'einvoice'), Supabase calls it with paths like '/consolidate' 

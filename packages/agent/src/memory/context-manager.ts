@@ -1,6 +1,6 @@
-import { generateText }   from 'ai'
-import { google }         from '@ai-sdk/google'
-import { createClient }   from '@supabase/supabase-js'
+import { generateText } from 'ai'
+import { google } from '@ai-sdk/google'
+import { createClient } from '@supabase/supabase-js'
 // import type { CoreMessage } from 'ai'
 type CoreMessage = any
 
@@ -15,10 +15,10 @@ function estimateTokens(messages: CoreMessage[]): number {
 }
 
 const MAX_HISTORY_TOKENS = 12_000   // ~48K chars — leaves headroom for system + tools
-const SUMMARY_THRESHOLD  = 10_000   // start summarising when we approach limit
+const SUMMARY_THRESHOLD = 10_000   // start summarising when we approach limit
 
 export async function buildContextMessages(
-  sessionId:  string,
+  sessionId: string,
   merchantId: string,
   newMessage: string
 ): Promise<CoreMessage[]> {
@@ -36,7 +36,7 @@ export async function buildContextMessages(
     .limit(40)
 
   const history: CoreMessage[] = (rows ?? []).map(r => ({
-    role:    r.role as 'user' | 'assistant',
+    role: r.role as 'user' | 'assistant',
     content: r.content
   }))
 
@@ -48,12 +48,12 @@ export async function buildContextMessages(
   }
 
   // Over threshold — summarise the oldest half, keep recent messages verbatim
-  const mid       = Math.floor(history.length / 2)
-  const oldHalf   = history.slice(0, mid)
+  const mid = Math.floor(history.length / 2)
+  const oldHalf = history.slice(0, mid)
   const recentHalf = history.slice(mid)
 
   const { text: compressionSummary } = await generateText({
-    model:  google('gemini-2.0-flash'),
+    model: google('gemini-2.5-flash-lite'),
     prompt: `Summarise this conversation history as a compact context block.
 Focus on: decisions made, key facts established, actions completed, anything pending.
 Maximum 200 words. Write in third person ("The merchant asked...", "The agent confirmed...").
@@ -63,7 +63,7 @@ ${oldHalf.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n')}`
 
   // Inject summary as a system-style user message at the start
   const compressed: CoreMessage[] = [
-    { role: 'user',      content: `[CONTEXT SUMMARY]\n${compressionSummary}` },
+    { role: 'user', content: `[CONTEXT SUMMARY]\n${compressionSummary}` },
     { role: 'assistant', content: 'Understood. I have the context from earlier in our conversation.' },
     ...recentHalf,
     { role: 'user', content: newMessage }
@@ -71,7 +71,7 @@ ${oldHalf.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n')}`
 
   // Save the compression event so we don't re-summarise old messages again
   await supabase.from('agent_sessions').update({
-    summary:    compressionSummary,
+    summary: compressionSummary,
     updated_at: new Date().toISOString()
   }).eq('id', sessionId)
 

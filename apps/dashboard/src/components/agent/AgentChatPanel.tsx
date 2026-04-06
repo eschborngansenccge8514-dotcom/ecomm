@@ -5,12 +5,14 @@ import { useState, useRef, useEffect } from 'react'
 // @ts-ignore
 import { useChat } from '@ai-sdk/react'
 import { toast } from 'react-hot-toast'
+import { cn } from '@/lib/utils'
 
 interface Props {
   initialSessionId?: string
+  hideHeader?: boolean
 }
 
-export function AgentChatPanel({ initialSessionId }: Props) {
+export function AgentChatPanel({ initialSessionId, hideHeader = false }: Props) {
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -164,18 +166,20 @@ export function AgentChatPanel({ initialSessionId }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full border-l bg-background">
-      <div className="flex items-center justify-between px-4 py-3 border-b">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-sm font-semibold">MerchantMind</span>
+    <div className={cn("flex flex-col h-full bg-background", !hideHeader && "border-l")}>
+      {!hideHeader && (
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-sm font-semibold">MerchantMind</span>
+          </div>
+          {sessionId && (
+            <span className="text-xs text-muted-foreground font-mono">
+              {sessionId.slice(0, 8)}
+            </span>
+          )}
         </div>
-        {sessionId && (
-          <span className="text-xs text-muted-foreground font-mono">
-            {sessionId.slice(0, 8)}
-          </span>
-        )}
-      </div>
+      )}
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.length === 0 && (

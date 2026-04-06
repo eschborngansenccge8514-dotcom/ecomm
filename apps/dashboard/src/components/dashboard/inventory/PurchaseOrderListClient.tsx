@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
   FileText, 
@@ -39,6 +40,7 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export function PurchaseOrderListClient({ initialOrders }: { initialOrders: any[] }) {
+  const router = useRouter()
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
 
@@ -107,41 +109,43 @@ export function PurchaseOrderListClient({ initialOrders }: { initialOrders: any[
           </TableHeader>
           <TableBody>
             {filtered.length > 0 ? filtered.map((po) => (
-              <Link key={po.id} href={`/inventory/purchase-orders/${po.id}`} className="contents group">
-                <TableRow className="cursor-pointer group-hover:bg-gray-50">
-                  <TableCell>
-                    <div className="flex items-center gap-2 font-bold text-gray-900">
-                      <FileText size={14} className="text-gray-400" />
-                      {po.po_number}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium text-gray-700">{po.suppliers?.name}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                      <Clock size={12} className="text-gray-400" />
-                      <span>{new Date(po.order_date).toLocaleDateString()}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-bold text-gray-900">
-                    {po.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className={cn(
-                      "rounded-lg px-2 py-0.5 text-[10px] uppercase font-bold border-none",
-                      STATUS_COLORS[po.status] || 'bg-gray-100'
-                    )}>
-                      {po.status.replace('_', ' ')}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                       <Button variant="ghost" size="icon" className="rounded-full text-gray-400 group-hover:text-blue-600">
-                        <ChevronRight size={18} />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              </Link>
+              <TableRow 
+                key={po.id} 
+                className="cursor-pointer hover:bg-gray-50 group"
+                onClick={() => router.push(`/inventory/purchase-orders/${po.id}`)}
+              >
+                <TableCell>
+                  <div className="flex items-center gap-2 font-bold text-gray-900">
+                    <FileText size={14} className="text-gray-400" />
+                    {po.po_number}
+                  </div>
+                </TableCell>
+                <TableCell className="font-medium text-gray-700">{po.suppliers?.name}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                    <Clock size={12} className="text-gray-400" />
+                    <span>{new Date(po.order_date).toLocaleDateString()}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="font-bold text-gray-900">
+                  {po.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </TableCell>
+                <TableCell>
+                  <Badge variant="secondary" className={cn(
+                    "rounded-lg px-2 py-0.5 text-[10px] uppercase font-bold border-none",
+                    STATUS_COLORS[po.status] || 'bg-gray-100'
+                  )}>
+                    {po.status.replace('_', ' ')}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                     <Button variant="ghost" size="icon" className="rounded-full text-gray-400 group-hover:text-blue-600">
+                      <ChevronRight size={18} />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
             )) : (
               <TableRow>
                 <TableCell colSpan={6} className="h-48 text-center text-gray-400">

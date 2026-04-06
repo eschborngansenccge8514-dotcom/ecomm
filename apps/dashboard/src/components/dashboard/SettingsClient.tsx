@@ -182,6 +182,7 @@ export function SettingsClient({
     lng: (merchant.store_config?.lng ?? merchant.lng) ?? null,
     phone: (merchant.store_config?.phone ?? merchant.phone) ?? '',
     email: (merchant.store_config?.email ?? merchant.email) ?? '',
+    inboundEmail: (merchant.store_config?.inboundEmail ?? merchant.inbound_email) ?? '',
     minOrderAmount: (merchant.store_config?.minOrderAmount ?? merchant.min_order_amount) ?? 0,
     delivery_radius_km: (merchant.store_config?.delivery_radius_km ?? merchant.delivery_radius_km) ?? 10,
   })
@@ -218,6 +219,7 @@ export function SettingsClient({
           lng: config.lng,
           phone: config.phone,
           email: config.email,
+          inbound_email: config.inboundEmail,
           min_order_amount: config.minOrderAmount,
           delivery_radius_km: config.delivery_radius_km,
         })
@@ -478,7 +480,6 @@ export function SettingsClient({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="Business Phone"><Input value={config.phone} onChange={e => setCfg('phone', e.target.value)} className="rounded-xl h-11" placeholder="012-..." /></Field>
                   <Field label="WhatsApp Link"><Input value={config.whatsapp} onChange={e => setCfg('whatsapp', e.target.value)} className="rounded-xl h-11" placeholder="+60..." /></Field>
-                  <Field label="Public Email"><Input value={config.email} onChange={e => setCfg('email', e.target.value)} className="rounded-xl h-11" placeholder="hello@store.com" /></Field>
                   <Field label="Official Website"><Input value={config.website} onChange={e => setCfg('website', e.target.value)} className="rounded-xl h-11" placeholder="https://..." /></Field>
                 </div>
               </Section>

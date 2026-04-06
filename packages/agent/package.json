@@ -9,6 +9,7 @@
   "dependencies": {
     "@ai-sdk/google": "3.0.51",
     "@google/genai": "^1.48.0",
+    "@repo/email": "workspace:^",
     "@supabase/supabase-js": "^2.100.1",
     "ai": "^6.0.0",
     "zod": "latest"

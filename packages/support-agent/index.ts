@@ -4,3 +4,4 @@ export {
   loadSupportMessages, 
   touchSupportSession 
 } from './src/memory/messages'
+export { handleWhatsAppMessage } from './src/whatsapp-handler'

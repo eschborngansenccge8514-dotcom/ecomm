@@ -23,6 +23,10 @@ export interface Bindings {
   RAZORPAY_KEY_SECRET: string
   RAZORPAY_WEBHOOK_SECRET: string
   RESEND_API_KEY: string
+  RESEND_WEBHOOK_SECRET: string
+  EVOLUTION_API_URL: string
+  EVOLUTION_API_KEY: string
+  WHATSAPP_INSTANCE_NAME: string
   R2_BUCKET: R2Bucket
 }
 

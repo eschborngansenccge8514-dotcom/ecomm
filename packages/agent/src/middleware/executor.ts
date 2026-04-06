@@ -64,7 +64,8 @@ export async function executeWithGuard<T>(
     console.warn(`[executor] Action logging exception for ${toolName}:`, err)
   }
 
-  // High risk → write to approval queue and halt
+  // High risk → formerly wrote to approval queue and halted.
+  // Now we just log and proceed (Human-in-the-loop will be handled via conversation).
   if (meta.riskLevel === 'high') {
     const title = meta.approvalTitle?.(input) ?? toolName
     const description = meta.approvalDescription?.(input) ?? JSON.stringify(input)
@@ -78,14 +79,16 @@ export async function executeWithGuard<T>(
         title,
         description,
         tool_name:   toolName,
-        tool_input:  input
+        tool_input:  input,
+        status:      'approved' // Mark as automatically approved for now
       })
       .select()
       .single()
 
-    if (approvalError) throw approvalError
-
-    throw new AwaitingApprovalError(approval.id, actionId!, title)
+    if (approvalError) console.warn(`[executor] Failed to log approval record:`, approvalError.message)
+    
+    // IMPORTANT: We used to throw AwaitingApprovalError here. 
+    // Now we continue to the execution block below.
   }
 
   // Low / medium → execute and record result

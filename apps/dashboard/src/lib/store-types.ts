@@ -127,6 +127,7 @@ export interface StoreConfig {
   phone:            string
   whatsapp:         string
   email:            string
+  inboundEmail:     string
   address:          string
   city:             string
   state:            string
@@ -168,7 +169,7 @@ export const DEFAULT_APPEARANCE: StoreAppearance = {
 }
 
 export const DEFAULT_CONFIG: StoreConfig = {
-  phone: '', whatsapp: '', email: '', address: '', city: '', state: '',
+  phone: '', whatsapp: '', email: '', inboundEmail: '', address: '', city: '', state: '',
   postcode: '', country: 'Malaysia', instagram: '', facebook: '',
   tiktok: '', twitter: '', website: '', returnPolicy: '', shippingPolicy: '',
   privacyPolicy: '', enableAddons: false, enableBooking: false,

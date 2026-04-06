@@ -130,7 +130,38 @@ export async function updatePurchaseOrder(id: string, params: any) {
 }
 
 export async function sendPurchaseOrder(id: string) {
-  return updatePurchaseOrder(id, { status: 'sent', order_date: new Date().toISOString() })
+  const supabase = await createClient()
+  const merchantId = await getMerchantId(supabase)
+
+  // 1. Check if supplier has email first (optional but better UX)
+  const po = await getPurchaseOrder(id)
+  if (!po.suppliers?.email) {
+    throw new Error(`Supplier "${po.suppliers?.name}" does not have an email address configured.`)
+  }
+
+  // 2. Update status
+  const updatedPo = await updatePurchaseOrder(id, { 
+    status: 'sent', 
+    order_date: new Date().toISOString() 
+  })
+
+  // 3. Trigger email (best-effort)
+  try {
+    const { error: emailError } = await supabase.functions.invoke('send-po-email', {
+      body: { 
+        po_id: id, 
+        merchant_id: merchantId 
+      }
+    })
+    
+    if (emailError) {
+      console.error('[sendPurchaseOrder] Edge function error:', emailError)
+    }
+  } catch (err) {
+    console.error('[sendPurchaseOrder] Failed to invoke email function:', err)
+  }
+
+  return updatedPo
 }
 
 export async function cancelPurchaseOrder(id: string) {

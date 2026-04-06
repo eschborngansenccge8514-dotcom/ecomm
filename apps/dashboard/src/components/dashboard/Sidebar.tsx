@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { 
   LayoutDashboard, 
   ShoppingBag, 
+  Receipt,
   Package, 
   Tag,
   Users,
@@ -25,7 +26,9 @@ import {
   ShieldAlert,
   Headphones,
   Monitor,
-  ArrowUpRight
+  ArrowUpRight,
+  Mail,
+  MessageSquare
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -34,29 +37,30 @@ import { ApprovalsBadge } from '@/components/nav/ApprovalsBadge'
 import { SupportBadge } from '@/components/nav/SupportBadge'
 
 const NAV = [
-  { href: '/agent',       label: 'MerchantMind', icon: Zap             },
   { href: '/pos',         label: 'Web POS',      icon: Monitor         },
   { href: '/operations',  label: 'Operations',  icon: LayoutDashboard },
   { href: '/orders',      label: 'Orders',      icon: ShoppingBag     },
+  { href: '/expenses',    label: 'Expenses',    icon: Receipt         },
   { href: '/agent/approvals', label: 'Approvals', icon: ShieldAlert, badge: <ApprovalsBadge /> },
   { href: '/products',    label: 'Products',    icon: Package         },
   { href: '/inventory',                label: 'Inventory',       icon: BarChart2 },
   { href: '/inventory/suppliers',      label: 'Suppliers',       icon: Truck },
   { href: '/inventory/purchase-orders',label: 'Purchase Orders', icon: FileText },
-  { href: '/inventory/transfers',      label: 'Transfers',       icon: ArrowUpRight },
   { href: '/categories',  label: 'Categories',  icon: Tag             },
   { href: '/customers',   label: 'Customers',   icon: Users           },
-  { href: '/reports/products', label: 'Product Analytics', icon: PieChart },
   { href: '/reports',     label: 'Reports',     icon: FileText        },
   { href: '/loyalty',     label: 'Loyalty',     icon: Star            },
   { href: '/shipping/easyparcel', label: 'EasyParcel', icon: Box        },
   { href: '/shipping/lalamove',   label: 'Lalamove',   icon: Zap        },
   { href: '/einvoice',   label: 'E-Invoicing', icon: FileCheck       },
+  { href: '/email',      label: 'Email Logs',   icon: Mail            },
+  { href: '/email/settings', label: 'Email Setup', icon: Settings        },
   { href: '/support/inbox', label: 'Support Inbox', icon: Headphones, badge: <SupportBadge /> },
   { href: '/support/settings', label: 'Support Setup', icon: Headphones },
   { href: '/marketplace', label: 'Marketplace', icon: Store           },
   { href: '/payment-exceptions', label: 'Payment Errors', icon: AlertCircle },
   { href: '/settings/store', label: 'Store Theme', icon: Palette       },
+  { href: '/settings/whatsapp', label: 'WhatsApp', icon: MessageSquare },
   { href: '/settings',    label: 'Settings',    icon: Settings        },
 ]
 

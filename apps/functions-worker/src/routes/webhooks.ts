@@ -1,9 +1,74 @@
 import { Hono } from 'hono'
+import { Webhook } from 'svix'
 import { getSupabaseClient, Bindings } from '../lib/supabase'
 import { hmacSha256, hmacSha512 } from '../lib/utils'
 import { mapLalamoveStatus, mapLalamoveDriverInfo, buildLalamoveHeaders, getLalamoveBaseUrl } from '../lib/lalamove'
+// Agent imports moved to dynamic to avoid boot-time ReferenceError
 
 const webhooks = new Hono<{ Bindings: Bindings }>()
+
+// --- Resend Webhook ---
+webhooks.post('/resend', async (c) => {
+  const payload = await c.req.text()
+  const sig = c.req.header('svix-signature')
+  const id = c.req.header('svix-id')
+  const timestamp = c.req.header('svix-timestamp')
+  const secret = c.env.RESEND_WEBHOOK_SECRET
+
+  // 1. Signature Verification
+  if (secret) {
+    if (!sig || !id || !timestamp) {
+      return c.text('Missing Svix headers', 400)
+    }
+    const wh = new Webhook(secret)
+    try {
+      wh.verify(payload, {
+        'svix-id': id,
+        'svix-timestamp': timestamp,
+        'svix-signature': sig,
+      })
+    } catch (err) {
+      console.error('[Resend Webhook] Signature verification failed:', err)
+      return c.text('Invalid signature', 401)
+    }
+  } else {
+    console.warn('[Resend Webhook] Skipping verification: RESEND_WEBHOOK_SECRET not set')
+  }
+
+  // 2. Process Event
+  const body = JSON.parse(payload)
+  const eventType = body.type // e.g., email.delivered, email.bounced
+  const emailId = body.data.email_id
+  if (eventType === 'email.received') {
+    c.executionCtx.waitUntil(processInboundEmail(body.data, c.env))
+    return c.text('OK')
+  }
+
+  const status = eventType.split('.')[1] // delivered, bounced, complained
+
+  if (!emailId || !status) {
+    return c.text('Invalid payload', 400)
+  }
+
+  const supabase = getSupabaseClient(c.env)
+
+  // 3. Update Email Log
+  const { error } = await supabase
+    .from('email_logs')
+    .update({ 
+      status: status,
+      metadata: body.data 
+    })
+    .eq('resend_id', emailId)
+
+  if (error) {
+    console.error('[Resend Webhook] Failed to update email_logs:', error)
+    return c.text('Database error', 500)
+  }
+
+  console.log(`[Resend Webhook] Updated email ${emailId} to status: ${status}`)
+  return c.text('OK')
+})
 
 // --- Billplz Webhook ---
 webhooks.post('/billplz', async (c) => {
@@ -192,5 +257,100 @@ webhooks.post('/razorpay', async (c) => {
 
   return c.json({ received: true })
 })
+
+// --- Helpers for Inbound Email ---
+
+async function processInboundEmail(
+  data: { email_id: string; from: string; to: string[]; subject: string },
+  env: Bindings
+) {
+  try {
+    const supabase = getSupabaseClient(env)
+
+    // 1. Fetch the full email content from Resend
+    const res = await fetch(`https://api.resend.com/emails/${data.email_id}`, {
+      headers: { 'Authorization': `Bearer ${env.RESEND_API_KEY}` }
+    })
+    if (!res.ok) throw new Error(`Failed to fetch email from Resend: ${res.statusText}`)
+    
+    const emailData = (await res.json()) as any
+    const body = emailData.text || emailData.html || ''
+    const recipient = data.to[0]
+
+    // 2. Identify the merchant
+    const { data: merchant, error: mErr } = await supabase
+      .from('merchants')
+      .select('id, owner_id, store_name')
+      .eq('inbound_email', recipient)
+      .maybeSingle()
+
+    if (mErr || !merchant) {
+      console.error(`[InboundEmail] No merchant found for recipient ${recipient}`)
+      return
+    }
+
+    // 3. Resolve or Create Session
+    // For email, we use the 'from' address as a key to find/create a session
+    const { data: existingSession } = await supabase
+      .from('agent_sessions')
+      .select('id')
+      .eq('merchant_id', merchant.id)
+      .eq('metadata->>email', data.from)
+      .maybeSingle()
+
+    let sessionId = existingSession?.id
+    if (!sessionId) {
+      const { data: newSession, error: sErr } = await supabase
+        .from('agent_sessions')
+        .insert({
+          merchant_id: merchant.id,
+          user_id: merchant.owner_id,
+          title: `Email from ${data.from}`,
+          metadata: { channel: 'email', email: data.from }
+        })
+        .select('id')
+        .single()
+      
+      if (sErr) throw sErr
+      sessionId = newSession.id
+    }
+
+    // 4. Call Agent
+    const { handleEmailInput } = await import('../../../../packages/agent')
+    const { replyText } = await handleEmailInput({
+      from: data.from,
+      subject: data.subject,
+      body: body,
+      merchantId: merchant.id,
+      merchantName: merchant.store_name,
+      sessionId: sessionId
+    })
+
+    // 5. Send Reply
+    const sendRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${env.RESEND_API_KEY}`
+      },
+      body: JSON.stringify({
+        from: `${merchant.store_name} <${recipient}>`,
+        to: data.from,
+        subject: `Re: ${data.subject}`,
+        text: replyText
+      })
+    })
+
+    if (!sendRes.ok) {
+      const errText = await sendRes.text()
+      console.error(`[InboundEmail] Failed to send reply: ${errText}`)
+    } else {
+      console.log(`[InboundEmail] Success: Sent reply to ${data.from} for merchant ${merchant.id}`)
+    }
+
+  } catch (err: any) {
+    console.error('[InboundEmail] Critical Error:', err.message)
+  }
+}
 
 export default webhooks

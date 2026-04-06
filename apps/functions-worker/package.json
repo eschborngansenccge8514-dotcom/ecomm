@@ -10,7 +10,10 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",
     "hono": "^4.12.10",
-    "resend": "^6.10.0"
+    "resend": "^6.10.0",
+    "svix": "^1.90.0",
+    "@project1/agent": "workspace:*",
+    "@project1/support-agent": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
