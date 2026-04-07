@@ -55,18 +55,25 @@ export async function handleSupportEmailInput({
       }).eq('id', logId)
     }
 
-    const [configRes, history] = await Promise.all([
+    const [configRes, history, customerId] = await Promise.all([
       supabase
         .from('support_configs')
         .select('ai_enabled, knowledge_base_text')
         .eq('merchant_id', ownerId)
         .maybeSingle(),
-      loadSupportMessages(sessionId, 20, supabase).catch(() => [])
+      loadSupportMessages(sessionId, 20, supabase).catch(() => []),
+      // Resolve customer_id from email
+      supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', from)
+        .maybeSingle()
+        .then((res: any) => res.data?.id)
     ])
 
     if (logId) {
       await supabase.from('email_logs').update({
-        metadata: { step: 'handler-data-loaded', sessionId, hasConfig: !!configRes.data, historyCount: history.length }
+        metadata: { step: 'handler-data-loaded', sessionId, hasConfig: !!configRes.data, historyCount: history.length, customerId: customerId }
       }).eq('id', logId)
     }
 
@@ -82,7 +89,7 @@ export async function handleSupportEmailInput({
       attachmentContext = `\n\n## Attachments\nThe user attached the following files:\n${attachments.map(a => `- ${a.filename} (${a.contentType})`).join('\n')}`
     }
 
-    const systemPrompt = buildSupportSystemPrompt(merchantName, knowledge_base_text, `\nCUSTOMER: ${from}`) +
+    const systemPrompt = buildSupportSystemPrompt(merchantName, knowledge_base_text, `\nCUSTOMER: ${from}${customerId ? ` (ID: ${customerId})` : ''}`) +
       `\n\n## Email Context\nFrom: ${from}\nSubject: ${subject}${attachmentContext}\n\n` +
       `You are replying to an inbound support email. Please follow these guidelines:\n` +
       `1. Be professional, empathetic, and efficient.\n` +
@@ -112,8 +119,8 @@ export async function handleSupportEmailInput({
         model: google('gemini-2.5-flash-lite'),
         system: systemPrompt + "\n\nIMPORTANT: You MUST always provide a helpful, professional text response. Never return an empty message.",
         messages: processedHistory,
-        tools: buildSupportTools(merchantId, ownerId, sessionId, supabase) as any,
-        maxSteps: 7, // Increased for complex order lookups
+        tools: buildSupportTools(merchantId, ownerId, sessionId, supabase, customerId) as any,
+        maxSteps: 10, // Increased for complex order lookups
       } as any)
       console.log(`[SupportAgent] AI response received for ${sessionId}. Text length: ${response.text?.length || 0}`)
 
@@ -128,28 +135,30 @@ export async function handleSupportEmailInput({
         await supabase.from('email_logs').update({
           status: 'error',
           error: `AI Generation Error: ${err.message}`,
-          metadata: { step: 'handler-ai-error', sessionId }
+          metadata: { step: 'ai-generation-failed', sessionId, error: err.message, stack: err.stack }
         }).eq('id', logId)
       }
       throw err
     }
 
-    const fullTurnMessages = (response as any).responseMessages || []
+    const resultMessages = (response as any).responseMessages || (response as any).messages || []
     let replyText = response.text
-    if (!replyText && fullTurnMessages.length > 0) {
-      // Fallback: If text is empty but we have messages, take the content of the last assistant message
-      const lastAssistant = [...fullTurnMessages].reverse().find(m => m.role === 'assistant')
+    if (!replyText && resultMessages.length > 0) {
+      const lastAssistant = [...resultMessages].reverse().find((m: any) => m.role === 'assistant')
       if (lastAssistant) {
-        replyText = typeof lastAssistant.content === 'string'
-          ? lastAssistant.content
-          : JSON.stringify(lastAssistant.content)
+        if (typeof lastAssistant.content === 'string') {
+          replyText = lastAssistant.content
+        } else if (Array.isArray(lastAssistant.content)) {
+          const textPart = lastAssistant.content.find((p: any) => p.type === 'text' || p.text)
+          replyText = typeof textPart === 'string' ? textPart : (textPart?.text || "")
+        }
       }
     }
     const finalReplyText = replyText || "I'm sorry, I'm currently processing multiple inquiries and reached a temporary limit. I'll follow up properly in a few minutes."
 
     // 3. Persistence: Force Syncing History
     // Create a synthesized assistant message if the turn returned no messages but we have a reply
-    const finalMessages = [...fullTurnMessages]
+    const finalMessages = [...resultMessages]
     if (finalMessages.length === 0 && finalReplyText) {
       console.log(`[SupportAgent] Synthesizing assistant message for session ${sessionId} (Empty turn messages but found reply text)`)
       finalMessages.push({ role: 'assistant', content: finalReplyText })

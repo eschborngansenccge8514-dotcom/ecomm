@@ -80,6 +80,20 @@ export async function runSupportAgent({
   }
 
   // 1. Fetch support config, session state, and customer context in parallel
+  // NEW: Resolve customerId from email if missing
+  let resolvedCustomerId = customerId
+  if (!resolvedCustomerId && customerEmail) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', customerEmail)
+      .maybeSingle()
+    if (profile) {
+      resolvedCustomerId = profile.id
+      console.log(`[SupportAgent] Resolved customerId from email: ${customerEmail} -> ${resolvedCustomerId}`)
+    }
+  }
+
   const [configRes, sessionRes, customerContext] = await Promise.all([
     supabase
       .from('support_configs')
@@ -111,12 +125,12 @@ export async function runSupportAgent({
       }
 
       // Pre-fetch by customer_id (reliable, since buyer_email is not stored on orders)
-      if (customerId) {
+      if (resolvedCustomerId) {
         const { data: recent } = await supabase
           .from('orders')
           .select('order_number, status, created_at, delivery_status')
           .eq('merchant_id', merchantUuid)
-          .eq('customer_id', customerId)
+          .eq('customer_id', resolvedCustomerId)
           .order('created_at', { ascending: false })
           .limit(3)
 
@@ -161,7 +175,7 @@ export async function runSupportAgent({
     model: google('gemini-2.5-flash-lite'),
     system: buildSupportSystemPrompt(merchantName, knowledge_base_text, customerContext),
     messages,
-    tools: buildSupportTools(merchantUuid, ownerId, sessionId, supabase, customerId) as any,
+    tools: buildSupportTools(merchantUuid, ownerId, sessionId, supabase, resolvedCustomerId) as any,
     stopWhen: stepCountIs(5), // Keep support agent lean
 
     onFinish: async ({ text, usage, finishReason }) => {

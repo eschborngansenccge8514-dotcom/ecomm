@@ -34,14 +34,23 @@ export async function handleWhatsAppMessage({
   supabase
 }: WhatsAppSupportInput) {
 
-  // 1. Load history
-  let history = await loadSupportMessages(sessionId, 40, supabase)
+  // 1. Load history and resolve customer context
+  const [history, profile] = await Promise.all([
+    loadSupportMessages(sessionId, 40, supabase),
+    supabase
+      .from('profiles')
+      .select('id')
+      .eq('phone', senderPhone)
+      .maybeSingle()
+  ])
+
+  const customerId = profile?.data?.id
 
   // 2. Build context
   const systemPrompt = buildSupportSystemPrompt(
     merchantName,
     knowledgeBase,
-    `CUSTOMER PHONE: ${senderPhone}\nSESSION: WhatsApp`
+    `CUSTOMER PHONE: ${senderPhone}${customerId ? ` (ID: ${customerId})` : ''}\nSESSION: WhatsApp`
   )
 
   // 3. Generate response
@@ -62,24 +71,27 @@ export async function handleWhatsAppMessage({
     model: google('gemini-2.5-flash-lite'), // Use latest stable
     system: systemPrompt + "\n\nIMPORTANT: You MUST always provide a helpful, professional text response. Never return an empty message.",
     messages: processedHistory,
-    tools: buildSupportTools(merchantId, ownerId, sessionId, supabase) as any,
-    maxSteps: 7,
+    tools: buildSupportTools(merchantId, ownerId, sessionId, supabase, customerId) as any,
+    maxSteps: 10,
   } as any)
 
-  const fullTurnMessages = (response as any).responseMessages || []
+  const resultMessages = (response as any).responseMessages || (response as any).messages || []
   let replyText = response.text
-  if (!replyText && fullTurnMessages.length > 0) {
-    const lastAssistant = [...fullTurnMessages].reverse().find(m => m.role === 'assistant')
+  if (!replyText && resultMessages.length > 0) {
+    const lastAssistant = [...resultMessages].reverse().find((m: any) => m.role === 'assistant')
     if (lastAssistant) {
-      replyText = typeof lastAssistant.content === 'string'
-        ? lastAssistant.content
-        : JSON.stringify(lastAssistant.content)
+      if (typeof lastAssistant.content === 'string') {
+        replyText = lastAssistant.content
+      } else if (Array.isArray(lastAssistant.content)) {
+        const textPart = lastAssistant.content.find((p: any) => p.type === 'text' || p.text)
+        replyText = typeof textPart === 'string' ? textPart : (textPart?.text || "")
+      }
     }
   }
   const finalReplyText = replyText || "I'm sorry, I encountered an issue. I'll follow up shortly."
 
   // 4. Side-effects: ONLY save new messages to prevent duplication
-  const finalMessages = [...fullTurnMessages]
+  const finalMessages = [...resultMessages]
   if (finalMessages.length === 0 && finalReplyText) {
     console.log(`[SupportAgent] Synthesizing assistant message for WhatsApp ${sessionId}`)
     finalMessages.push({ role: 'assistant', content: finalReplyText })
@@ -87,7 +99,7 @@ export async function handleWhatsAppMessage({
 
   const messagesToSave = [...finalMessages]
   if (!mergedIntoLast) {
-    messagesToSave.unshift({ role: 'user', content: messageText })
+    messagesToSave.unshift({ role: 'user', content: messageText } as any)
   }
 
   await Promise.allSettled([
