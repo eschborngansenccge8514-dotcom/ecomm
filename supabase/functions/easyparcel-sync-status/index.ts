@@ -43,10 +43,23 @@ serve(async (req) => {
 
     for (const order of activeOrders) {
       try {
+        // Fetch per-merchant EasyParcel configuration
+        const { data: epConfig } = await supabase
+          .from('merchant_easyparcel_config')
+          .select('*')
+          .eq('merchant_id', order.merchant_id)
+          .maybeSingle()
+
+        const epCallConfig = { 
+          apiKey:      (epConfig?.is_enabled && epConfig?.api_key) ? epConfig.api_key : Deno.env.get('EASYPARCEL_API_KEY'), 
+          authKey:     (epConfig?.is_enabled && (epConfig?.auth_key || epConfig?.api_secret)) ? (epConfig.auth_key || epConfig.api_secret) : Deno.env.get('EASYPARCEL_AUTH_KEY'),
+          environment: (epConfig?.is_enabled && epConfig?.environment) ? epConfig.environment : (Deno.env.get('DELIVERY_ENV') || 'sandbox')
+        }
+
         // Phase 5 — Parcel Status (MPParcelStatusBulk)
         const statusData = await callEasyParcel(supabase, order.id, 'MPParcelStatusBulk', {
           bulk: [{ order_no: order.easyparcel_order_no }]
-        })
+        }, epCallConfig)
 
         const parcel = statusData.result?.[0]
         if (!parcel) continue
@@ -57,7 +70,7 @@ serve(async (req) => {
         // Phase 6 — Parcel Tracking (MPTrackingBulk)
         const trackingData = await callEasyParcel(supabase, order.id, 'MPTrackingBulk', {
           bulk: [{ order_no: order.easyparcel_order_no }]
-        })
+        }, epCallConfig)
         
         const epStatusCode = trackingData.result?.[0]?.ep_status_code
 

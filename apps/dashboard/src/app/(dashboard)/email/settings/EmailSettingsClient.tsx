@@ -49,6 +49,9 @@ export function EmailSettingsClient({ merchant }: { merchant: any }) {
     ...(merchant.store_config ?? {}),
     email: (merchant.store_config?.email ?? merchant.email) ?? '',
     inboundEmail: (merchant.store_config?.inboundEmail ?? merchant.inbound_email) ?? '',
+    supportInboundEmail: (merchant.store_config?.supportInboundEmail ?? merchant.support_inbound_email) ?? '',
+    marketingDomain: (merchant.store_config?.marketingDomain ?? merchant.marketing_domain) ?? '',
+    marketingFromName: (merchant.store_config?.marketingFromName ?? merchant.marketing_from_name) ?? '',
   })
 
   const setCfg = (k: keyof StoreConfig, v: any) => setConfig(p => ({ ...p, [k]: v }))
@@ -61,6 +64,9 @@ export function EmailSettingsClient({ merchant }: { merchant: any }) {
           store_config: config,
           email: config.email,
           inbound_email: config.inboundEmail,
+          support_inbound_email: config.supportInboundEmail,
+          marketing_domain: config.marketingDomain,
+          marketing_from_name: config.marketingFromName,
         })
         .eq('id', merchant.id)
 
@@ -113,6 +119,15 @@ export function EmailSettingsClient({ merchant }: { merchant: any }) {
               />
             </Field>
 
+            <Field label="Support Agent Inbound Email" hint="Dedicated address for Support Agent inquiries.">
+              <Input 
+                value={config.supportInboundEmail} 
+                onChange={e => setCfg('supportInboundEmail', e.target.value)} 
+                placeholder="support@mail.yourdomain.com"
+                className="rounded-xl h-11 border-purple-100 bg-purple-50/5"
+              />
+            </Field>
+
             <div className="p-4 rounded-2xl bg-blue-50 border border-blue-100 space-y-3">
               <h4 className="text-sm font-bold text-blue-900 flex items-center gap-2">
                 <ShieldCheck size={16} />
@@ -144,6 +159,28 @@ export function EmailSettingsClient({ merchant }: { merchant: any }) {
                 </a>
               </div>
             </div>
+          </div>
+        </Section>
+  
+        {/* Marketing Configuration */}
+        <Section title="Marketing Email" desc="Configure how your bulk marketing emails are sent." icon={<Mail size={20} />}>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Sender Name" hint="Example: 'Hyperlocal Support' or 'Your Store Name'">
+              <Input 
+                value={config.marketingFromName} 
+                onChange={e => setCfg('marketingFromName', e.target.value)} 
+                placeholder="My Awesome Store"
+                className="rounded-xl h-11"
+              />
+            </Field>
+            <Field label="Marketing Domain" hint="Verified domain in Resend (e.g. mail.yourstore.com)">
+              <Input 
+                value={config.marketingDomain} 
+                onChange={e => setCfg('marketingDomain', e.target.value)} 
+                placeholder="mail.yourstore.com"
+                className="rounded-xl h-11"
+              />
+            </Field>
           </div>
         </Section>
       </div>

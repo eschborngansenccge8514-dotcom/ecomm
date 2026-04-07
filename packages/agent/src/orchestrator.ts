@@ -8,11 +8,12 @@ import { buildContextMessages } from './memory/context-manager'
 import { AgentTracer } from './observability/tracer'
 
 export interface AgentInput {
-  newMessage:   string
-  userId:       string    // For session ownership/persistence (matches FK in agent_sessions)
-  merchantId:   string    // For business data tools (orders, analytics)
+  newMessage: string
+  userId: string    // For session ownership/persistence (matches FK in agent_sessions)
+  merchantId: string    // For business data tools (orders, analytics)
   merchantName: string
-  sessionId:    string
+  sessionId: string
+  stream?: boolean   // Default to true
 }
 
 export async function runAgent({
@@ -20,7 +21,8 @@ export async function runAgent({
   userId,
   merchantId,
   merchantName,
-  sessionId
+  sessionId,
+  stream = true
 }: AgentInput): Promise<Response> {
   const t0 = Date.now()
   console.log(`[Agent] START session=${sessionId} msg="${newMessage.slice(0, 40)}"`)
@@ -58,7 +60,7 @@ export async function runAgent({
   // Step 3: call streamText — synchronous in ai@6, returns StreamTextResult directly
   console.log(`[Agent] calling streamText (${Date.now() - t0}ms)`)
   const result = streamText({
-    model: google('gemini-3.1-flash-lite-preview'),
+    model: google('gemini-2.5-flash-lite'),
     system: buildSystemPrompt(merchantName) + memoryContext,
     messages,
     tools: buildTools(merchantId, sessionId) as any,
@@ -125,6 +127,14 @@ export async function runAgent({
     }
   })
 
-  // ai@6: return standard UI message stream protocol
-  return result.toUIMessageStreamResponse()
+  // ai@6: return standard UI message stream protocol OR wait and return full JSON (for mobile/non-streaming)
+  if (stream) {
+    return result.toUIMessageStreamResponse()
+  } else {
+    // Wait for the stream to complete and return a standard JSON object
+    const text = await result.text
+    return new Response(JSON.stringify({ text, sessionId }), {
+      headers: { 'Content-Type': 'application/json' }
+    })
+  }
 }

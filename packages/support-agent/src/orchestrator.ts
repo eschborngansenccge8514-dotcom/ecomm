@@ -1,24 +1,23 @@
 import { streamText, stepCountIs } from 'ai'
-import type { CoreMessage } from 'ai'
 import { google } from '@ai-sdk/google'
 import { createClient } from '@supabase/supabase-js'
 
 import { buildSupportTools } from './tools'
 import { buildSupportSystemPrompt } from './prompts/system'
-import { 
-  loadSupportMessages, 
-  saveSupportMessages, 
-  touchSupportSession 
+import {
+  loadSupportMessages,
+  saveSupportMessages,
+  touchSupportSession
 } from './memory/messages'
 
 export interface SupportAgentInput {
-  newMessage:     string
-  sessionId:      string
-  merchantId:     string
-  customerId?:    string // The authenticated customer's user UUID
+  newMessage: string
+  sessionId: string
+  merchantId: string
+  customerId?: string // The authenticated customer's user UUID
   customerEmail?: string
-  customerName?:  string
-  orderId?:       string // Optional: to start chat in context of a specific order
+  customerName?: string
+  orderId?: string // Optional: to start chat in context of a specific order
 }
 
 function getSupabase() {
@@ -49,7 +48,7 @@ export async function runSupportAgent({
   let merchantUuid = merchantId
   let ownerId = merchantId
   let merchantName = 'this store'
-  
+
   // Try to find merchant by owner_id (standard path from dashboard)
   const { data: m1 } = await supabase
     .from('merchants')
@@ -69,7 +68,7 @@ export async function runSupportAgent({
       .select('id, owner_id, store_name')
       .eq('id', merchantId)
       .maybeSingle()
-    
+
     if (m2) {
       merchantUuid = m2.id
       ownerId = m2.owner_id
@@ -107,10 +106,10 @@ export async function runSupportAgent({
           .eq('id', orderId)
           .maybeSingle()
         if (order) {
-           context += `\n- ACTIVE TOPIC: Order #${order.order_number} (Status: ${order.status}, Delivery: ${order.delivery_status ?? 'N/A'})`
+          context += `\n- ACTIVE TOPIC: Order #${order.order_number} (Status: ${order.status}, Delivery: ${order.delivery_status ?? 'N/A'})`
         }
       }
-      
+
       // Pre-fetch by customer_id (reliable, since buyer_email is not stored on orders)
       if (customerId) {
         const { data: recent } = await supabase
@@ -120,7 +119,7 @@ export async function runSupportAgent({
           .eq('customer_id', customerId)
           .order('created_at', { ascending: false })
           .limit(3)
-        
+
         if (recent && recent.length > 0) {
           context += `\n- RECENT ORDERS (use order_number to look up details):`
           recent.forEach(o => {
@@ -140,15 +139,15 @@ export async function runSupportAgent({
   const isAiHandling = sessionRes.data?.is_ai_handling ?? true
   if (!ai_enabled || !isAiHandling) {
     console.log(`[SupportAgent] AI disabled OR human taken over. session=${sessionId} (enabled=${ai_enabled}, handling=${isAiHandling})`)
-    return new Response(JSON.stringify({ 
-      error: 'AI is currently disabled for this session. A human agent will be with you shortly.' 
+    return new Response(JSON.stringify({
+      error: 'AI is currently disabled for this session. A human agent will be with you shortly.'
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   }
 
   // 3. Load message history for context
-  let messages: CoreMessage[]
+  let messages: any[]
   try {
-    const historical = await loadSupportMessages(sessionId, 20)
+    const historical = await loadSupportMessages(sessionId, 20, supabase)
     messages = [...historical, { role: 'user', content: newMessage }]
     console.log(`[SupportAgent] Loaded history OK (${Date.now() - t0}ms) — ${historical.length} msgs`)
   } catch (e) {
@@ -159,12 +158,12 @@ export async function runSupportAgent({
   // 4. Call streamText with lightweight Gemini model
   console.log(`[SupportAgent] calling streamText (${Date.now() - t0}ms)`)
   const result = streamText({
-    model: google('gemini-3.1-flash-lite-preview'),
+    model: google('gemini-2.5-flash-lite'),
     system: buildSupportSystemPrompt(merchantName, knowledge_base_text, customerContext),
     messages,
-    tools: buildSupportTools(merchantUuid, ownerId, sessionId, customerId) as any,
-    stopWhen: stepCountIs(10), // Keep support agent lean
-    
+    tools: buildSupportTools(merchantUuid, ownerId, sessionId, supabase, customerId) as any,
+    stopWhen: stepCountIs(5), // Keep support agent lean
+
     onFinish: async ({ text, usage, finishReason }) => {
       const u = usage as any
       const inputTok = u.inputTokens ?? u.promptTokens ?? 0
@@ -177,8 +176,8 @@ export async function runSupportAgent({
           saveSupportMessages(sessionId, ownerId, [
             { role: 'user', content: newMessage },
             { role: 'assistant', content: text }
-          ]),
-          touchSupportSession(sessionId)
+          ], supabase),
+          touchSupportSession(sessionId, supabase)
         ]).then(results => {
           results.forEach((r, i) => {
             if (r.status === 'rejected') console.error(`[SupportAgent] Side-effect ${i} FAILED:`, r.reason)

@@ -23,9 +23,21 @@ billplz.post('/create-bill', async (c) => {
     }
 
     const apiKey = c.env.BILLPLZ_API_KEY
-    const collectionId = c.env.BILLPLZ_COLLECTION_ID
     const isSandbox = c.env.BILLPLZ_SANDBOX === 'true'
     const baseUrl = BILLPLZ_BASE(isSandbox)
+
+    // Fetch Merchant Billplz Config
+    const { data: config } = await supabase
+      .from('merchant_billplz_config')
+      .select('collection_id, enabled')
+      .eq('merchant_id', order.merchant_id)
+      .maybeSingle()
+
+    if (config && !config.enabled) {
+      throw new Error('Billplz is currently disabled for this merchant')
+    }
+
+    const collectionId = config?.collection_id || c.env.BILLPLZ_COLLECTION_ID
     
     const authHeader = 'Basic ' + btoa(`${apiKey}:`)
     const amountInCents = Math.round(Number(order.total_amount) * 100)

@@ -32,6 +32,18 @@ serve(async (req) => {
 
     if (orderErr || !order) throw new Error('Order not found')
 
+    // ── Pre-booking Balance Check ──────────────────────────────────────────
+    const { data: wallet } = await supabase
+      .from('merchant_wallets')
+      .select('balance')
+      .eq('merchant_id', order.merchant_id)
+      .single()
+
+    if (!wallet || Number(wallet.balance) < 10) {
+      throw new Error('Insufficient wallet balance. Please top up at least RM 10.00 to book deliveries.')
+    }
+    // ──────────────────────────────────────────────────────────────────────
+
     // Fetch per-merchant EasyParcel configuration
     const { data: epConfig } = await supabase
       .from('merchant_easyparcel_config')
@@ -40,9 +52,9 @@ serve(async (req) => {
       .single()
 
     const epCallConfig = { 
-      apiKey:      epConfig?.api_key || Deno.env.get('EASYPARCEL_API_KEY'), 
-      authKey:     epConfig?.auth_key || Deno.env.get('EASYPARCEL_AUTH_KEY'),
-      environment: epConfig?.environment || 'sandbox' 
+      apiKey:      (epConfig?.is_enabled && epConfig?.api_key) ? epConfig.api_key : Deno.env.get('EASYPARCEL_API_KEY'), 
+      authKey:     (epConfig?.is_enabled && (epConfig?.auth_key || epConfig?.api_secret)) ? (epConfig.auth_key || epConfig.api_secret) : Deno.env.get('EASYPARCEL_AUTH_KEY'),
+      environment: (epConfig?.is_enabled && epConfig?.environment) ? epConfig.environment : (Deno.env.get('DELIVERY_ENV') || 'sandbox')
     }
     
     console.log(`[easyparcel-create-order] Using environment: ${epCallConfig.environment}, fallback: ${!epConfig?.api_key}`)
@@ -222,6 +234,20 @@ serve(async (req) => {
       })
 
       throw new Error(errorMsg)
+    }
+
+    // Phase 3.5 — Wallet Deduction
+    if (finalShippingCost > 0) {
+      try {
+        await supabase.rpc('deduct_shipping_wallet_balance', {
+          p_merchant_id: order.merchant_id,
+          p_amount:      finalShippingCost,
+          p_order_id:    orderId,
+          p_description: `EasyParcel booking for order ${order.order_number}`
+        })
+      } catch (deductErr: any) {
+        console.error('[easyparcel-create-order] Wallet deduction failed:', deductErr.message)
+      }
     }
 
     // Step 4: Create shipment record for dashboard tracking

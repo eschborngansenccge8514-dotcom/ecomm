@@ -1,13 +1,46 @@
 import { runAgent, checkRateLimit, createSession } from '@project1/agent'
 import { getAuthContext } from '@/lib/utils.server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
-  // Authenticate from Supabase session cookie
-  const { user, merchant, isAdmin } = await getAuthContext()
-  if (!user || (!merchant && !isAdmin)) return new Response('Unauthorized', { status: 401 })
+  let user: any = null
+  let merchant: any = null
+  let isAdmin = false
+
+  // 1. Try to authenticate from Supabase session cookie (SSR)
+  try {
+    const auth = await getAuthContext()
+    user = auth.user
+    merchant = auth.merchant
+    isAdmin = auth.isAdmin
+  } catch (err) {
+    // 2. Fallback to Bearer Token (Mobile)
+    const authHeader = req.headers.get('Authorization')
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '')
+      const supabase = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      const { data: { user: tokenUser } } = await supabase.auth.getUser(token)
+      if (tokenUser) {
+        user = tokenUser
+        const [{ data: m }, { data: p }] = await Promise.all([
+          supabase.from('merchants').select('*').eq('owner_id', tokenUser.id).single(),
+          supabase.from('profiles').select('*').eq('id', tokenUser.id).single()
+        ])
+        merchant = m
+        isAdmin = p?.role === 'admin'
+      }
+    }
+  }
+
+  if (!user || (!merchant && !isAdmin)) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+  }
 
   // Rate limit check (scoped to user)
   const limit = checkRateLimit(user.id, 'chat')
@@ -29,16 +62,22 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json()
-  const { sessionId: existingSessionId, messages, merchantId: bodyMerchantId } = body
+  const { sessionId: existingSessionId, messages, merchantId: bodyMerchantId, stream } = body
+
+  // Extract newMessage — if not present, get it from the standard messages array (AI SDK useChat)
+  let newMessage = body.newMessage
+  if (!newMessage && Array.isArray(messages) && messages.length > 0) {
+    const lastMsg = messages[messages.length - 1]
+    if (lastMsg.role === 'user') newMessage = lastMsg.content
+  }
 
   // Use a virtual merchant ID for admins if needed, but normally they should have a merchant context or be restricted
   // If admin, prioritize merchantId from body (so they can scope the chat)
   const effectiveMerchantId = merchant?.id || bodyMerchantId || (isAdmin ? 'admin' : null)
-  if (!effectiveMerchantId) return new Response('Unauthorized', { status: 401 })
-  let newMessage = body.newMessage
+  if (!effectiveMerchantId) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
 
   // Ensure standard extraction
-  if (!newMessage?.trim()) return new Response('Empty message', { status: 400 })
+  if (!newMessage?.trim()) return new Response(JSON.stringify({ error: 'Empty message' }), { status: 400 })
   
   console.log(`[API] Agent Chat: session=${existingSessionId} user=${user.id} merchant=${effectiveMerchantId} msg=${newMessage?.slice(0, 50)}...`)
 
@@ -52,7 +91,8 @@ export async function POST(req: Request) {
       userId: user.id,
       merchantId: effectiveMerchantId,
       merchantName: merchant?.store_name ?? 'Merchant',
-      sessionId
+      sessionId,
+      stream: stream !== false // Explicitly check for false, default to true
     })
 
     response.headers.set('x-session-id', sessionId)

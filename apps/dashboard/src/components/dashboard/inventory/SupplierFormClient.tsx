@@ -42,7 +42,8 @@ export function SupplierFormClient({ initialData }: { initialData?: any }) {
     payment_terms: '',
     contact_person: '',
     notes: '',
-    is_active: true
+    is_active: true,
+    preferred_contact_method: 'email'
   })
   
   const [links, setLinks] = useState<any[]>([])
@@ -188,6 +189,20 @@ export function SupplierFormClient({ initialData }: { initialData?: any }) {
                   onChange={e => setFormData({...formData, is_active: e.target.checked})} 
                   className="w-5 h-5 rounded accent-blue-600"
                 />
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-gray-50">
+                <Label htmlFor="contact_method">PO Contact Method</Label>
+                <select 
+                  id="contact_method"
+                  value={formData.preferred_contact_method}
+                  onChange={e => setFormData({...formData, preferred_contact_method: e.target.value})}
+                  className="w-full h-10 px-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="email">Email</option>
+                  <option value="whatsapp">WhatsApp</option>
+                </select>
+                <p className="text-[10px] text-gray-400">Channel used to send digital POs.</p>
               </div>
             </CardContent>
           </Card>

@@ -1,27 +1,77 @@
 'use client'
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import Image     from 'next/image'
-import { Button }  from '@/components/ui/button'
+import { Button, buttonVariants }  from '@/components/ui/button'
 import { Input }   from '@/components/ui/input'
 import { Badge }   from '@/components/ui/badge'
 import { createClient }     from '@/lib/supabase/client'
 import { ProductFormModal } from './ProductFormModal'
 import toast  from 'react-hot-toast'
 import { type StoreType }      from '@/lib/store-types'
-import { Plus, Search, Pencil, Trash2, ToggleLeft, ToggleRight, LayoutGrid, List, Filter, ArrowUpDown, ChevronDown, CheckCircle2, AlertTriangle, PackageSearch, X, Boxes, History } from 'lucide-react'
+import { 
+  Plus, 
+  Search, 
+  Pencil, 
+  Trash2, 
+  ToggleLeft, 
+  ToggleRight, 
+  LayoutGrid, 
+  List, 
+  Filter, 
+  ArrowUpDown, 
+  ChevronDown, 
+  CheckCircle2, 
+  AlertTriangle, 
+  PackageSearch, 
+  X, 
+  Boxes, 
+  History,
+  MoreVertical
+} from 'lucide-react'
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from '@/components/ui/dropdown-menu'
 import { InventoryAdjustmentModal } from './InventoryAdjustmentModal'
 import { InventoryHistoryModal } from './InventoryHistoryModal'
 import { cn } from '@/lib/utils'
+import { openBarcodePrintWindow } from './BarcodeLabelPrint'
 
-export function ProductsClient({ products: initial, categories, merchantId, storeType }: {
-  products: any[]; categories: any[]; merchantId: string; storeType: StoreType
+
+export function ProductsClient({ 
+  products: initial, 
+  categories, 
+  merchantId, 
+  storeType, 
+  activeCategoryId = 'all', 
+  hideHeader = false 
+}: {
+  products: any[]
+  categories: any[]
+  merchantId: string
+  storeType: StoreType
+  activeCategoryId?: string
+  hideHeader?: boolean
 }) {
   const [products, setProducts] = useState(initial)
+  
+  useEffect(() => {
+    setProducts(initial)
+  }, [initial])
+
   const [search, setSearch]     = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [catFilter, setCatFilter] = useState('all')
+  const [catFilter, setCatFilter] = useState(activeCategoryId)
+  
+  useEffect(() => {
+    setCatFilter(activeCategoryId)
+  }, [activeCategoryId])
+
   const [statusFilter, setStatusFilter] = useState('all') // all, active, inactive, out_of_stock
   const [stockFilter, setStockFilter] = useState('all') // all, low, out
   const [sortBy, setSortBy] = useState('newest') // newest, price-asc, price-desc, stock-asc, stock-desc
@@ -35,7 +85,9 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
   const filteredAndSorted = useMemo(() => {
     let result = products.filter(p => {
       const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || 
-                          (p.sku?.toLowerCase().includes(search.toLowerCase()) ?? false)
+                          (p.sku?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
+                          (p.barcode?.toLowerCase().includes(search.toLowerCase()) ?? false)
+
       const matchCat    = catFilter === 'all' || p.category_id === catFilter
       const matchStatus = statusFilter === 'all' || p.status === statusFilter
       const matchStock  = stockFilter === 'all' || 
@@ -141,7 +193,8 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
   return (
     <div className="space-y-6 flex flex-col h-full overflow-hidden">
       {/* Advanced Toolbar */}
-      <div className="bg-white/80 backdrop-blur-md sticky top-0 z-30 py-4 border-b border-gray-100 -mx-4 px-4 sm:-mx-8 sm:px-8">
+      {!hideHeader && (
+        <div className="bg-white/80 backdrop-blur-md sticky top-0 z-30 py-4 border-b border-gray-100 -mx-4 px-4 sm:-mx-8 sm:px-8">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <div className="flex items-center gap-3">
@@ -177,7 +230,8 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <Input
                   className="pl-9 w-full sm:w-64 bg-gray-50/50 border-gray-200 focus:bg-white rounded-xl transition-all"
-                  placeholder="Search name or SKU..."
+                  placeholder="Search name, SKU, or barcode..."
+
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                 />
@@ -253,7 +307,30 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
                 >
                   <X size={14} /> Mark Inactive
                 </button>
+                <button
+                  onClick={() => {
+                    const selectedProducts = products
+                      .filter(p => selectedIds.includes(p.id))
+                      .map(p => ({
+                        name: p.name,
+                        price: Number(p.price),
+                        sku: p.sku || '',
+                        barcode: p.barcode || p.sku || p.id // Fallback
+                      }))
+                      .filter(p => p.barcode)
+                    
+                    if (selectedProducts.length === 0) {
+                      toast.error('Selected products have no barcodes or SKUs to print')
+                      return
+                    }
+                    openBarcodePrintWindow(selectedProducts)
+                  }}
+                  className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+                >
+                  <History size={14} /> Print Labels
+                </button>
                 <div className="w-px h-5 bg-white/20 mx-1" />
+
                 <button
                   onClick={handleBulkDelete}
                   className="px-3 py-1.5 bg-red-500 hover:bg-red-400 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
@@ -271,6 +348,7 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
           )}
         </div>
       </div>
+    )}
 
       {/* Main Content Area */}
       <div 
@@ -289,21 +367,10 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
             </Button>
           </div>
         ) : (
-          <div
-            style={{
-              height: `${totalSize}px`,
-              width: '100%',
-              position: 'relative',
-            }}
-          >
+          <div className="w-full">
             {viewMode === 'grid' ? (
-              /* Grid View with Virtualization */
-              /* Note: For grid, we usually want to virtualize rows. 
-                 But since we have a simple useVirtualizer, we'll position each item.
-                 Responsive grid makes it tricky. We'll stick to a simpler list for grid virtualization here or just use a fixed number of columns for calculations.
-              */
+              /* Grid View - Normal layout for responsive grid */
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-4">
-                {/* Fallback to normal map for grid if virtualization proves too complex for responsive layout without fixed row heights */}
                 {filteredAndSorted.map(product => (
                   <ProductCardItem 
                     key={product.id}
@@ -340,11 +407,15 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
                     <div className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider w-28 shrink-0">Stock</div>
                     <div className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider w-32 shrink-0 text-right">Price</div>
                     <div className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider w-24 shrink-0">Status</div>
-                    <div className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider w-40 shrink-0 text-right">Actions</div>
+                    <div className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider w-40 shrink-0 text-right">Manage</div>
                   </div>
-                  <div className="relative">
+                  <div 
+                    className="relative" 
+                    style={{ height: `${totalSize}px` }}
+                  >
                     {virtualItems.map(virtualRow => {
                       const product = filteredAndSorted[virtualRow.index]
+                      if (!product) return null
                       return (
                         <div 
                           key={virtualRow.key}
@@ -404,20 +475,87 @@ export function ProductsClient({ products: initial, categories, merchantId, stor
                           <div className="px-6 py-4 w-24 shrink-0">
                             <StatusBadge status={product.status} />
                           </div>
-                          <div className="px-6 py-4 w-40 shrink-0 text-right">
-                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <ActionButton icon={Boxes} onClick={() => setAdjusting(product)} color="text-green-600 hover:bg-green-100" />
-                              <ActionButton icon={History} onClick={() => setHistorying(product)} color="text-blue-600 hover:bg-blue-100" />
-                              <ActionButton icon={Pencil} onClick={() => { setEditing(product); setShowForm(true) }} color="text-blue-600 hover:bg-blue-100" />
-                              <button
-                                onClick={() => handleToggle(product)}
-                                className={cn("p-2 rounded-lg transition-colors", 
-                                  product.status === 'active' ? "hover:bg-amber-100 text-amber-600" : "hover:bg-green-100 text-green-600")}
-                              >
-                                {product.status === 'active' ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
-                              </button>
-                              <ActionButton icon={Trash2} onClick={() => handleDelete(product)} color="text-red-500 hover:bg-red-100" />
-                            </div>
+                          <div className="px-6 py-4 w-40 shrink-0 text-right flex items-center justify-end">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger
+                                render={
+                                  <button className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), "h-9 w-24 rounded-xl border border-gray-100 hover:border-blue-200 hover:bg-blue-50 text-gray-600 hover:text-blue-600 font-bold gap-2 group/btn")}>
+                                    Manage
+                                    <ChevronDown size={14} className="group-hover/btn:translate-y-0.5 transition-transform" />
+                                  </button>
+                                }
+                              />
+                              <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl border-gray-100 shadow-xl">
+                                <DropdownMenuItem 
+                                  onClick={() => { setEditing(product); setShowForm(true) }}
+                                  className="rounded-xl flex items-center gap-3 p-2.5 cursor-pointer"
+                                >
+                                  <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                                    <Pencil size={16} />
+                                  </div>
+                                  <div className="flex flex-col text-left">
+                                    <span className="text-sm font-bold text-gray-900">Edit Product</span>
+                                    <span className="text-[10px] text-gray-400 font-medium">Change name, price, etc.</span>
+                                  </div>
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuItem 
+                                  onClick={() => setAdjusting(product)}
+                                  className="rounded-xl flex items-center gap-3 p-2.5 cursor-pointer"
+                                >
+                                  <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                    <Boxes size={16} />
+                                  </div>
+                                  <div className="flex flex-col text-left">
+                                    <span className="text-sm font-bold text-gray-900">Adjust Stock</span>
+                                    <span className="text-[10px] text-gray-400 font-medium">Update current counts</span>
+                                  </div>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem 
+                                  onClick={() => setHistorying(product)}
+                                  className="rounded-xl flex items-center gap-3 p-2.5 cursor-pointer"
+                                >
+                                  <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                                    <History size={16} />
+                                  </div>
+                                  <div className="flex flex-col text-left">
+                                    <span className="text-sm font-bold text-gray-900">Health History</span>
+                                    <span className="text-[10px] text-gray-400 font-medium">View stock movements</span>
+                                  </div>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuSeparator className="my-1 bg-gray-50" />
+
+                                <DropdownMenuItem 
+                                  onClick={() => handleToggle(product)}
+                                  className={cn("rounded-xl flex items-center gap-3 p-2.5 cursor-pointer text-left", 
+                                    product.status === 'active' ? "text-amber-600" : "text-emerald-600")}
+                                >
+                                  <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", 
+                                    product.status === 'active' ? "bg-amber-50" : "bg-emerald-50")}>
+                                    {product.status === 'active' ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-bold">{product.status === 'active' ? 'Deactivate' : 'Activate'}</span>
+                                    <span className="text-[10px] text-gray-400 font-medium">Currently {product.status}</span>
+                                  </div>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem 
+                                  onClick={() => handleDelete(product)}
+                                  className="rounded-xl flex items-center gap-3 p-2.5 cursor-pointer text-red-600"
+                                >
+                                  <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
+                                    <Trash2 size={16} />
+                                  </div>
+                                  <div className="flex flex-col text-left">
+                                    <span className="text-sm font-bold">Delete</span>
+                                    <span className="text-[10px] text-gray-400 font-medium italic">Cannot be undone</span>
+                                  </div>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
                       )
@@ -499,9 +637,87 @@ function ProductCardItem({ product, isSelected, onSelect, onToggle, onDelete, on
             <p className="text-xs font-bold text-gray-700">{product.variants?.length ?? 0}</p>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2 mt-4">
-          <Button variant="outline" size="sm" className="rounded-xl" onClick={onEdit}><Pencil size={14} className="mr-1.5" /> Edit</Button>
-          <Button variant="outline" size="sm" className="rounded-xl bg-blue-50/50 text-blue-600" onClick={onAdjust}><Boxes size={14} className="mr-1.5" /> Stock</Button>
+        <div className="mt-4">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <button className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), "w-full rounded-xl bg-white hover:bg-blue-50 text-gray-600 hover:text-blue-600 font-bold border-gray-100 hover:border-blue-200 transition-all gap-2 group/card-btn")}>
+                  Manage Product
+                  <ChevronDown size={14} className="group-hover/card-btn:translate-y-0.5 transition-transform" />
+                </button>
+              }
+            />
+            <DropdownMenuContent className="p-2 rounded-2xl border-gray-100 shadow-xl w-64" align="center">
+              <DropdownMenuItem 
+                onClick={onEdit}
+                className="rounded-xl flex items-center gap-3 p-2.5 cursor-pointer"
+              >
+                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                  <Pencil size={16} />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-sm font-bold text-gray-900">Edit Details</span>
+                  <span className="text-[10px] text-gray-400 font-medium font-sans">Name, price, images</span>
+                </div>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem 
+                onClick={onAdjust}
+                className="rounded-xl flex items-center gap-3 p-2.5 cursor-pointer"
+              >
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                  <Boxes size={16} />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-sm font-bold text-gray-900">Adjust Stock</span>
+                  <span className="text-[10px] text-gray-400 font-medium font-sans">Update current levels</span>
+                </div>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem 
+                onClick={onHistory}
+                className="rounded-xl flex items-center gap-3 p-2.5 cursor-pointer"
+              >
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                  <History size={16} />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-sm font-bold text-gray-900">Health Check</span>
+                  <span className="text-[10px] text-gray-400 font-medium font-sans">Recent movements</span>
+                </div>
+              </DropdownMenuItem>
+              
+              <DropdownMenuSeparator className="my-1 bg-gray-50" />
+
+              <DropdownMenuItem 
+                onClick={onToggle}
+                className={cn("rounded-xl flex items-center gap-3 p-2.5 cursor-pointer text-left", 
+                  product.status === 'active' ? "text-amber-600" : "text-emerald-600")}
+              >
+                <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", 
+                  product.status === 'active' ? "bg-amber-50" : "bg-emerald-50")}>
+                  {product.status === 'active' ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold">{product.status === 'active' ? 'Deactivate' : 'Activate'}</span>
+                  <span className="text-[10px] text-gray-400 font-medium font-sans">Toggle visibility</span>
+                </div>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem 
+                onClick={onDelete}
+                className="rounded-xl flex items-center gap-3 p-2.5 cursor-pointer text-red-600"
+              >
+                <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
+                  <Trash2 size={16} />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-sm font-bold">Delete</span>
+                  <span className="text-[10px] text-gray-400 font-medium italic font-sans truncate">Permanently remove</span>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </div>

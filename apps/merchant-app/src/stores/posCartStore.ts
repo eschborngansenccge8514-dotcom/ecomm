@@ -1,0 +1,118 @@
+import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { immer } from 'zustand/middleware/immer'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { Cart, CartItem, PosProduct, CartTotals, calcCartTotals } from '@project1/domain'
+
+export interface PosCartState extends Cart {
+  // Actions
+  addItem: (product: PosProduct) => void
+  removeItem: (productId: string, variantId?: string) => void
+  updateQty: (productId: string, variantId: string | undefined, qty: number) => void
+  setDiscount: (discountRm: number) => void
+  setCustomer: (id?: string, name?: string, phone?: string) => void
+  setNote: (note: string) => void
+  setSession: (outletId: string, sessionId: string) => void
+  setTaxRate: (rate: number) => void
+  clearCart: () => void
+  
+  // Computed
+  getTotals: () => CartTotals
+
+  taxRate: number
+  outletId: string
+  sessionId: string
+}
+
+export const usePosCartStore = create<PosCartState>()(
+  persist(
+    immer((set, get) => ({
+      items: [],
+      globalDiscountRm: 0,
+      pointsToRedeem: 0,
+      note: '',
+      outletId: '',
+      sessionId: '',
+      taxRate: 8,
+      customerId: undefined,
+      customerName: undefined,
+      customerPhone: undefined,
+
+      addItem: (product: PosProduct) => {
+        set((state: PosCartState) => {
+          const existing = state.items.find(
+            (i: CartItem) => i.productId === product.id && i.variantId === product.variantId
+          )
+          if (existing) {
+            existing.qty += 1
+            existing.lineTotal = existing.qty * (existing.unitPrice - existing.discountRm)
+          } else {
+            state.items.push({
+              productId: product.id,
+              variantId: product.variantId,
+              name: product.name,
+              sku: product.sku,
+              unitPrice: product.unitPrice,
+              qty: 1,
+              discountRm: 0,
+              lineTotal: product.unitPrice
+            })
+          }
+        })
+      },
+
+      removeItem: (productId: string, variantId?: string) => {
+        set((state: PosCartState) => {
+          state.items = state.items.filter(
+            (i: CartItem) => !(i.productId === productId && i.variantId === variantId)
+          )
+        })
+      },
+
+      updateQty: (productId: string, variantId: string | undefined, qty: number) => {
+        set((state: PosCartState) => {
+          const item = state.items.find(
+            (i: CartItem) => i.productId === productId && i.variantId === variantId
+          )
+          if (item) {
+            item.qty = Math.max(0, qty)
+            item.lineTotal = item.qty * (item.unitPrice - item.discountRm)
+            if (item.qty === 0) {
+              state.items = state.items.filter((i: CartItem) => i.productId !== productId || i.variantId !== variantId)
+            }
+          }
+        })
+      },
+
+      setDiscount: (discount: number) => set({ globalDiscountRm: discount }),
+      setCustomer: (id?: string, name?: string, phone?: string) => {
+        set((state: PosCartState) => {
+          state.customerId = id
+          state.customerName = name
+          state.customerPhone = phone
+        })
+      },
+      setNote: (note: string) => set({ note }),
+      setSession: (outletId: string, sessionId: string) => set({ outletId, sessionId }),
+      setTaxRate: (taxRate: number) => set({ taxRate }),
+      clearCart: () => set({ 
+        items: [], 
+        globalDiscountRm: 0, 
+        pointsToRedeem: 0, 
+        note: '', 
+        customerId: undefined, 
+        customerName: undefined, 
+        customerPhone: undefined 
+      }),
+
+      getTotals: () => {
+        const state = get()
+        return calcCartTotals(state, 1, state.taxRate)
+      }
+    })),
+    {
+      name: 'pos-cart-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+    }
+  )
+)

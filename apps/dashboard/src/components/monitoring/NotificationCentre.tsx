@@ -40,16 +40,18 @@ export function NotificationCentre({ merchantId }: { merchantId: string }) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>
-        <div className="relative p-2 rounded-full hover:bg-gray-100 cursor-pointer">
-          <Bell className="w-5 h-5 text-gray-500" />
-          {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
-        </div>
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger
+        render={
+          <button className="relative p-2 rounded-full hover:bg-gray-100 cursor-pointer border-none bg-transparent outline-none">
+            <Bell className="w-5 h-5 text-gray-500" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+        }
+      />
       <DropdownMenuContent align="end" className="w-80 p-0">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="p-4 border-b">

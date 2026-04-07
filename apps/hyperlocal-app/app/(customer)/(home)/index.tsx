@@ -29,7 +29,9 @@ import { useAuthStore } from '@/stores/authStore'
 import { formatCurrency } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/Skeleton'
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window')
+const { width: WINDOW_WIDTH } = Dimensions.get('window')
+const IS_WEB = Platform.OS === 'web'
+const SCREEN_WIDTH = IS_WEB ? Math.min(WINDOW_WIDTH, 1200) : WINDOW_WIDTH
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Industry = {
@@ -89,7 +91,7 @@ function AnimatedHeader({ scrollY, name }: { scrollY: SharedValue<number>, name:
 
   // We layer an animated blur view over the regular content for a smooth scroll transition.
   return (
-    <View style={[styles.headerContainer, { paddingTop: insets.top + 8 }]}>
+    <View style={[styles.headerContainer, { paddingTop: insets.top + 8, left: (WINDOW_WIDTH - SCREEN_WIDTH) / 2, width: SCREEN_WIDTH }]}>
       <Animated.View style={[{ position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0 }, headerStyle]}>
         {Platform.OS === 'ios' ? (
           <BlurView intensity={80} tint="light" style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0 }} />
@@ -137,20 +139,33 @@ function AnimatedHeader({ scrollY, name }: { scrollY: SharedValue<number>, name:
 
 function PromoBanner() {
   const [active, setActive] = useState(0)
+  const bannerWidth = IS_WEB ? Math.min(SCREEN_WIDTH - 40, 600) : SCREEN_WIDTH - 40
 
   return (
-    <View className="mt-2">
+    <View className="mt-2 w-full items-center">
       <Animated.ScrollView
         horizontal
-        pagingEnabled
+        pagingEnabled={Platform.OS !== 'web'}
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={(e) => {
-          const index = Math.round(e.nativeEvent.contentOffset.x / (SCREEN_WIDTH - 40))
+          const index = Math.round(e.nativeEvent.contentOffset.x / (bannerWidth + 16))
           setActive(index)
         }}
-        contentContainerStyle={{ paddingHorizontal: 20, gap: 16 }}
-        snapToInterval={SCREEN_WIDTH - 24}
+        onScroll={Platform.OS === 'web' ? (e) => {
+          const index = Math.round(e.nativeEvent.contentOffset.x / (bannerWidth + 16))
+          if (index !== active) setActive(index)
+        } : undefined}
+        scrollEventThrottle={16}
+        contentContainerStyle={{ 
+          paddingHorizontal: (SCREEN_WIDTH - bannerWidth) / 2, 
+          gap: 16,
+        }}
+        snapToInterval={bannerWidth + 16}
         decelerationRate="fast"
+        style={[{ width: SCREEN_WIDTH }, Platform.OS === 'web' && {
+          scrollSnapType: 'x mandatory',
+          overflowX: 'auto',
+        } as any]}
       >
         {BANNERS.map((banner) => (
           <TouchableOpacity
@@ -158,12 +173,14 @@ function PromoBanner() {
             key={banner.id}
             style={[
               {
-                width: SCREEN_WIDTH - 40,
-                height: 180,
+                width: bannerWidth,
+                height: IS_WEB ? 240 : 180,
                 backgroundColor: '#f1f5f9',
                 borderRadius: 24,
                 overflow: 'hidden',
-              },
+                // @ts-ignore
+                scrollSnapAlign: 'center',
+              } as any,
               styles.shadowHeavy
             ]}
           >
@@ -449,10 +466,12 @@ export default function HomeScreen() {
 
   return (
     <View className="flex-1 bg-[#f8fafc]">
-      {/* Animated Fixed Header */}
-      <AnimatedHeader scrollY={scrollY} name={firstName} />
+      {/* Centered App Container */}
+      <View style={{ flex: 1, width: SCREEN_WIDTH, alignSelf: 'center' }}>
+        {/* Animated Fixed Header */}
+        <AnimatedHeader scrollY={scrollY} name={firstName} />
 
-      <Animated.ScrollView
+        <Animated.ScrollView
         showsVerticalScrollIndicator={false}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
@@ -506,6 +525,7 @@ export default function HomeScreen() {
           )}
         </View>
       </Animated.ScrollView>
+      </View>
     </View>
   )
 }

@@ -15,14 +15,32 @@ import { Button } from "@/components/ui/button";
 export default async function ExpensesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string; search?: string }>
+  searchParams: Promise<{ 
+    category?: string; 
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: string;
+  }>
 }) {
-  const { category = "all", search = "" } = await searchParams;
+  const { 
+    category = "all", 
+    search = "", 
+    startDate, 
+    endDate, 
+    page = "1" 
+  } = await searchParams;
   const { merchant } = await getAuthContext();
 
-  const [summary, expenses] = await Promise.all([
+  const [summary, { data: expenses, totalCount }] = await Promise.all([
     getExpenseSummary(),
-    getExpenses({ category, search }),
+    getExpenses({ 
+      category, 
+      search, 
+      startDate, 
+      endDate, 
+      page: parseInt(page) 
+    }),
   ]);
 
   const stats = [

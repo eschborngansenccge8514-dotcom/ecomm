@@ -38,8 +38,8 @@ export default async function EmailDashboardPage() {
         {[
           { label: 'Total Sent',     value: kpis.total,     className: 'bg-muted/50' },
           { label: 'Delivered',      value: kpis.delivered, className: 'bg-green-500/10 text-green-700' },
+          { label: 'Received',       value: kpis.received,  className: 'bg-blue-500/10 text-blue-700' },
           { label: 'Failed',         value: kpis.failed,    className: 'bg-red-500/10 text-red-700'   },
-          { label: 'Bounced',        value: kpis.bounced,   className: 'bg-yellow-500/10 text-yellow-700' },
         ].map((kpi) => (
           <div key={kpi.label} className={`rounded-lg border p-4 ${kpi.className}`}>
             <p className="text-xs font-medium uppercase tracking-wider opacity-70">{kpi.label}</p>

@@ -89,10 +89,16 @@ serve(async (req) => {
     if (driverId && (!driverName || !driverPhoto)) {
       try {
         console.log(`[lalamove-webhook] Fetching extended details for driver ${driverId}...`)
-        const apiKey    = Deno.env.get('LALAMOVE_API_KEY')!
-        const apiSecret = Deno.env.get('LALAMOVE_API_SECRET')!
-        const market    = Deno.env.get('LALAMOVE_MARKET') || 'MY'
-        const env       = Deno.env.get('DELIVERY_ENV')   || 'sandbox'
+        const { data: llConfig } = await supabase
+          .from('merchant_lalamove_config')
+          .select('*')
+          .eq('merchant_id', order.merchant_id)
+          .maybeSingle()
+
+        const apiKey    = (llConfig?.is_enabled && llConfig?.api_key) ? llConfig.api_key : Deno.env.get('LALAMOVE_API_KEY')!
+        const apiSecret = (llConfig?.is_enabled && llConfig?.api_secret) ? llConfig.api_secret : Deno.env.get('LALAMOVE_API_SECRET')!
+        const market    = llConfig?.market || Deno.env.get('LALAMOVE_MARKET') || 'MY'
+        const env       = (llConfig?.is_enabled && llConfig?.environment) ? llConfig.environment : (Deno.env.get('DELIVERY_ENV') || 'sandbox')
         const baseUrl   = getLalamoveBaseUrl(env)
 
         const driverPath = `/v3/orders/${lalamoveOrderId}/drivers/${driverId}`

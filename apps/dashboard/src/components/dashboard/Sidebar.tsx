@@ -7,11 +7,9 @@ import {
   LayoutDashboard, 
   ShoppingBag, 
   Receipt,
-  Package, 
-  Tag,
+  Package,
   Users,
-  BarChart2,
-  Truck, 
+  Truck,
   Settings, 
   LogOut, 
   Store,
@@ -28,50 +26,88 @@ import {
   Monitor,
   ArrowUpRight,
   Mail,
-  MessageSquare
+  MessageSquare,
+  ShoppingCart,
+  Wallet,
+  Share2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'react-hot-toast'
-import { ApprovalsBadge } from '@/components/nav/ApprovalsBadge'
 import { SupportBadge } from '@/components/nav/SupportBadge'
 
-const NAV = [
-  { href: '/pos',         label: 'Web POS',      icon: Monitor         },
-  { href: '/operations',  label: 'Operations',  icon: LayoutDashboard },
-  { href: '/orders',      label: 'Orders',      icon: ShoppingBag     },
-  { href: '/expenses',    label: 'Expenses',    icon: Receipt         },
-  { href: '/agent/approvals', label: 'Approvals', icon: ShieldAlert, badge: <ApprovalsBadge /> },
-  { href: '/products',    label: 'Products',    icon: Package         },
-  { href: '/inventory',                label: 'Inventory',       icon: BarChart2 },
-  { href: '/inventory/suppliers',      label: 'Suppliers',       icon: Truck },
-  { href: '/inventory/purchase-orders',label: 'Purchase Orders', icon: FileText },
-  { href: '/categories',  label: 'Categories',  icon: Tag             },
-  { href: '/customers',   label: 'Customers',   icon: Users           },
-  { href: '/reports',     label: 'Reports',     icon: FileText        },
-  { href: '/loyalty',     label: 'Loyalty',     icon: Star            },
-  { href: '/shipping/easyparcel', label: 'EasyParcel', icon: Box        },
-  { href: '/shipping/lalamove',   label: 'Lalamove',   icon: Zap        },
-  { href: '/einvoice',   label: 'E-Invoicing', icon: FileCheck       },
-  { href: '/email',      label: 'Email Logs',   icon: Mail            },
-  { href: '/email/settings', label: 'Email Setup', icon: Settings        },
-  { href: '/support/inbox', label: 'Support Inbox', icon: Headphones, badge: <SupportBadge /> },
-  { href: '/support/settings', label: 'Support Setup', icon: Headphones },
-  { href: '/marketplace', label: 'Marketplace', icon: Store           },
-  { href: '/payment-exceptions', label: 'Payment Errors', icon: AlertCircle },
-  { href: '/settings/store', label: 'Store Theme', icon: Palette       },
-  { href: '/settings/whatsapp', label: 'WhatsApp', icon: MessageSquare },
-  { href: '/settings',    label: 'Settings',    icon: Settings        },
+const NAV_GROUPS = [
+  {
+    group: 'Home',
+    items: [
+      { href: '/', label: 'Overview', icon: LayoutDashboard },
+    ]
+  },
+  {
+    group: 'Management',
+    items: [
+      { href: '/pos', label: 'Web POS', icon: Monitor },
+      { href: '/operations', label: 'Operations', icon: ArrowUpRight },
+    ]
+  },
+  {
+    group: 'Sales',
+    items: [
+      { href: '/orders', label: 'Orders', icon: ShoppingBag },
+      { href: '/customers', label: 'Customers', icon: Users },
+      { href: '/loyalty', label: 'Loyalty', icon: Star },
+      { href: '/payment-exceptions', label: 'Payment Errors', icon: AlertCircle },
+    ]
+  },
+  {
+    group: 'Inventory',
+    items: [
+      { href: '/inventory', label: 'Inventory', icon: Package, badge: undefined },
+      { href: '/inventory/purchasing', label: 'Procurement', icon: ShoppingCart, badge: undefined },
+    ]
+  },
+  {
+    group: 'Finance',
+    items: [
+      { href: '/wallet', label: 'Wallet', icon: Wallet },
+      { href: '/expenses', label: 'Expenses', icon: Receipt },
+      { href: '/einvoice', label: 'E-Invoicing', icon: FileCheck },
+      { href: '/reports', label: 'Reports', icon: FileText },
+    ]
+  },
+  {
+    group: 'Logistics',
+    items: [
+      { href: '/shipping/easyparcel', label: 'EasyParcel', icon: Box },
+      { href: '/shipping/lalamove', label: 'Lalamove', icon: Zap },
+    ]
+  },
+  {
+    group: 'Communication',
+    items: [
+      { href: '/support/inbox', label: 'Support Inbox', icon: Headphones, badge: <SupportBadge /> },
+      { href: '/support/settings', label: 'Support Setup', icon: Headphones },
+      { href: '/settings/whatsapp', label: 'WhatsApp', icon: MessageSquare },
+      { href: '/email', label: 'Email Logs', icon: Mail },
+      { href: '/marketing', label: 'Email Marketing', icon: Zap },
+      { href: '/social', label: 'Social Hub', icon: Share2 },
+      { href: '/email/settings', label: 'Email Setup', icon: Settings },
+    ]
+  },
+  {
+    group: 'System',
+    items: [
+      { href: '/marketplace', label: 'Marketplace', icon: Store },
+      { href: '/settings/store', label: 'Store Theme', icon: Palette },
+      { href: '/settings', label: 'Settings', icon: Settings },
+    ]
+  }
 ]
 
 
 export function Sidebar({ merchant, profile }: { merchant: any; profile: any }) {
   const isAdmin = profile?.role === 'admin'
   
-  const ADMIN_NAV = [
-    { href: '/admin/applications', label: 'Merchant Applications', icon: FileText },
-    { href: '/admin/merchants',    label: 'All Merchants',          icon: Users    },
-  ]
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -108,9 +144,9 @@ export function Sidebar({ merchant, profile }: { merchant: any; profile: any }) 
       </div>
 
       {/* Nav links */}
-      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 p-3 space-y-6 overflow-y-auto">
         {isAdmin && (
-          <div className="mb-6 px-1">
+          <div className="px-1">
             <Link href="/admin" prefetch={true}
               className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-all shadow-sm"
             >
@@ -123,29 +159,33 @@ export function Sidebar({ merchant, profile }: { merchant: any; profile: any }) 
           </div>
         )}
 
-        <div className="mb-4">
-          <p className="px-3 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            {isAdmin ? 'Merchant View' : 'Management'}
-          </p>
-          {NAV.map(({ href, label, icon: Icon, badge }) => {
-            const active = href === '/' ? pathname === '/' : pathname.startsWith(href)
-            if (isAdmin && (href === '/settings' || href === '/settings/store')) return null // Admins handle global settings
-            return (
-              <Link key={href} href={href} prefetch={true}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
-                  active
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                )}
-              >
-                <Icon size={18} />
-                <span className="flex-1">{label}</span>
-                {badge}
-              </Link>
-            )
-          })}
-        </div>
+        {NAV_GROUPS.map((group) => (
+          <div key={group.group}>
+            <p className="px-3 mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em]">
+              {group.group}
+            </p>
+            <div className="space-y-0.5">
+              {group.items.map(({ href, label, icon: Icon, badge }) => {
+                const active = href === '/' ? pathname === '/' : pathname.startsWith(href)
+                if (isAdmin && (href === '/settings' || href === '/settings/store')) return null // Admins handle global settings
+                return (
+                  <Link key={href} href={href} prefetch={true}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors',
+                      active
+                        ? 'bg-blue-50 text-blue-600'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    )}
+                  >
+                    <Icon size={18} />
+                    <span className="flex-1">{label}</span>
+                    {badge}
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Sign out */}

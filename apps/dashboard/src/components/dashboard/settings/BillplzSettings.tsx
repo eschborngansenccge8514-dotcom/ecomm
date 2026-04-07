@@ -35,7 +35,7 @@ export function BillplzSettings({ config: initial, merchantId }: {
     collection_id:               initial?.collection_id ?? '',
     payment_order_collection_id: initial?.payment_order_collection_id ?? '',
     x_signature:                 initial?.x_signature   ?? '',
-    enabled:                     initial?.enabled       ?? true,
+    enabled:                     initial?.enabled       ?? false,
   })
 
   const [saving, setSaving] = useState(false)
@@ -43,8 +43,8 @@ export function BillplzSettings({ config: initial, merchantId }: {
   const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
 
   const handleSave = async () => {
-    if (!form.collection_id) {
-      toast.error('Collection ID is required')
+    if (form.enabled && !form.collection_id) {
+      toast.error('Collection ID is required to enable Billplz')
       return
     }
     setSaving(true)

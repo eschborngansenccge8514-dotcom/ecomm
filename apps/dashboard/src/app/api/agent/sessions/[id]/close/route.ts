@@ -9,7 +9,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: sessionId } = await params
-  
+
   const { user, merchant, isAdmin } = await getAuthContext()
   if (!user || (!merchant && !isAdmin)) return new Response('Unauthorized', { status: 401 })
 
@@ -50,7 +50,7 @@ export async function POST(
     .join('\n')
 
   const { text: summary } = await generateText({
-    model: google('gemini-3.1-flash-lite-preview'),
+    model: google('gemini-2.5-flash-lite'),
     prompt: `Summarize this agent-merchant conversation into a concise 1-2 sentence overview of what was discussed and any actions taken.
     
     TRANSCRIPT:

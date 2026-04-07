@@ -11,7 +11,7 @@ import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { exportOrdersCSV } from '@/lib/export'
 import { toast } from 'react-hot-toast'
-import { 
+import {
   Download, 
   Search, 
   Filter, 
@@ -27,7 +27,8 @@ import {
   Wallet,
   CreditCard,
   Check,
-  Printer
+  Printer,
+  Package
 } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/client'
@@ -41,6 +42,7 @@ import {
 import { OrderActionMenu } from './OrderActionMenu'
 import { bulkUpdateOrderStatus, printInvoice } from '@/lib/order-actions'
 import { Progress } from '@/components/ui/progress'
+import { FulfilmentClient } from './FulfilmentClient'
 
 const STATUS_FILTERS = [
   { key: 'all',              label: 'All Orders' },
@@ -69,6 +71,7 @@ interface OrdersTableProps {
     revenueToday: number
   }
   statusCounts: Record<string, number>
+  initialFulfilments?: any[]
 }
 
 const STATUS_STAGES: Record<string, number> = {
@@ -83,8 +86,6 @@ const STATUS_STAGES: Record<string, number> = {
   failed: 0,
 }
 
-import { AgentActivityFeed } from '@/components/agent/AgentActivityFeed'
-
 export function OrdersTable({ 
   orders, 
   total, 
@@ -95,7 +96,8 @@ export function OrdersTable({
   merchant,
   merchantEinvoiceConfig,
   stats,
-  statusCounts
+  statusCounts,
+  initialFulfilments = []
 }: OrdersTableProps) {
 
   const router = useRouter()
@@ -103,6 +105,7 @@ export function OrdersTable({
   const [isPending, startTransition] = useTransition()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
+  const [activeView, setActiveView] = useState<'orders' | 'fulfilment'>('orders')
   
   const parentRef = useRef<HTMLDivElement>(null)
 
@@ -196,10 +199,39 @@ export function OrdersTable({
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-      <div className="lg:col-span-3 space-y-6">
-      {/* Stats Header */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="space-y-6">
+      {/* View Toggle */}
+      <div className="flex bg-gray-100/50 p-1 rounded-2xl w-fit">
+        <button
+          onClick={() => setActiveView('orders')}
+          className={cn(
+            "px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center gap-2",
+            activeView === 'orders' ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-900"
+          )}
+        >
+          <Box size={16} />
+          Orders
+        </button>
+        <button
+          onClick={() => setActiveView('fulfilment')}
+          className={cn(
+            "px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center gap-2",
+            activeView === 'fulfilment' ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-900"
+          )}
+        >
+          <Package size={16} />
+          Fulfilments
+        </button>
+      </div>
+
+      {activeView === 'fulfilment' ? (
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <FulfilmentClient initialFulfilments={initialFulfilments} />
+        </div>
+      ) : (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Stats Header */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
             <Box size={24} />
@@ -417,7 +449,7 @@ export function OrdersTable({
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-5 w-40 shrink-0">
+                      <td className="px-5 py-5 w-44 shrink-0">
                         <div className="flex flex-col gap-1.5">
                            <div className="flex items-center gap-2">
                              <delInfo.icon size={14} className="text-gray-400" />
@@ -425,16 +457,26 @@ export function OrdersTable({
                                 {provider?.replace('_', ' ') || order.delivery_type}
                              </span>
                            </div>
-                           {order.delivery_provider === 'lalamove' && order.driver_name && (
-                             <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full w-fit">
-                               🏍️ {order.driver_name}
+                           <div className="flex flex-wrap gap-1">
+                             <span className={cn(
+                               "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter w-fit shadow-inner",
+                               order.fulfilment_status === 'fulfilled' ? "bg-emerald-50 text-emerald-600 border border-emerald-100/50" :
+                               order.fulfilment_status === 'partially_fulfilled' ? "bg-amber-50 text-amber-600 border border-amber-100/50" :
+                               "bg-gray-50 text-gray-400 border border-gray-100"
+                             )}>
+                               {(order.fulfilment_status || 'unfulfilled').replace('_', ' ')}
                              </span>
-                           )}
-                           {order.tracking_number && (
-                             <span className="text-[10px] font-bold text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full w-fit">
-                               📦 {order.tracking_number}
-                             </span>
-                           )}
+                             {order.delivery_provider === 'lalamove' && order.driver_name && (
+                               <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full w-fit">
+                                 🏍️ {order.driver_name}
+                               </span>
+                             )}
+                             {order.tracking_number && (
+                               <span className="text-[9px] font-bold text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full w-fit">
+                                 📦 {order.tracking_number}
+                               </span>
+                             )}
+                           </div>
                         </div>
                       </td>
                       <td className="px-5 py-5 w-32 shrink-0">
@@ -518,15 +560,8 @@ export function OrdersTable({
           </div>
         )}
       </div>
-      </div>
-
-      {/* Agent Activity Feed Side Panel */}
-      <aside className="space-y-6">
-        <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm sticky top-6">
-          <AgentActivityFeed limit={8} />
         </div>
-      </aside>
+      )}
     </div>
   )
 }
-

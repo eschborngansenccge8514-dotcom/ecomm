@@ -42,11 +42,12 @@ lalamove.post('/quote', async (c) => {
       custLng = addrRow?.lng
     }
 
-    const apiKey = c.env.LALAMOVE_API_KEY
-    const apiSecret = c.env.LALAMOVE_API_SECRET
-    const market = 'MY'
-    const env = c.env.LALAMOVE_SANDBOX === 'true' ? 'sandbox' : 'production'
-    const baseUrl = getLalamoveBaseUrl(env)
+    const { data: llConfig } = await supabase.from("merchant_lalamove_config").select("*").eq("merchant_id", order.merchant_id).maybeSingle();
+    const apiKey = (llConfig?.is_enabled && llConfig?.api_key) ? llConfig.api_key : c.env.LALAMOVE_API_KEY;
+    const apiSecret = (llConfig?.is_enabled && llConfig?.api_secret) ? llConfig.api_secret : c.env.LALAMOVE_API_SECRET;
+    const market = llConfig?.market || "MY_KUL";
+    const env = (llConfig?.is_enabled && llConfig?.environment) ? llConfig.environment : (c.env.LALAMOVE_SANDBOX === "true" ? "sandbox" : "production");
+    const baseUrl = getLalamoveBaseUrl(env);
     const path = '/v3/quotations'
 
     const merchLat = String(merchant.lat ?? '5.4141')
@@ -138,10 +139,10 @@ lalamove.post('/create-order', async (c) => {
       .eq('merchant_id', order.merchant_id)
       .maybeSingle()
 
-    const apiKey = c.env.LALAMOVE_API_KEY
-    const apiSecret = c.env.LALAMOVE_API_SECRET
-    const market = 'MY'
-    const env = c.env.LALAMOVE_SANDBOX === 'true' ? 'sandbox' : 'production'
+    const apiKey = (llConfig?.is_enabled && llConfig?.api_key) ? llConfig.api_key : c.env.LALAMOVE_API_KEY
+    const apiSecret = (llConfig?.is_enabled && llConfig?.api_secret) ? llConfig.api_secret : c.env.LALAMOVE_API_SECRET
+    const market = llConfig?.market || 'MY_KUL'
+    const env = (llConfig?.is_enabled && llConfig?.environment) ? llConfig.environment : (c.env.LALAMOVE_SANDBOX === 'true' ? 'sandbox' : 'production')
     const baseUrl = getLalamoveBaseUrl(env)
 
     if (!apiKey || !apiSecret) {
@@ -317,13 +318,18 @@ lalamove.post('/status', async (c) => {
   try {
     const { orderId } = await c.req.json()
     const supabase = getSupabaseClient(c.env)
-    const { data: order } = await supabase.from('orders').select('lalamove_order_id, delivery_status').eq('id', orderId).single()
+    const { data: order } = await supabase.from('orders').select('lalamove_order_id, delivery_status, merchant_id').eq('id', orderId).single()
     if (!order?.lalamove_order_id) throw new Error('No Lalamove order found')
 
-    const env = c.env.LALAMOVE_SANDBOX === 'true' ? 'sandbox' : 'production'
+    const { data: llConfig } = await supabase.from('merchant_lalamove_config').select('*').eq('merchant_id', order.merchant_id).maybeSingle()
+
+    const apiKey = (llConfig?.is_enabled && llConfig?.api_key) ? llConfig.api_key : c.env.LALAMOVE_API_KEY
+    const apiSecret = (llConfig?.is_enabled && llConfig?.api_secret) ? llConfig.api_secret : c.env.LALAMOVE_API_SECRET
+    const market = llConfig?.market || 'MY_KUL'
+    const env = (llConfig?.is_enabled && llConfig?.environment) ? llConfig.environment : (c.env.LALAMOVE_SANDBOX === 'true' ? 'sandbox' : 'production')
     const baseUrl = getLalamoveBaseUrl(env)
     const path = `/v3/orders/${order.lalamove_order_id}`
-    const headers = await buildLalamoveHeaders(c.env.LALAMOVE_API_KEY, c.env.LALAMOVE_API_SECRET, 'GET', path, '', 'MY')
+    const headers = await buildLalamoveHeaders(apiKey, apiSecret, 'GET', path, '', market)
     
     const res = await fetch(`${baseUrl}${path}`, { headers })
     const data = (await res.json()) as any
@@ -339,13 +345,18 @@ lalamove.post('/cancel', async (c) => {
   try {
     const { orderId } = await c.req.json()
     const supabase = getSupabaseClient(c.env)
-    const { data: order } = await supabase.from('orders').select('id, lalamove_order_id').eq('id', orderId).single()
+    const { data: order } = await supabase.from('orders').select('id, lalamove_order_id, merchant_id').eq('id', orderId).single()
     if (!order?.lalamove_order_id) throw new Error('No Lalamove order to cancel')
 
-    const env = c.env.LALAMOVE_SANDBOX === 'true' ? 'sandbox' : 'production'
+    const { data: llConfig } = await supabase.from('merchant_lalamove_config').select('*').eq('merchant_id', order.merchant_id).maybeSingle()
+
+    const apiKey = (llConfig?.is_enabled && llConfig?.api_key) ? llConfig.api_key : c.env.LALAMOVE_API_KEY
+    const apiSecret = (llConfig?.is_enabled && llConfig?.api_secret) ? llConfig.api_secret : c.env.LALAMOVE_API_SECRET
+    const market = llConfig?.market || 'MY_KUL'
+    const env = (llConfig?.is_enabled && llConfig?.environment) ? llConfig.environment : (c.env.LALAMOVE_SANDBOX === 'true' ? 'sandbox' : 'production')
     const baseUrl = getLalamoveBaseUrl(env)
     const path = `/v3/orders/${order.lalamove_order_id}`
-    const headers = await buildLalamoveHeaders(c.env.LALAMOVE_API_KEY, c.env.LALAMOVE_API_SECRET, 'DELETE', path, '', 'MY')
+    const headers = await buildLalamoveHeaders(apiKey, apiSecret, 'DELETE', path, '', market)
 
     const res = await fetch(`${baseUrl}${path}`, { method: 'DELETE', headers })
     const data = (await res.json()) as any
@@ -389,17 +400,19 @@ lalamove.post('/add-priority-fee', async (c) => {
     const supabase = getSupabaseClient(c.env)
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select('id, lalamove_order_id, priority_fee_added')
+      .select('id, lalamove_order_id, priority_fee_added, merchant_id')
       .eq('id', orderId)
       .single()
 
     if (orderError || !order) throw new Error('Order not found')
     if (!order.lalamove_order_id) throw new Error('Lalamove order ID missing — delivery may not have been booked yet')
 
-    const apiKey = c.env.LALAMOVE_API_KEY
-    const apiSecret = c.env.LALAMOVE_API_SECRET
-    const market = 'MY'
-    const env = c.env.LALAMOVE_SANDBOX === 'true' ? 'sandbox' : 'production'
+    const { data: llConfig } = await supabase.from('merchant_lalamove_config').select('*').eq('merchant_id', order.merchant_id).maybeSingle()
+
+    const apiKey = (llConfig?.is_enabled && llConfig?.api_key) ? llConfig.api_key : c.env.LALAMOVE_API_KEY
+    const apiSecret = (llConfig?.is_enabled && llConfig?.api_secret) ? llConfig.api_secret : c.env.LALAMOVE_API_SECRET
+    const market = llConfig?.market || 'MY_KUL'
+    const env = (llConfig?.is_enabled && llConfig?.environment) ? llConfig.environment : (c.env.LALAMOVE_SANDBOX === 'true' ? 'sandbox' : 'production')
     const baseUrl = getLalamoveBaseUrl(env)
 
     const path = `/v3/orders/${order.lalamove_order_id}/priority-fee`
@@ -479,10 +492,10 @@ lalamove.post('/retry-order', async (c) => {
     const merchant     = order.merchant as any
     const serviceType  = order.delivery_service_id || 'MOTORCYCLE'
 
-    const apiKey = c.env.LALAMOVE_API_KEY
-    const apiSecret = c.env.LALAMOVE_API_SECRET
-    const market = 'MY'
-    const env = c.env.LALAMOVE_SANDBOX === 'true' ? 'sandbox' : 'production'
+    const apiKey = (llConfig?.is_enabled && llConfig?.api_key) ? llConfig.api_key : c.env.LALAMOVE_API_KEY
+    const apiSecret = (llConfig?.is_enabled && llConfig?.api_secret) ? llConfig.api_secret : c.env.LALAMOVE_API_SECRET
+    const market = llConfig?.market || 'MY_KUL'
+    const env = (llConfig?.is_enabled && llConfig?.environment) ? llConfig.environment : (c.env.LALAMOVE_SANDBOX === 'true' ? 'sandbox' : 'production')
     const baseUrl = getLalamoveBaseUrl(env)
 
     if (!apiKey || !apiSecret) {

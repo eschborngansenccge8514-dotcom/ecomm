@@ -308,12 +308,28 @@ export default function CheckoutScreen() {
     fetchLastInvoice()
   }, [user?.id, hasPrefilled])
 
-  // Load loyalty data
   useEffect(() => {
     if (!merchantId) return
     loyaltyService.getBalance(merchantId).then(setLoyaltyBalance)
     loyaltyService.getSettings(merchantId).then(setLoyaltySettings)
   }, [merchantId])
+
+  // Fetch merchant payment settings to show/hide gateways
+  const { data: paymentSettings } = useQuery({
+    queryKey: ['merchant-payment-settings', merchantId],
+    queryFn: async () => {
+      if (!merchantId) return null
+      const [bp, rp] = await Promise.all([
+        supabase.from('merchant_billplz_config').select('enabled').eq('merchant_id', merchantId).maybeSingle(),
+        supabase.from('merchant_razorpay_config').select('use_global_key, key_id').eq('merchant_id', merchantId).maybeSingle(),
+      ])
+      return {
+        billplz: bp.data?.enabled ?? false,
+        razorpay: rp.data ? (rp.data.use_global_key || !!rp.data.key_id) : true, // Default to true if not configured yet (using global)
+      }
+    },
+    enabled: !!merchantId,
+  })
 
   // Total weight from cart items (product.weight_grams stored in cart item)
   const totalWeightKg = useMemo(() => {
@@ -333,6 +349,19 @@ export default function CheckoutScreen() {
 
   const isSelfPickup   = deliveryOption?.type === 'self_pickup'
   const hasDelivery    = !!deliveryOption
+
+  const disabledPayments = useMemo(() => {
+    const disabled = isSelfPickup ? ['cod'] : []
+    if (paymentSettings) {
+      if (!paymentSettings.billplz) disabled.push('billplz')
+      if (!paymentSettings.razorpay) disabled.push('razorpay')
+    } else {
+      // While loading or if settings missing, default to hiding online payments
+      disabled.push('billplz', 'razorpay')
+    }
+    return disabled
+  }, [isSelfPickup, paymentSettings])
+
   const canPlace       = !!selectedAddress && hasDelivery && !!paymentMethod && items.length > 0 && !!merchantId
 
   // No auto-redirect for pickup payment anymore, mandatory choice
@@ -536,7 +565,7 @@ export default function CheckoutScreen() {
           <PaymentPicker
             selected={paymentMethod}
             onSelect={setPaymentMethod}
-            disabledOptions={isSelfPickup ? ['cod'] : []}
+            disabledOptions={disabledPayments}
           />
         </Section>
 

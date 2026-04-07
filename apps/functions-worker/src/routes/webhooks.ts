@@ -66,6 +66,29 @@ webhooks.post('/resend', async (c) => {
     return c.text('Database error', 500)
   }
 
+  // 4. Update Campaign Analytics
+  const tags = body.data.tags as { name: string; value: string }[] | undefined
+  const campaignId = tags?.find(t => t.name === 'campaign_id')?.value
+
+  if (campaignId) {
+    const columnMap: Record<string, string> = {
+      'delivered': 'total_recipients', // delivered is already tracked at send, but we can sync
+      'opened': 'opens',
+      'clicked': 'clicks',
+      'bounced': 'bounces',
+      'complained': 'complaints'
+    }
+
+    const column = columnMap[status]
+    if (column) {
+      // Use raw SQL to increment for atomicity
+      await supabase.rpc('increment_campaign_stat', { 
+        p_campaign_id: campaignId, 
+        p_column: column 
+      })
+    }
+  }
+
   console.log(`[Resend Webhook] Updated email ${emailId} to status: ${status}`)
   return c.text('OK')
 })
@@ -261,70 +284,217 @@ webhooks.post('/razorpay', async (c) => {
 // --- Helpers for Inbound Email ---
 
 async function processInboundEmail(
-  data: { email_id: string; from: string; to: string[]; subject: string },
+  data: { email_id: string; message_id: string; from: string; to: string[]; subject: string },
   env: Bindings
 ) {
+  const supabase = getSupabaseClient(env)
+  
+  // Inject environment variables for tools/packages that still rely on process.env
+  // (Legacy check for Cloudflare Worker nodejs_compat environment)
+  if (typeof process !== 'undefined' && process.env) {
+    process.env.SUPABASE_URL = env.SUPABASE_URL
+    process.env.SUPABASE_SERVICE_ROLE_KEY = env.SUPABASE_SERVICE_ROLE_KEY
+    process.env.RESEND_API_KEY = env.RESEND_API_KEY
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = env.GOOGLE_GENERATIVE_AI_API_KEY
+  }
+
+  const recipient = data.to[0]
+  let logId: string | undefined
   try {
-    const supabase = getSupabaseClient(env)
 
     // 1. Fetch the full email content from Resend
-    const res = await fetch(`https://api.resend.com/emails/${data.email_id}`, {
+    // NOTE: Inbound emails require the /receiving/ segment in the URL
+    const res = await fetch(`https://api.resend.com/emails/receiving/${data.email_id}`, {
       headers: { 'Authorization': `Bearer ${env.RESEND_API_KEY}` }
     })
     if (!res.ok) throw new Error(`Failed to fetch email from Resend: ${res.statusText}`)
     
     const emailData = (await res.json()) as any
     const body = emailData.text || emailData.html || ''
-    const recipient = data.to[0]
+    
+    // Extract basic attachment metadata (names/types)
+    const attachments = (emailData.attachments || []).map((a: any) => ({
+      filename: a.filename,
+      contentType: a.contentType
+    }))
 
-    // 2. Identify the merchant
-    const { data: merchant, error: mErr } = await supabase
+    // 2. Identify the merchant or platform support
+    const { data: merchant } = await supabase
       .from('merchants')
-      .select('id, owner_id, store_name')
-      .eq('inbound_email', recipient)
+      .select('id, owner_id, store_name, inbound_email, support_inbound_email')
+      .or(`inbound_email.eq.${recipient},support_inbound_email.eq.${recipient}`)
       .maybeSingle()
 
-    if (mErr || !merchant) {
-      console.error(`[InboundEmail] No merchant found for recipient ${recipient}`)
+    // 2. Identify the agent type
+    // It's support if the address explicitly matches the support config OR starts with support@
+    const isSupport = (merchant && merchant.support_inbound_email === recipient) || 
+                     recipient.toLowerCase().startsWith('support@')
+
+    // 2.5 Log the receipt in email_logs
+    const { data: logEntry, error: logError } = await supabase.from('email_logs').insert({
+      resend_id: data.email_id,
+      recipient: recipient,
+      status: 'received',
+      template: 'inbound',
+      metadata: { 
+        from: data.from, 
+        subject: data.subject, 
+        message_id: data.message_id,
+        attachments
+      }
+    }).select('id').single()
+
+    logId = logEntry?.id
+    if (logError) console.error('[InboundEmail] Warning: Initial log capture failed:', logError.message)
+
+    // 3. Resolve or Create Session & Route
+    let sessionId: string | undefined
+    let sessionMetadata: any
+    let replyText: string | null = null
+    let responseText: string | null = null // for perfect threading tracking
+
+    if (isSupport || !merchant) {
+      // --- Support Agent Path ---
+      const { data: supportSession } = await supabase
+        .from('support_sessions')
+        .select('id, metadata')
+        .or(`customer_email.eq."${data.from}",metadata->>email.eq."${data.from}"`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      sessionId = supportSession?.id
+      sessionMetadata = supportSession?.metadata || { channel: 'email', email: data.from, references: [] }
+      
+      const references = Array.isArray(sessionMetadata.references) ? [...sessionMetadata.references] : []
+      if (!references.includes(data.message_id)) references.push(data.message_id)
+      sessionMetadata.references = references
+
+      // Merchant UUID fallback for support (platform level or specific)
+      const targetMerchantId = merchant?.id || null
+      const targetOwnerId = merchant?.owner_id || null
+
+      if (!sessionId) {
+        console.log(`[InboundEmail] Creating new support session for ${data.from}`)
+        const { data: newS, error: newSError } = await supabase.from('support_sessions').insert({
+          merchant_id: targetOwnerId,
+          customer_email: data.from,
+          source: 'email',
+          metadata: sessionMetadata
+        }).select('id').single()
+        
+        if (newSError) {
+          console.error('[InboundEmail] Failed to create support session:', newSError.message)
+          await supabase.from('email_logs').insert({
+            resend_id: data.email_id,
+            recipient: recipient,
+            status: 'error',
+            template: 'session-creation',
+            error: newSError.message,
+            metadata: { step: 'session-creation-failed', targetOwnerId }
+          })
+          return
+        }
+        sessionId = newS?.id
+      } else {
+        await supabase.from('support_sessions').update({ metadata: sessionMetadata }).eq('id', sessionId)
+      }
+
+      if (!sessionId) {
+        console.error('[InboundEmail] Could not resolve sessionId — aborting')
+        return
+      }
+
+      if (logId) {
+        await supabase.from('email_logs').update({
+          status: 'processing',
+          template: 'agent-start',
+          metadata: { step: 'support-agent-start', sessionId }
+        }).eq('id', logId)
+      }
+
+      const { handleSupportEmailInput } = await import('@project1/support-agent')
+      console.log(`[InboundEmail] Calling handleSupportEmailInput for ${sessionId}...`)
+      const result = await handleSupportEmailInput({
+        from: data.from,
+        subject: data.subject,
+        body,
+        merchantId: targetMerchantId,
+        ownerId: targetOwnerId,
+        merchantName: merchant?.store_name || 'Hyperlocal',
+        sessionId: sessionId!,
+        attachments,
+        supabase,
+        googleApiKey: env.GOOGLE_GENERATIVE_AI_API_KEY,
+        logId
+      })
+      replyText = result.replyText
+    } else {
+      // --- Merchant Agent Path ---
+      const { data: existingSession } = await supabase
+        .from('agent_sessions')
+        .select('id, metadata')
+        .eq('merchant_id', merchant.owner_id)
+        .eq('metadata->>email', data.from)
+        .maybeSingle()
+
+      sessionId = existingSession?.id
+      sessionMetadata = existingSession?.metadata || { channel: 'email', email: data.from, references: [] }
+      
+      const references = Array.isArray(sessionMetadata.references) ? [...sessionMetadata.references] : []
+      if (!references.includes(data.message_id)) references.push(data.message_id)
+      sessionMetadata.references = references
+
+      if (!sessionId) {
+        const { data: newS } = await supabase.from('agent_sessions').insert({
+          merchant_id: merchant.owner_id,
+          title: `Email from ${data.from}`,
+          metadata: sessionMetadata
+        }).select('id').single()
+        sessionId = newS?.id
+      } else {
+        await supabase.from('agent_sessions').update({ metadata: sessionMetadata }).eq('id', sessionId)
+      }
+
+      console.log(`[InboundEmail] Dynamically importing @project1/agent for ${sessionId}...`)
+      let handleEmailInput: any
+      try {
+        const module = await import('@project1/agent')
+        handleEmailInput = module.handleEmailInput
+        console.log(`[InboundEmail] Package @project1/agent imported successfully for ${sessionId}`)
+      } catch (importErr: any) {
+        console.error(`[InboundEmail] FAILED to import @project1/agent:`, importErr.message)
+        await supabase.from('email_logs').insert({
+          resend_id: data.email_id,
+          recipient: recipient,
+          status: 'error',
+          template: 'import-failure',
+          error: importErr.message,
+          metadata: { step: 'import-merchant-agent-package', stack: importErr.stack }
+        })
+        return
+      }
+
+      const result = await handleEmailInput({
+        from: data.from,
+        subject: data.subject,
+        body,
+        merchantId: merchant.id,
+        ownerId: merchant.owner_id,
+        merchantName: merchant.store_name,
+        sessionId: sessionId!,
+        attachments,
+        supabase,
+        googleApiKey: env.GOOGLE_GENERATIVE_AI_API_KEY,
+        logId
+      })
+      replyText = result.replyText
+    }
+
+    if (!replyText) {
+      console.warn(`[InboundEmail] Agent produced empty reply for session ${sessionId}`)
       return
     }
-
-    // 3. Resolve or Create Session
-    // For email, we use the 'from' address as a key to find/create a session
-    const { data: existingSession } = await supabase
-      .from('agent_sessions')
-      .select('id')
-      .eq('merchant_id', merchant.id)
-      .eq('metadata->>email', data.from)
-      .maybeSingle()
-
-    let sessionId = existingSession?.id
-    if (!sessionId) {
-      const { data: newSession, error: sErr } = await supabase
-        .from('agent_sessions')
-        .insert({
-          merchant_id: merchant.id,
-          user_id: merchant.owner_id,
-          title: `Email from ${data.from}`,
-          metadata: { channel: 'email', email: data.from }
-        })
-        .select('id')
-        .single()
-      
-      if (sErr) throw sErr
-      sessionId = newSession.id
-    }
-
-    // 4. Call Agent
-    const { handleEmailInput } = await import('../../../../packages/agent')
-    const { replyText } = await handleEmailInput({
-      from: data.from,
-      subject: data.subject,
-      body: body,
-      merchantId: merchant.id,
-      merchantName: merchant.store_name,
-      sessionId: sessionId
-    })
 
     // 5. Send Reply
     const sendRes = await fetch('https://api.resend.com/emails', {
@@ -334,23 +504,72 @@ async function processInboundEmail(
         'Authorization': `Bearer ${env.RESEND_API_KEY}`
       },
       body: JSON.stringify({
-        from: `${merchant.store_name} <${recipient}>`,
+        from: merchant ? `${merchant.store_name} <${recipient}>` : `Support <${recipient}>`,
         to: data.from,
-        subject: `Re: ${data.subject}`,
-        text: replyText
+        subject: data.subject.toLowerCase().startsWith('re:') ? data.subject : `Re: ${data.subject}`,
+        text: replyText,
+        headers: {
+          'In-Reply-To': data.message_id,
+          'References': sessionMetadata.references.join(' ')
+        }
       })
     })
 
     if (!sendRes.ok) {
       const errText = await sendRes.text()
       console.error(`[InboundEmail] Failed to send reply: ${errText}`)
+      if (logId) {
+        await supabase.from('email_logs').update({
+          status: 'failed',
+          error: `Resend Send Error: ${errText}`,
+          metadata: { parent_email_id: data.email_id, session_id: sessionId }
+        }).eq('id', logId)
+      }
     } else {
-      console.log(`[InboundEmail] Success: Sent reply to ${data.from} for merchant ${merchant.id}`)
+      const sendData = (await sendRes.json()) as any
+      
+      // --- Perfect Threading: Fetch the sent message_id ---
+      // We do this in a background task to not block the current flow (already in waitUntil)
+      try {
+        const sentRes = await fetch(`https://api.resend.com/emails/${sendData.id}`, {
+          headers: { 'Authorization': `Bearer ${env.RESEND_API_KEY}` }
+        })
+        const sentEmailData = (await sentRes.json()) as any
+        if (sentEmailData.message_id) {
+          sessionMetadata.references.push(sentEmailData.message_id)
+          const table = (isSupport || !merchant) ? 'support_sessions' : 'agent_sessions'
+          await supabase.from(table).update({ metadata: sessionMetadata }).eq('id', sessionId!)
+        }
+      } catch (err) {
+        console.warn(`[InboundEmail] Failed to fetch sent message_id for threading:`, err)
+      }
+
+      if (logId) {
+        await supabase.from('email_logs').update({
+          resend_id: sendData.id, // Update with the OUTBOUND email ID
+          status: 'sent',
+          template: 'agent-reply',
+          metadata: { parent_email_id: data.email_id, session_id: sessionId }
+        }).eq('id', logId)
+      }
     }
 
   } catch (err: any) {
     console.error('[InboundEmail] Critical Error:', err.message)
+    // Log critical error to email_logs for debugging
+    try {
+      if (logId) {
+        await supabase.from('email_logs').update({
+          status: 'failed',
+          error: err.message,
+          metadata: { step: 'critical-background-failure', stack: err.stack, recipient }
+        }).eq('id', logId)
+      }
+    } catch (logErr: any) {
+      console.error('[InboundEmail] Double Fault — failed to log error to DB:', logErr.message)
+    }
   }
 }
+
 
 export default webhooks

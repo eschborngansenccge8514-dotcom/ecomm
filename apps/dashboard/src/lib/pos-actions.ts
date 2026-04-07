@@ -317,7 +317,7 @@ export async function fetchPosProducts(outletId: string) {
       id,
       name,
       sku,
-      barcode:gtin,
+      barcode,
       unitPrice:price,
       images,
       stock_quantity,
@@ -327,7 +327,7 @@ export async function fetchPosProducts(outletId: string) {
         name,
         sku,
         price_modifier,
-        barcode:sku,
+        barcode,
         stock_quantity
       )
     `)

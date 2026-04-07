@@ -87,6 +87,17 @@ export async function executeWithGuard<T>(
 
     if (approvalError) console.warn(`[executor] Failed to log approval record:`, approvalError.message)
     
+    // NEW: Notify merchant of high-risk action
+    try {
+      const { informMerchantViaWhatsApp } = await import('../utils/whatsapp-notifier')
+      await informMerchantViaWhatsApp(
+        merchantId,
+        `⚠️ *Agent Alert: High-Risk Action*\n\nYour agent is performing a high-risk task.\n\n*Action*: ${title}\n*Details*: ${description.slice(0, 50)}${description.length > 50 ? '...' : ''}\n\nThis action was automatically logged for your review.`
+      )
+    } catch (e) {
+      console.warn(`[executor] Notification failed:`, e)
+    }
+
     // IMPORTANT: We used to throw AwaitingApprovalError here. 
     // Now we continue to the execution block below.
   }
@@ -108,6 +119,18 @@ export async function executeWithGuard<T>(
         .update({ status: 'failed', output: { error: String(err) } as any })
         .eq('id', actionId)
     }
+
+    // NEW: Notify merchant of tool failure
+    try {
+      const { informMerchantViaWhatsApp } = await import('../utils/whatsapp-notifier')
+      await informMerchantViaWhatsApp(
+        merchantId,
+        `❌ *Agent Alert: Tool Failure*\n\nThe agent encountered an issue while running *${toolName}*.\n\n*Error*: ${String(err).slice(0, 100)}${String(err).length > 100 ? '...' : ''}\n\nThe agent will attempt to recover or report the error to the user.`
+      )
+    } catch (e) {
+      console.warn(`[executor] Error notification failed:`, e)
+    }
+
     throw err
   }
 }

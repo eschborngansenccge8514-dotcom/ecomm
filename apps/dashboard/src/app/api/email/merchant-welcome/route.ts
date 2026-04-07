@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendEmail, FROM_ADDRESSES } from '@repo/email';
-import { OrderConfirmationEmail } from '@repo/email/templates/order-confirmation';
 
 // Note: In the actual implementation, we might want a specific MerchantWelcome template.
 // For now, I'll use the OrderConfirmation placeholder or similar if available, 

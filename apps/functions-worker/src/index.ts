@@ -20,6 +20,8 @@ import marketplace from './routes/marketplace'
 import logistics from './routes/logistics'
 import whatsapp from './routes/whatsapp'
 
+import meta from './routes/meta'
+
 const app = new Hono<{ Bindings: Bindings }>()
 
 // Middleware
@@ -56,6 +58,7 @@ app.route('/einvoice', einvoice)
 app.route('/marketplace', marketplace)
 app.route('/logistics', logistics)
 app.route('/whatsapp', whatsapp)
+app.route('/meta', meta)
 
 // Explicit Fallbacks: When this worker is deployed as a single-purpose function 
 // (e.g., named 'einvoice'), Supabase calls it with paths like '/consolidate' 

@@ -28,7 +28,13 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
-export function SupplierListClient({ suppliers }: { suppliers: any[] }) {
+export function SupplierListClient({ 
+  suppliers, 
+  hideHeader = false 
+}: { 
+  suppliers: any[], 
+  hideHeader?: boolean 
+}) {
   const [query, setQuery] = useState('')
 
   const filtered = suppliers.filter(s => 
@@ -37,20 +43,22 @@ export function SupplierListClient({ suppliers }: { suppliers: any[] }) {
   )
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Suppliers</h1>
-          <p className="text-gray-500">Manage your product vendors and procurement contacts.</p>
+    <div className={cn("space-y-6", !hideHeader && "p-6")}>
+      {!hideHeader && (
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Suppliers</h1>
+            <p className="text-gray-500">Manage your product vendors and procurement contacts.</p>
+          </div>
+          <Link 
+            href="/inventory/suppliers/new"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <Plus size={18} />
+            Add Supplier
+          </Link>
         </div>
-        <Link 
-          href="/inventory/suppliers/new"
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors shadow-sm"
-        >
-          <Plus size={18} />
-          Add Supplier
-        </Link>
-      </div>
+      )}
 
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">

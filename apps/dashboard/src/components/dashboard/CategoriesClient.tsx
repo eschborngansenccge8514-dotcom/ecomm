@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -239,9 +239,9 @@ export function CategoriesClient({ categories: initial, merchantId }: {
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         render={
-                          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-gray-50">
+                          <button className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), "h-10 w-10 rounded-xl hover:bg-gray-50")}>
                             <MoreVertical size={18} className="text-gray-400" />
-                          </Button>
+                          </button>
                         }
                       />
                       <DropdownMenuContent align="end" className="rounded-xl border-gray-100 p-1.5 min-w-[140px] shadow-xl">

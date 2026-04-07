@@ -53,9 +53,17 @@ serve(async (req) => {
       custLng = addrRow?.lng
     }
 
-    const apiKey    = Deno.env.get('LALAMOVE_API_KEY')!
-    const apiSecret = Deno.env.get('LALAMOVE_API_SECRET')!
-    const baseUrl   = getLalamoveBaseUrl()
+    const { data: llConfig } = await supabase
+      .from('merchant_lalamove_config')
+      .select('*')
+      .eq('merchant_id', order.merchant_id)
+      .maybeSingle()
+
+    const apiKey    = (llConfig?.is_enabled && llConfig?.api_key) ? llConfig.api_key : Deno.env.get('LALAMOVE_API_KEY')!
+    const apiSecret = (llConfig?.is_enabled && llConfig?.api_secret) ? llConfig.api_secret : Deno.env.get('LALAMOVE_API_SECRET')!
+    const env       = (llConfig?.is_enabled && llConfig?.environment) ? llConfig.environment : (Deno.env.get('DELIVERY_ENV') || 'sandbox')
+    const market    = llConfig?.market || Deno.env.get('LALAMOVE_MARKET') || 'MY'
+    const baseUrl   = getLalamoveBaseUrl(env)
     const path      = '/v3/quotations'
 
     const merchLat = String(merchant.lat  ?? '5.4141')

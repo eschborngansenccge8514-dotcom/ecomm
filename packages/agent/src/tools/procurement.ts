@@ -94,3 +94,26 @@ export const listSuppliers = (merchantId: string, sessionId: string) =>
       executeWithGuard('list_suppliers', input, { riskLevel: 'low' }, merchantId, sessionId,
         () => edgeCall('list-suppliers', { ...input, merchant_id: merchantId }))
   } as any)
+
+// Tool 6: Receive Goods — high risk
+export const receiveGoods = (merchantId: string, sessionId: string) =>
+  tool({
+    description: 'Record a partial or full delivery of goods for a purchase order. Use this when the merchant confirms they have received items from a supplier.',
+    parameters: z.object({
+      po_id: z.string().describe('The purchase order UUID'),
+      items: z.array(z.object({
+        po_item_id: z.string().describe('The UUID of the PO item'),
+        quantity: z.number().int().positive().describe('The quantity actually received')
+      })).min(1),
+      notes: z.string().optional().describe('Receipt notes (e.g. "Arrived damaged", "Shortage")')
+    }),
+    execute: (input: any) =>
+      executeWithGuard('receive_goods', input, {
+        riskLevel:           'high',
+        approvalTitle:       () => 'Receive Goods',
+        approvalDescription: (i: any) =>
+          `Agent wants to record a delivery of ${i.items.length} item(s) for PO ${i.po_id}. This will increase inventory stock.`
+      }, merchantId, sessionId,
+        () => edgeCall('receive-goods', { ...input, merchant_id: merchantId }))
+  } as any)
+

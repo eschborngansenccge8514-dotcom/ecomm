@@ -62,7 +62,7 @@ export interface PosTransactionPayload {
 }
 
 export function calcCartTotals(cart: Cart, pointsRate = 1, taxRate = 8): CartTotals {
-  const subtotal      = cart.items.reduce((s, i) => s + i.lineTotal, 0)
+  const subtotal      = cart.items.reduce((s, i) => s + i.qty * i.unitPrice, 0)
   const lineDiscounts = cart.items.reduce((s, i) => s + i.discountRm * i.qty, 0)
   const globalDiscount = cart.globalDiscountRm
   const pointsDiscount = cart.pointsToRedeem * 0.01   // 1 pt = RM0.01

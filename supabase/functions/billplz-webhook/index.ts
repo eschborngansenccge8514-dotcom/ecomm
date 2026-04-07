@@ -83,17 +83,49 @@ serve(async (req) => {
   })
 
 
-  if (paid && orderId) {
-    await supabase
-      .from('orders')
-      .update({
-        status:            'paid',
-        payment_status:    'paid',
-        payment_reference: billId,
-        paid_at:           new Date().toISOString(),
-      })
-      .eq('id', orderId)
-      .eq('status', 'pending')
+  if (paid && (orderId || params.get('billplz[reference_2]') === 'wallet_topup')) {
+    const isTopup = params.get('billplz[reference_2]') === 'wallet_topup'
+    
+    if (isTopup) {
+      const topupId = orderId // Billplz reference_1 is orderId in my create-wallet-topup
+      const amount = Number(params.get('billplz[amount]')) / 100
+
+      // Get merchant from topup
+      const { data: topup } = await supabase
+        .from('wallet_topups')
+        .select('merchant_id')
+        .eq('id', topupId)
+        .single()
+
+      if (topup) {
+        const { data: wallet } = await supabase
+          .from('merchant_wallets')
+          .select('id')
+          .eq('merchant_id', topup.merchant_id)
+          .single()
+
+        if (wallet) {
+          await supabase.rpc('handle_wallet_topup_credit', {
+            p_wallet_id: wallet.id,
+            p_topup_id:  topupId,
+            p_amount:    amount,
+            p_gateway:   'billplz',
+            p_ref:       billId
+          })
+        }
+      }
+    } else {
+      await supabase
+        .from('orders')
+        .update({
+          status:            'paid',
+          payment_status:    'paid',
+          payment_reference: billId,
+          paid_at:           new Date().toISOString(),
+        })
+        .eq('id', orderId)
+        .eq('status', 'pending')
+    }
   }
 
   return new Response('OK', { status: 200 })

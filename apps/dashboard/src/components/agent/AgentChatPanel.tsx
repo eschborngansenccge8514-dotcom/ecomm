@@ -6,6 +6,9 @@ import { useState, useRef, useEffect } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { toast } from 'react-hot-toast'
 import { cn } from '@/lib/utils'
+import { Paperclip, Loader2 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { analyseReceipt } from '@/app/(dashboard)/expenses/actions'
 
 interface Props {
   initialSessionId?: string
@@ -20,6 +23,56 @@ export function AgentChatPanel({ initialSessionId, hideHeader = false }: Props) 
   const [messages, setMessages] = useState<any[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsUploading(true)
+    
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("Please log in first")
+
+      const fileName = `${user.id}/${Date.now()}-${file.name}`
+      const { data, error } = await supabase.storage
+        .from('receipts')
+        .upload(fileName, file)
+
+      if (error) throw error
+
+      toast.loading("Analyzing receipt...", { id: "analyze" })
+      const result = await analyseReceipt(data.path, file.type)
+      
+      const payload = `[Attached Receipt - ${file.name}]\nExtracted details: ${JSON.stringify(result.extraction, null, 2)}\n\nPlease record this expense and let me know when it's done.`
+      
+      toast.success("Receipt parsed! Summarizing and saving...", { id: "analyze" })
+      setInput(payload)
+      // We can auto-submit here, or let them press Enter
+      setTimeout(() => {
+         const fakeEvent = { preventDefault: () => {} } as any;
+         // Set input value then submit
+         setInput(prev => {
+            // Need to pass the updated value to handleSubmit somehow, or wait for state.
+            return payload;
+         })
+         // Trigger submit programmatically
+         requestAnimationFrame(() => {
+           if (inputRef.current) {
+             inputRef.current.form?.requestSubmit()
+           }
+         })
+      }, 100)
+
+    } catch (err: any) {
+      toast.error(`Upload failed: ${err.message}`, { id: "analyze" })
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -140,6 +193,37 @@ export function AgentChatPanel({ initialSessionId, hideHeader = false }: Props) 
   }, [initialSessionId, setMessages])
 
   useEffect(() => {
+    if (!sessionId) return
+
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`agent-messages-${sessionId}`)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'agent_messages',
+        filter: `session_id=eq.${sessionId}`
+      }, (payload) => {
+        // Deduplicate: If we already have this message (e.g. it was sent from dashboard), don't add
+        setMessages(prev => {
+          const exists = prev.some(m => m.content === payload.new.content && m.role === payload.new.role)
+          if (exists) return prev
+          
+          return [...prev, {
+            id: payload.new.id,
+            role: payload.new.role as 'user' | 'assistant',
+            content: payload.new.content
+          }]
+        })
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [sessionId])
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
@@ -230,6 +314,22 @@ export function AgentChatPanel({ initialSessionId, hideHeader = false }: Props) 
       </div>
 
       <form onSubmit={handleSubmit} className="px-4 py-3 border-t flex gap-2">
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          className="hidden" 
+          accept="image/*,application/pdf" 
+          onChange={handleFileUpload} 
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isLoading || isUploading}
+          className="p-2 text-muted-foreground hover:bg-muted rounded-lg transition-colors disabled:opacity-50"
+          title="Attach Receipt"
+        >
+          {isUploading ? <Loader2 size={20} className="animate-spin" /> : <Paperclip size={20} />}
+        </button>
         <input
           ref={inputRef}
           value={input}
@@ -241,16 +341,16 @@ export function AgentChatPanel({ initialSessionId, hideHeader = false }: Props) 
             }
           }}
           placeholder="Ask MerchantMind…"
-          disabled={isLoading}
+          disabled={isLoading || isUploading}
           className="flex-1 text-sm rounded-lg border bg-background px-3 py-2
                      focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
         />
         <button
           type="submit"
-          disabled={isLoading || !input.trim()}
+          disabled={isLoading || isUploading || !input.trim()}
           className="px-4 py-2 rounded-lg bg-primary text-primary-foreground
                      text-sm font-medium disabled:opacity-40 hover:bg-primary/90
-                     transition-colors"
+                     transition-colors flex-shrink-0"
         >
           {isLoading ? '…' : 'Send'}
         </button>

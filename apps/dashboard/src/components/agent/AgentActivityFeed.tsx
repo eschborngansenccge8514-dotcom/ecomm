@@ -24,7 +24,7 @@ const STATUS_CONFIG: Record<string, { icon: any, color: string, bg: string, labe
     icon: Hourglass, 
     color: 'text-amber-600 dark:text-amber-400', 
     bg: 'bg-amber-50 dark:bg-amber-950/30',
-    label: 'Awaiting Approval'
+    label: 'Pending'
   },
   approved: { 
     icon: CheckCircle2, 

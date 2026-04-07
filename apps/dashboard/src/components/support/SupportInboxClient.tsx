@@ -120,8 +120,7 @@ export function SupportInboxClient({ userId, initialSessions, defaultSessionId }
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'support_sessions',
-        filter: `merchant_id=eq.${userId}`
+        table: 'support_sessions'
       }, (payload) => {
         if (payload.eventType === 'INSERT') {
           setSessions(prev => [payload.new, ...prev])
@@ -185,7 +184,7 @@ export function SupportInboxClient({ userId, initialSessions, defaultSessionId }
 
     const { error } = await supabase.from('support_messages').insert({
       session_id: selectedSessionId,
-      merchant_id: userId,
+      merchant_id: selectedSession?.merchant_id || userId,
       role: 'merchant',
       content: inputMessage
     })
@@ -425,10 +424,10 @@ export function SupportInboxClient({ userId, initialSessions, defaultSessionId }
                 <DropdownMenu>
                   <DropdownMenuTrigger 
                     render={
-                      <Button variant="ghost" size="sm" className="h-9 rounded-xl gap-2 text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50">
+                      <button className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), "h-9 rounded-xl gap-2 text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50")}>
                         <Tag size={14} strokeWidth={2.5} />
                         {selectedSession?.category ? CATEGORIES[selectedSession.category as keyof typeof CATEGORIES]?.label : 'Tag'}
-                      </Button>
+                      </button>
                     }
                   />
                   <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-200">
@@ -452,9 +451,9 @@ export function SupportInboxClient({ userId, initialSessions, defaultSessionId }
                 <DropdownMenu>
                   <DropdownMenuTrigger 
                     render={
-                      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-slate-400 hover:bg-slate-50 outline-none">
+                      <button className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), "h-9 w-9 rounded-xl text-slate-400 hover:bg-slate-50 outline-none")}>
                         <MoreVertical size={18} strokeWidth={2.5} />
-                      </Button>
+                      </button>
                     }
                   />
                   <DropdownMenuContent align="end" className="w-56 p-2 rounded-2xl shadow-2xl border-slate-200">

@@ -33,14 +33,23 @@ export default async function OrdersPage({
     { data: revenueData },
     { data: merchantData },
     { data: einvoiceConfig },
-    { data: statusCountsData }
+    { data: statusCountsData },
+    { data: fulfilments }
   ] = await Promise.all([
     statsQuery,
     pendingStatsQuery,
     revenueQuery,
     merchant ? supabase.from('merchants').select('*').eq('id', merchant.id).single() : Promise.resolve({ data: null }),
     merchant ? supabase.from('merchant_einvoice_config').select('*').eq('merchant_id', merchant.id).maybeSingle() : Promise.resolve({ data: null }),
-    supabase.rpc('get_order_status_counts', { p_merchant_id: merchant?.id || null })
+    supabase.rpc('get_order_status_counts', { p_merchant_id: merchant?.id || null }),
+    supabase.from('fulfilments')
+      .select(`
+        *,
+        order:orders(*, customer:customers(*)),
+        fulfilment_items(*, product:products(name, sku), variant:product_variants(name, sku))
+      `)
+      .in('status', ['pending', 'picking', 'picked', 'packing', 'packed'])
+      .order('created_at', { ascending: false })
   ])
 
   const revenueToday = (revenueData || []).reduce((acc, curr) => acc + Number(curr.total_amount), 0)
@@ -58,7 +67,7 @@ export default async function OrdersPage({
       id, order_number, status, payment_method, delivery_type, 
       delivery_provider, driver_name, tracking_number, created_at, 
       buyer_name, delivery_address, total_amount, delivery_status, 
-      delivery_tracking_url,
+      delivery_tracking_url, fulfilment_status,
       items:order_items(product_name, quantity, variant_name, line_total, unit_price),
       einvoices!einvoices_order_id_fkey(status, lhdn_long_id, submission_uid)
     `, { count: 'exact' })
@@ -90,6 +99,7 @@ export default async function OrdersPage({
   return (
     <OrdersTable
       orders={orders ?? []}
+      initialFulfilments={fulfilments || []}
       total={count ?? 0}
       page={Number(page)}
       pageSize={PAGE_SIZE}

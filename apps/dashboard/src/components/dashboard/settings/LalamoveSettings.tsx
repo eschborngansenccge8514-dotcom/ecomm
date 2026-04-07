@@ -83,6 +83,7 @@ export function LalamoveSettings({ config: initial, merchantId }: {
     default_service_type:    initial?.default_service_type  ?? 'MOTORCYCLE',
     default_priority_fee_rm: initial?.default_priority_fee_rm ?? 0,
     auto_book_on_ready:      initial?.auto_book_on_ready    ?? false,
+    is_enabled:              initial?.is_enabled            ?? false,
   })
 
   const [showKey,    setShowKey]    = useState(false)
@@ -137,12 +138,12 @@ export function LalamoveSettings({ config: initial, merchantId }: {
     setTesting(false)
   }
 
-  // Save all other settings (non-credential fields)
   const handleSave = async () => {
     if (!form.pickup_contact_name || !form.pickup_contact_phone || !form.pickup_address_text) {
       toast.error('Pickup contact name, phone, and address are required')
       return
     }
+    const hasCredentials = !!(form.api_key && form.api_secret)
     setSaving(true)
 
     const { error } = await supabase
@@ -158,6 +159,9 @@ export function LalamoveSettings({ config: initial, merchantId }: {
         auto_book_on_ready:       form.auto_book_on_ready,
         environment:              form.environment,
         market:                   form.market,
+        api_key:                  form.api_key || null,
+        api_secret:               form.api_secret || null,
+        is_enabled:               hasCredentials,
         updated_at:               new Date().toISOString(),
       }, { onConflict: 'merchant_id' })
 
@@ -175,15 +179,9 @@ export function LalamoveSettings({ config: initial, merchantId }: {
       {/* ── Credentials ──────────────────────────────────────────────────── */}
       <Section
         title="API Credentials"
-        subtitle="Platform-wide credentials are used for order creation. These settings are for diagnostic purposes."
+        subtitle="Choose between using the platform's account or your own Lalamove account."
       >
-        <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex gap-2.5 items-start">
-          <AlertTriangle size={15} className="text-blue-600 mt-0.5 shrink-0" />
-          <p className="text-xs text-blue-700 leading-relaxed">
-            <strong>Platform Managed:</strong> Orders are now processed using the platform's global Lalamove account. 
-            You do not need to enter your own API keys unless you are testing a specific integration.
-          </p>
-        </div>
+        {/* Custom Account Toggle Removed - logic handled by presence of keys */}
 
         {/* Environment toggle */}
         <div>
@@ -219,8 +217,8 @@ export function LalamoveSettings({ config: initial, merchantId }: {
         </div>
 
         {/* API Key */}
-        <div className="opacity-60">
-          <Label>API Key (Optional)</Label>
+        <div>
+          <Label>API Key</Label>
           <div className="relative mt-1.5">
             <Input
               type={showKey ? 'text' : 'password'}
@@ -240,8 +238,8 @@ export function LalamoveSettings({ config: initial, merchantId }: {
         </div>
 
         {/* API Secret */}
-        <div className="opacity-60">
-          <Label>API Secret (Optional)</Label>
+        <div>
+          <Label>API Secret</Label>
           <div className="relative mt-1.5">
             <Input
               type={showSecret ? 'text' : 'password'}
@@ -260,27 +258,6 @@ export function LalamoveSettings({ config: initial, merchantId }: {
           </div>
         </div>
 
-
-        {/* API Secret */}
-        <div>
-          <Label>API Secret</Label>
-          <div className="relative mt-1.5">
-            <Input
-              type={showSecret ? 'text' : 'password'}
-              value={form.api_secret}
-              onChange={e => set('api_secret', e.target.value)}
-              placeholder="Paste your Lalamove API Secret"
-              className="pr-10 font-mono text-sm"
-            />
-            <button
-              type="button"
-              onClick={() => setShowSecret(v => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-        </div>
 
         {/* Test result badge */}
         {testResult && (

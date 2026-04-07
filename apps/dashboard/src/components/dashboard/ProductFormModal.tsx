@@ -11,8 +11,11 @@ import toast        from 'react-hot-toast'
 import { X, Plus, Trash2, Upload, Loader2 } from 'lucide-react'
 import { type StoreType } from '@/lib/store-types'
 import { ProductTypeFields } from './ProductTypeFields'
+import { generateEAN13, detectBarcodeFormat } from '@/lib/barcode-utils'
 
-interface Variant { id?: string; name: string; price_modifier: number; stock_quantity: number }
+
+interface Variant { id?: string; name: string; price_modifier: number; stock_quantity: number; barcode?: string }
+
 
 export function ProductFormModal({ merchantId, categories, product, storeType, onClose, onSaved }: {
   merchantId: string; categories: any[]; product: any | null; storeType: StoreType
@@ -31,8 +34,11 @@ export function ProductFormModal({ merchantId, categories, product, storeType, o
     track_inventory: product?.track_inventory ?? true,
     stock_quantity: product?.stock_quantity ?? 0,
     sku:           product?.sku         ?? '',
+    barcode:       product?.barcode     ?? '',
     is_featured:    product?.is_featured ?? false,
+
     compare_at_price: product?.compare_at_price ?? '',
+    cost_price:       product?.cost_price       ?? '',
   })
   const [variants, setVariants]         = useState<Variant[]>(product?.variants ?? [])
   const [images, setImages]             = useState<string[]>(product?.images ?? [])
@@ -108,8 +114,11 @@ export function ProductFormModal({ merchantId, categories, product, storeType, o
         track_inventory: form.track_inventory,
         stock_quantity: form.track_inventory ? Number(form.stock_quantity) : 9999,
         sku:            form.sku.trim() || null,
+        barcode:        form.barcode.trim() || null,
         is_featured:    form.is_featured,
+
         compare_at_price: form.compare_at_price ? Number(form.compare_at_price) : null,
+        cost_price:     form.cost_price ? Number(form.cost_price) : 0,
         images,
       }
 
@@ -134,6 +143,8 @@ export function ProductFormModal({ merchantId, categories, product, storeType, o
             name:           v.name,
             price_modifier: Number(v.price_modifier),
             stock_quantity: Number(v.stock_quantity),
+            barcode:        v.barcode?.trim() || null,
+
           }))
         if (variantPayload.length > 0) {
           // Delete old + re-insert (simplest approach)
@@ -164,8 +175,7 @@ export function ProductFormModal({ merchantId, categories, product, storeType, o
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-      onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl">
 
         {/* Header */}
@@ -224,17 +234,47 @@ export function ProductFormModal({ merchantId, categories, product, storeType, o
             </div>
           </div>
 
-          {/* SKU + Featured */}
+          {/* SKU + Barcode */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>SKU</Label>
               <Input value={form.sku} onChange={e => set('sku', e.target.value)} placeholder="e.g. NL-001" />
             </div>
-            <div className="flex items-center justify-between bg-amber-50/50 border border-amber-100 rounded-xl px-3 py-2 mt-auto h-10">
-              <span className="text-sm font-medium text-amber-900">Featured Product</span>
-              <Switch checked={form.is_featured} onCheckedChange={v => set('is_featured', v)} />
+            <div>
+              <Label className="flex justify-between">
+                Barcode
+                {form.barcode && (
+                  <span className="text-[10px] font-normal text-blue-500 bg-blue-50 px-1 rounded">
+                    {detectBarcodeFormat(form.barcode)}
+                  </span>
+                )}
+              </Label>
+              <div className="flex gap-2">
+                <Input 
+                  value={form.barcode} 
+                  onChange={e => set('barcode', e.target.value)} 
+                  placeholder="e.g. 9556001234567" 
+                  className="flex-1"
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  className="px-2 h-9"
+                  onClick={() => set('barcode', generateEAN13())}
+                >
+                  Gen
+                </Button>
+              </div>
             </div>
           </div>
+
+          {/* Featured */}
+          <div className="flex items-center justify-between bg-amber-50/50 border border-amber-100 rounded-xl px-3 py-2">
+            <span className="text-sm font-medium text-amber-900">Featured Product</span>
+            <Switch checked={form.is_featured} onCheckedChange={v => set('is_featured', v)} />
+          </div>
+
 
           {/* Description */}
           <div>
@@ -248,7 +288,12 @@ export function ProductFormModal({ merchantId, categories, product, storeType, o
             <div>
               <Label>Price (RM) *</Label>
               <Input type="number" min="0" step="0.01" value={form.price}
-                onChange={e => set('price', e.target.value)} placeholder="0.00" />
+                onChange={e => set('price', e.target.value)} placeholder="0.01" />
+            </div>
+            <div>
+              <Label>Cost Price (RM)</Label>
+              <Input type="number" min="0" step="0.01" value={form.cost_price}
+                onChange={e => set('cost_price', e.target.value)} placeholder="0.00" />
             </div>
             <div>
               <Label>Compare-at Price (RM)</Label>
@@ -271,21 +316,12 @@ export function ProductFormModal({ merchantId, categories, product, storeType, o
             </div>
           </div>
 
-          {/* Stock tracking */}
-          <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3">
-            <div>
-              <p className="text-sm font-medium text-gray-800">Track inventory</p>
-              <p className="text-xs text-gray-400">Auto-deduct stock when orders are placed</p>
-            </div>
-            <Switch checked={form.track_inventory} onCheckedChange={v => set('track_inventory', v)} />
+          {/* Stock tracking - Toggle removed as requested */}
+          <div>
+            <Label>Stock Quantity</Label>
+            <Input type="number" min="0" value={form.stock_quantity}
+              onChange={e => set('stock_quantity', e.target.value)} />
           </div>
-          {form.track_inventory && (
-            <div>
-              <Label>Stock Quantity</Label>
-              <Input type="number" min="0" value={form.stock_quantity}
-                onChange={e => set('stock_quantity', e.target.value)} />
-            </div>
-          )}
 
           {/* Type-specific custom fields */}
           <ProductTypeFields
@@ -313,17 +349,21 @@ export function ProductFormModal({ merchantId, categories, product, storeType, o
                   <Input type="number" placeholder="+/- RM" step="0.01"
                     value={v.price_modifier}
                     onChange={e => updateVariant(i, 'price_modifier', e.target.value)}
-                    className="w-24" />
+                    className="w-20" />
                   <Input type="number" placeholder="Stock" min="0"
                     value={v.stock_quantity}
                     onChange={e => updateVariant(i, 'stock_quantity', e.target.value)}
-                    className="w-20" />
+                    className="w-16" />
+                  <Input placeholder="Barcode" value={v.barcode || ''}
+                    onChange={e => updateVariant(i, 'barcode', e.target.value)}
+                    className="w-28" />
                   <button onClick={() => removeVariant(i)}
                     className="text-red-400 hover:text-red-600 transition-colors">
                     <Trash2 size={16} />
                   </button>
                 </div>
               ))}
+
             </div>
           </div>
         </div>

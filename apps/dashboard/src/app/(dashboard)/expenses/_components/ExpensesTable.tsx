@@ -26,8 +26,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { deleteExpense } from '../actions'
+import { deleteExpense, exportExpensesCsv } from '../actions'
 import { toast } from 'react-hot-toast'
+import { 
+  ChevronLeft,
+  ChevronRight as ChevronRightIcon,
+  Calendar
+} from 'lucide-react'
 
 const CATEGORY_FILTERS = [
   { key: 'all', label: 'All Expenses', emoji: '📊' },
@@ -53,12 +58,50 @@ export function ExpensesTable({
   const [isPending, startTransition] = useTransition()
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
 
-  const navigate = (params: Record<string, string>) => {
+  const navigate = (params: Record<string, string | null>) => {
     const sp = new URLSearchParams(searchParams.toString())
     Object.entries(params).forEach(([k, v]) => {
       if (v) sp.set(k, v); else sp.delete(k)
     })
+    // Reset page if filters change (except when paging itself)
+    if (!('page' in params)) sp.delete('page')
     router.push(`/expenses?${sp.toString()}`)
+  }
+
+  const page = parseInt(searchParams.get('page') || '1')
+  const totalPages = Math.ceil(totalCount / 20)
+  const startDate = searchParams.get('startDate') || ''
+  const endDate = searchParams.get('endDate') || ''
+
+  const handleExport = async () => {
+    const tid = toast.loading('Generating CSV...')
+    try {
+      const csv = await exportExpensesCsv({
+        category: currentCategory,
+        search: searchQuery,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined
+      })
+      
+      if (!csv) {
+        toast.error('No data to export', { id: tid })
+        return
+      }
+
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `expenses-${format(new Date(), 'yyyy-MM-dd')}.csv`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+      toast.success('Exported successfully', { id: tid })
+    } catch (err: any) {
+      toast.error(err.message, { id: tid })
+    }
   }
 
   const handleSearch = (e: React.FormEvent) => {
@@ -83,12 +126,12 @@ export function ExpensesTable({
       {/* Filters & Search */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex bg-white rounded-2xl border border-gray-100 p-1 gap-1 overflow-x-auto no-scrollbar">
+          <div className="flex bg-white rounded-2xl border border-gray-100 p-1 gap-1 overflow-x-auto no-scrollbar items-center">
             {CATEGORY_FILTERS.map(f => (
               <button key={f.key}
                 onClick={() => navigate({ category: f.key })}
                 className={cn(
-                  'px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center gap-2 whitespace-nowrap',
+                  'px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-200 flex items-center gap-2 whitespace-nowrap',
                   currentCategory === f.key
                     ? 'bg-gray-900 text-white shadow-md shadow-gray-200'
                     : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
@@ -98,10 +141,36 @@ export function ExpensesTable({
                 {f.label}
               </button>
             ))}
+            <div className="w-px h-6 bg-gray-100 mx-2 shrink-0" />
+            <div className="flex items-center gap-2 px-2 text-gray-400">
+               <Calendar size={14} />
+               <input 
+                 type="date" 
+                 value={startDate}
+                 onChange={(e) => navigate({ startDate: e.target.value })}
+                 className="bg-transparent border-none text-[11px] font-bold text-gray-900 focus:ring-0 p-0"
+               />
+               <span className="text-[10px] font-black">—</span>
+               <input 
+                 type="date" 
+                 value={endDate}
+                 onChange={(e) => navigate({ endDate: e.target.value })}
+                 className="bg-transparent border-none text-[11px] font-bold text-gray-900 focus:ring-0 p-0"
+               />
+               {(startDate || endDate) && (
+                 <button onClick={() => navigate({ startDate: null, endDate: null })} className="p-1 hover:bg-gray-50 rounded-md text-rose-500">
+                   <Trash2 size={12} />
+                 </button>
+               )}
+            </div>
           </div>
 
-          <Button variant="outline" className="rounded-2xl h-11 px-4 border-gray-200">
-            <Download size={18} className="mr-2 text-gray-500" />
+          <Button 
+            variant="outline" 
+            onClick={handleExport}
+            className="rounded-2xl h-11 px-4 border-gray-200 font-bold text-xs"
+          >
+            <Download size={16} className="mr-2 text-gray-500" />
             Export CSV
           </Button>
         </div>
@@ -235,6 +304,52 @@ export function ExpensesTable({
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between bg-white p-4 rounded-[24px] border border-gray-100 shadow-sm">
+          <p className="text-xs font-bold text-gray-400">
+            Showing <span className="text-gray-900">{(page - 1) * 20 + 1}</span> to <span className="text-gray-900">{Math.min(page * 20, totalCount)}</span> of <span className="text-gray-900">{totalCount}</span> expenses
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => navigate({ page: (page - 1).toString() })}
+              className="rounded-xl h-9 border-gray-200 font-bold text-xs"
+            >
+              <ChevronLeft size={14} className="mr-1" /> Previous
+            </Button>
+            <div className="flex items-center gap-1">
+               {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+                 const p = i + 1;
+                 return (
+                   <button
+                     key={p}
+                     onClick={() => navigate({ page: p.toString() })}
+                     className={cn(
+                       "w-9 h-9 rounded-xl text-xs font-bold transition-all",
+                       page === p ? "bg-gray-900 text-white shadow-md" : "text-gray-500 hover:bg-gray-50"
+                     )}
+                   >
+                     {p}
+                   </button>
+                 )
+               })}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => navigate({ page: (page + 1).toString() })}
+              className="rounded-xl h-9 border-gray-200 font-bold text-xs"
+            >
+              Next <ChevronRightIcon size={14} className="ml-1" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -39,7 +39,8 @@ export function InventoryAdjustmentModal({ product, onClose, onSaved }: Props) {
     : product.stock_quantity ?? 0
 
   const handleSave = async () => {
-    const delta = mode === 'add' ? Number(amount) : -Number(amount)
+    const absAmount = Math.abs(Number(amount))
+    const delta = mode === 'add' ? absAmount : -absAmount
     if (isNaN(delta) || delta === 0) {
       toast.error('Invalid amount')
       return
@@ -60,11 +61,13 @@ export function InventoryAdjustmentModal({ product, onClose, onSaved }: Props) {
       if (selectedVariantId) {
         updated.variants = updated.variants.map((v: any) => 
           v.id === selectedVariantId 
-            ? { ...v, stock_quantity: v.stock_quantity + delta } 
+            ? { ...v, stock_quantity: Number(v.stock_quantity || 0) + delta } 
             : v
         )
+        // Also update the total product stock so the main table reflects the change
+        updated.stock_quantity = Number(updated.stock_quantity || 0) + delta
       } else {
-        updated.stock_quantity = (updated.stock_quantity ?? 0) + delta
+        updated.stock_quantity = Number(updated.stock_quantity || 0) + delta
       }
       
       onSaved(updated)

@@ -1,11 +1,5 @@
-'use server'
-import { getSuppliers } from '@/lib/supplier-actions'
-import { SupplierListClient } from '@/components/dashboard/inventory/SupplierListClient'
+import { redirect } from 'next/navigation'
 
 export default async function SuppliersPage() {
-  const suppliers = await getSuppliers()
-
-  return (
-    <SupplierListClient suppliers={suppliers} />
-  )
+  redirect('/inventory/purchasing?tab=suppliers')
 }

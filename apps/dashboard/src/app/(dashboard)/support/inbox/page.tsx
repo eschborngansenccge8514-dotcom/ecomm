@@ -8,14 +8,14 @@ export default async function SupportInboxPage() {
     return <div>Unauthorized</div>
   }
 
-  // Fetch all support sessions for this merchant
+  // Fetch all support sessions for this merchant (and platform support)
   const { data: sessions } = await supabase
     .from('support_sessions')
     .select(`
       *,
       support_messages (count)
     `)
-    .eq('merchant_id', user.id)
+    .or(`merchant_id.eq.${user.id},merchant_id.is.null`)
     .order('updated_at', { ascending: false })
 
   return (

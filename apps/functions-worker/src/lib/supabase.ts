@@ -24,6 +24,9 @@ export interface Bindings {
   RAZORPAY_WEBHOOK_SECRET: string
   RESEND_API_KEY: string
   RESEND_WEBHOOK_SECRET: string
+  GOOGLE_GENERATIVE_AI_API_KEY: string
+  META_APP_ID: string
+  META_APP_SECRET: string
   EVOLUTION_API_URL: string
   EVOLUTION_API_KEY: string
   WHATSAPP_INSTANCE_NAME: string

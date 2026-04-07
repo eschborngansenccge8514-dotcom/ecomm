@@ -24,9 +24,10 @@ import { savePlaybook, runPlaybook, listPlaybooks,
          pushDashboardAlert, getMerchantSnapshot }         from './automation'
 import { listPurchaseOrders, getPurchaseOrderDetails,
          createPurchaseOrder, sendPurchaseOrder,
-         listSuppliers }            from './procurement'
+         listSuppliers, receiveGoods }            from './procurement'
 import { sendEmailTool }          from './communication'
 import { whatsappSendTextTool, whatsappCheckNumberTool } from './whatsapp'
+import { recordExpense, listExpenses, getExpenseDetails } from './expenses'
 
 export const buildTools = (merchantId: string, sessionId: string) => ({
   // Orders (6)
@@ -97,9 +98,15 @@ export const buildTools = (merchantId: string, sessionId: string) => ({
   create_purchase_order:          createPurchaseOrder(merchantId, sessionId),
   send_purchase_order:            sendPurchaseOrder(merchantId, sessionId),
   list_suppliers:                 listSuppliers(merchantId, sessionId),
+  receive_goods:                  receiveGoods(merchantId, sessionId),
 
   // Communication (3)
   send_email:                     sendEmailTool(merchantId, sessionId),
   whatsapp_send_text:             whatsappSendTextTool(merchantId, sessionId),
-  whatsapp_check_number:          whatsappCheckNumberTool(merchantId, sessionId)
+  whatsapp_check_number:          whatsappCheckNumberTool(merchantId, sessionId),
+
+  // Expenses (3)
+  record_expense:                 recordExpense(merchantId, sessionId),
+  list_expenses:                   listExpenses(merchantId, sessionId),
+  get_expense_details:             getExpenseDetails(merchantId, sessionId)
 })

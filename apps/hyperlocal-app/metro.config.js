@@ -19,6 +19,7 @@ config.resolver.nodeModulesPaths = [
 // 3. Explicitly map problematic packages
 config.resolver.extraNodeModules = {
   'scheduler': path.resolve(workspaceRoot, 'node_modules/scheduler'),
+  'react-dom/server.browser.js': path.resolve(projectRoot, 'node_modules/react-dom/server.browser.js'),
 };
 
 module.exports = withNativeWind(config, { input: './global.css' });

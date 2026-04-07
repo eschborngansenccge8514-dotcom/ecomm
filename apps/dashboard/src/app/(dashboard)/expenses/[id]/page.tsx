@@ -43,12 +43,21 @@ export default async function ExpenseDetailPage({
            </div>
            
            <Card className="rounded-[40px] border-gray-100 shadow-xl overflow-hidden bg-gray-50 aspect-[3/4] relative group">
-              <img src={expense.receipt_url} alt="Receipt" className="w-full h-full object-contain" />
-              <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-8">
-                <Link href={expense.receipt_url} target="_blank" className="p-4 bg-white rounded-full shadow-2xl text-gray-900 font-bold flex items-center gap-2 hover:scale-110 transition-all">
-                   Open Original <ArrowLeft className="rotate-135" size={16} />
-                </Link>
-              </div>
+              {expense.receipt_url ? (
+                <>
+                  <img src={expense.receipt_url} alt="Receipt" className="w-full h-full object-contain" />
+                  <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-8">
+                    <Link href={expense.receipt_url} target="_blank" className="p-4 bg-white rounded-full shadow-2xl text-gray-900 font-bold flex items-center gap-2 hover:scale-110 transition-all">
+                       Open Original <ArrowLeft className="rotate-135" size={16} />
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-gray-300 gap-3">
+                   <Receipt size={48} />
+                   <p className="text-sm font-bold">No receipt image available</p>
+                </div>
+              )}
            </Card>
         </div>
 

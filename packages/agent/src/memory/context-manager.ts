@@ -32,10 +32,10 @@ export async function buildContextMessages(
     .from('agent_messages')
     .select('role, content, created_at')
     .eq('session_id', sessionId)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(40)
 
-  const history: CoreMessage[] = (rows ?? []).map(r => ({
+  const history: CoreMessage[] = (rows ?? []).reverse().map(r => ({
     role: r.role as 'user' | 'assistant',
     content: r.content
   }))

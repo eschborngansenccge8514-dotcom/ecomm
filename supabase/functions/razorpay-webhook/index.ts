@@ -95,8 +95,11 @@ serve(async (req) => {
   if (event.event === 'payment.captured') {
     const payment  = event.payload.payment.entity
     const orderId  = payment.notes?.hyperlocal_order_id
+    const type     = payment.notes?.type
+    const topupId  = payment.notes?.topup_id
 
-    if (orderId) {
+    // Case 1: Standard Order Payment
+    if (orderId && !type) {
       await supabase
         .from('orders')
         .update({
@@ -107,6 +110,30 @@ serve(async (req) => {
         })
         .eq('id', orderId)
         .in('status', ['pending'])
+    }
+
+    // Case 2: Wallet Top-up
+    if (type === 'wallet_topup' && topupId) {
+      const amount = Number(payment.amount) / 100 // Convert from sen
+      const merchantId = payment.notes.merchant_id
+
+      // Get wallet
+      const { data: wallet } = await supabase
+        .from('merchant_wallets')
+        .select('id')
+        .eq('merchant_id', merchantId)
+        .single()
+
+      if (wallet) {
+        // Atomic credit
+        await supabase.rpc('handle_wallet_topup_credit', {
+          p_wallet_id: wallet.id,
+          p_topup_id:  topupId,
+          p_amount:    amount,
+          p_gateway:   'razorpay',
+          p_ref:       payment.id
+        })
+      }
     }
   }
 

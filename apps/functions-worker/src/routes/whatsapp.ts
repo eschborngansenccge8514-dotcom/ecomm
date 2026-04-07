@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { Bindings, getSupabaseClient } from '../lib/supabase'
 import { injectEnv } from '../env_shim'
-import { handleMerchantWhatsApp } from '@project1/agent'
+import { handleMerchantWhatsApp, extractReceiptData } from '@project1/agent'
 import { handleWhatsAppMessage, createSupportSession } from '@project1/support-agent'
 
 const whatsapp = new Hono<{ Bindings: Bindings }>()
@@ -184,19 +184,77 @@ whatsapp.post('/webhook/*', async (c) => {
     }
   }
 
-  const messageText = message.conversation || message.extendedTextMessage?.text
-  if (!messageText) {
+  let messageText = message.conversation || message.extendedTextMessage?.text
+  
+  // If it's an image or document, attempt to extract receipt data
+  let isMediaDetails = false
+  if (message.imageMessage || message.documentMessage) {
+     const mimeType = message.imageMessage?.mimetype || message.documentMessage?.mimetype
+     // Evolution API can provide base64 right in the webhook if configured,
+     // or we expect the message to have a base64 field from some other extension.
+     // Also checking if it is image/jpeg, image/png, etc or pdf
+     if (mimeType?.includes('image') || mimeType?.includes('pdf')) {
+        let base64Data = ''
+        if (data.message?.base64) {
+           base64Data = data.message.base64
+        } else if (message.imageMessage?.url) {
+           // We might need to handle this manually if webhook base64 is off, 
+           // but let's try calling Evolution API getBase64 as fallback
+           try {
+             const res = await fetch(`${c.env.EVOLUTION_API_URL}/chat/getBase64/${body.instance}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'apikey': c.env.EVOLUTION_API_KEY || '' },
+                body: JSON.stringify({ message: message }) // Send the raw message object
+             }).catch(() => null)
+             
+             if (res && res.ok) {
+                const b64Json = await res.json() as any
+                base64Data = b64Json.base64
+             }
+           } catch(e) { console.error('Failed to get bases64', e) }
+        }
+        
+        if (base64Data) {
+            try {
+              // Re-inject environment variables since this is detached/running in Edge sometimes
+              // though right now we're still in the main request handler (synchronous phase)
+              // We'll put this logic inside waitUntil to ensure it works, but wait -
+              // If we put it in wait until, it's safer. Let's do it immediately for now 
+              // Wait, the process gets base64 then sends to extractReceiptData
+              
+              // We convert base64 to buffer for the AI sdk
+              const buffer = Buffer.from(base64Data, 'base64')
+              
+              const extraction = await extractReceiptData(buffer as unknown as ArrayBuffer, mimeType as any)
+              
+              const attachedText = `[User sent a receipt image. Extracted Details: ${JSON.stringify(extraction, null, 2)}] \nPlease record this expense if clear, and let me know.`
+              messageText = (messageText ? messageText + '\n\n' : '') + attachedText
+              isMediaDetails = true
+            } catch(e) {
+              console.error('Failed to extract receipt', e)
+              const attachedText = '[User sent an image but AI failed to parse receipt details.]'
+              messageText = (messageText ? messageText + '\n\n' : '') + attachedText
+              isMediaDetails = true
+            }
+        }
+     }
+  }
+
+  if (!messageText && !isMediaDetails) {
     return c.json({ success: true, ignored: 'non_text' })
   }
 
-  const senderRemoteJid = body.sender || data.key?.remoteJid
-  const senderNumber = senderRemoteJid?.split('@')[0]
+  const remoteJid = data.key?.remoteJid
+  const isFromMe = !!data.key?.fromMe
   const instanceName = body.instance
 
-  if (!senderNumber || !instanceName) {
-    console.log(`[WhatsApp Webhook] Missing info: sender=${senderNumber}, instance=${instanceName}`)
+  if (!remoteJid || !instanceName) {
+    console.log(`[WhatsApp Webhook] Missing info: remoteJid=${remoteJid}, instance=${instanceName}`)
     return c.json({ success: false, error: 'missing_info' })
   }
+
+  // The conversation we're in (reply target)
+  const conversationJid = remoteJid
 
   c.executionCtx.waitUntil((async () => {
     try {
@@ -215,8 +273,16 @@ whatsapp.post('/webhook/*', async (c) => {
         return
       }
 
-      const isMerchantSender = senderNumber === merchant.phone?.replace(/\D/g, '')
-      console.log(`[WhatsApp Webhook] Sender: ${senderNumber}, Merchant Phone: ${merchant.phone}, isMerchant: ${isMerchantSender}`)
+      // Identify the sender number for logging and session lookups
+      const senderNumber = isFromMe ? 
+          merchant.phone?.replace(/\D/g, '') : 
+          remoteJid.split('@')[0]
+
+      // If it's 'fromMe', it's definitely the merchant talking from their linked phone.
+      // Otherwise, check if the sender number matches the registered merchant phone.
+      const isMerchantSender = isFromMe || (senderNumber === merchant.phone?.replace(/\D/g, ''))
+      
+      console.log(`[WhatsApp Webhook] isFromMe: ${isFromMe}, Sender: ${senderNumber}, Merchant Phone: ${merchant.phone}, isMerchant: ${isMerchantSender}`)
       
       let replyText = ''
       let sessionId = ''
@@ -228,8 +294,7 @@ whatsapp.post('/webhook/*', async (c) => {
           const { data: session } = await supabase
             .from('agent_sessions')
             .select('id')
-            .eq('user_id', merchant.owner_id)
-            .eq('merchant_id', merchant.id)
+            .eq('merchant_id', merchant.owner_id)
             .order('updated_at', { ascending: false })
             .limit(1)
             .maybeSingle()
@@ -237,10 +302,10 @@ whatsapp.post('/webhook/*', async (c) => {
           sessionId = session?.id || ''
           if (!sessionId) {
             const { data: newSess, error: sErr } = await supabase.from('agent_sessions').insert({ 
-              merchant_id: merchant.id, 
+              merchant_id: merchant.owner_id, 
               title: 'WhatsApp Merchant Chat',
               status: 'active'
-            }).select('id').single()
+            }).select('id').maybeSingle()
             
             if (sErr || !newSess) {
               console.error('[WhatsApp Webhook] Session Creation Error:', sErr)
@@ -273,7 +338,7 @@ whatsapp.post('/webhook/*', async (c) => {
           if (sess) {
             supportSessionId = sess.id
           } else {
-            supportSessionId = await createSupportSession(merchant.id, undefined, `WhatsApp: ${senderNumber}`)
+            supportSessionId = await createSupportSession(merchant.owner_id, undefined, `WhatsApp: ${senderNumber}`)
             await supabase.from('support_sessions').update({ customer_phone: senderNumber }).eq('id', supportSessionId)
           }
 
@@ -297,7 +362,7 @@ whatsapp.post('/webhook/*', async (c) => {
           merchant_id: merchant.id,
           session_id: sessionId || 'error-session',
           support_session_id: supportSessionId,
-          recipient_number: senderRemoteJid,
+          recipient_number: conversationJid,
           sender_number: senderNumber,
           message_content: `[ERROR] AI processing failed: ${agentErr.message}`,
           direction: 'outbound',
@@ -311,7 +376,7 @@ whatsapp.post('/webhook/*', async (c) => {
         merchant_id: merchant.id,
         session_id: sessionId,
         support_session_id: supportSessionId,
-        recipient_number: senderRemoteJid,
+        recipient_number: conversationJid,
         sender_number: senderNumber,
         message_content: messageText,
         direction: 'inbound',
@@ -324,7 +389,7 @@ whatsapp.post('/webhook/*', async (c) => {
           method: 'POST',
           headers: getHeaders(c.env),
           body: JSON.stringify({
-            number: senderRemoteJid,
+            number: conversationJid,
             options: { delay: 1500, presence: 'composing' },
             text: replyText
           })
@@ -336,11 +401,24 @@ whatsapp.post('/webhook/*', async (c) => {
              merchant_id: merchant.id,
              session_id: sessionId,
              support_session_id: supportSessionId,
-             recipient_number: senderRemoteJid,
+             recipient_number: conversationJid,
              message_content: replyText,
              direction: 'outbound',
              status: 'sent',
              evolution_message_id: sendData.key?.id || sendData.message?.key?.id
+           })
+        } else {
+           const errorBody = await sendRes.text()
+           console.error('[WhatsApp Webhook] Message Send Failed:', errorBody)
+           await supabase.from('whatsapp_messages').insert({
+             merchant_id: merchant.id,
+             session_id: sessionId,
+             support_session_id: supportSessionId,
+             recipient_number: conversationJid,
+             message_content: `[ERROR] Send Failed: ${errorBody}`,
+             direction: 'outbound',
+             status: 'error',
+             sender_number: senderNumber
            })
         }
       }

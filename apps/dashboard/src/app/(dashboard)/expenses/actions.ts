@@ -63,7 +63,7 @@ export async function saveExpense(input: any) {
       tax_deductible_pct:    pct,
       tax_deductible_reason: input.taxDeductibleReason,
       deductible_amount:     deductibleAmt,
-      status:                "confirmed",
+      status:                input.status || "confirmed",
       ai_confidence_score:   input.confidenceScore,
       ai_notes:              input.aiNotes,
       notes:                 input.notes,
@@ -80,13 +80,25 @@ export async function saveExpense(input: any) {
   return data;
 }
 
-export async function getExpenses(filters?: { category?: string; search?: string }) {
+export async function getExpenses(filters?: { 
+  category?: string; 
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  pageSize?: number;
+}) {
   const { supabase, merchant } = await getAuthContext();
-  if (!merchant) return [];
+  if (!merchant) return { data: [], totalCount: 0 };
+
+  const page = filters?.page || 1;
+  const pageSize = filters?.pageSize || 20;
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
 
   let query = supabase
     .from("expenses")
-    .select("*")
+    .select("*", { count: "exact" })
     .eq("merchant_id", merchant.id)
     .order("receipt_date", { ascending: false });
 
@@ -98,13 +110,22 @@ export async function getExpenses(filters?: { category?: string; search?: string
     query = query.ilike("vendor_name", `%${filters.search}%`);
   }
 
-  const { data, error } = await query;
-  if (error) {
-    console.error("Get expenses error:", error.message || error);
-    return [];
+  if (filters?.startDate) {
+    query = query.gte("receipt_date", filters.startDate);
   }
 
-  return data;
+  if (filters?.endDate) {
+    query = query.lte("receipt_date", filters.endDate);
+  }
+
+  const { data, error, count } = await query.range(from, to);
+  
+  if (error) {
+    console.error("Get expenses error:", error.message || error);
+    return { data: [], totalCount: 0 };
+  }
+
+  return { data: data || [], totalCount: count || 0 };
 }
 
 export async function getExpenseSummary(year?: number) {
@@ -221,4 +242,55 @@ export async function deleteExpense(id: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/expenses");
+}
+
+export async function exportExpensesCsv(filters?: { category?: string; search?: string; startDate?: string; endDate?: string }) {
+  const { supabase, merchant } = await getAuthContext();
+  if (!merchant) throw new Error("Unauthorized");
+
+  let query = supabase
+    .from("expenses")
+    .select("receipt_date, vendor_name, category, total_amount, sst_amount, deductible_amount, payment_method, notes")
+    .eq("merchant_id", merchant.id)
+    .order("receipt_date", { ascending: false });
+
+  if (filters?.category && filters.category !== "all") {
+    query = query.eq("category", filters.category);
+  }
+
+  if (filters?.search) {
+    query = query.ilike("vendor_name", `%${filters.search}%`);
+  }
+
+  if (filters?.startDate) {
+    query = query.gte("receipt_date", filters.startDate);
+  }
+
+  if (filters?.endDate) {
+    query = query.lte("receipt_date", filters.endDate);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  if (!data || data.length === 0) return "";
+
+  const headers = ["Date", "Vendor", "Category", "Total Amount", "SST Amount", "Deductible Amount", "Payment Method", "Notes"];
+  const rows = data.map(e => [
+    e.receipt_date ? new Date(e.receipt_date).toLocaleDateString() : "",
+    e.vendor_name || "",
+    e.category || "",
+    e.total_amount || 0,
+    e.sst_amount || 0,
+    e.deductible_amount || 0,
+    e.payment_method || "",
+    e.notes || ""
+  ]);
+
+  const csvContent = [
+    headers.join(","),
+    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+  ].join("\n");
+
+  return csvContent;
 }

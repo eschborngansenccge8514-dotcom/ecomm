@@ -1,0 +1,12 @@
+{
+  "buildCommand": "pnpm --filter hyperlocal-app build",
+  "installCommand": "pnpm install",
+  "outputDirectory": "apps/hyperlocal-app/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "cleanUrls": true
+}

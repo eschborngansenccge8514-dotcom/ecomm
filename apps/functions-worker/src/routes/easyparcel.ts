@@ -36,10 +36,10 @@ easyparcel.post('/rate-check', async (c) => {
       .eq('merchant_id', order.merchant_id)
       .maybeSingle()
 
-    const epCallConfig = { 
-      apiKey: epConfig?.api_key || c.env.EASYPARCEL_API_KEY, 
-      authKey: epConfig?.auth_key || c.env.EASYPARCEL_AUTH_KEY,
-      environment: epConfig?.environment || 'sandbox' 
+    const epCallConfig = {
+      apiKey: (epConfig?.is_enabled && epConfig?.api_key) ? epConfig.api_key : c.env.EASYPARCEL_API_KEY,
+      authKey: (epConfig?.is_enabled && epConfig?.auth_key) ? epConfig.auth_key : c.env.EASYPARCEL_AUTH_KEY,
+      environment: (epConfig?.is_enabled && epConfig?.environment) ? epConfig.environment : "sandbox"
     }
 
     const epData = await callEasyParcel(supabase, orderId, 'MPRateCheckingBulk', {
@@ -118,10 +118,10 @@ easyparcel.post('/create-order', async (c) => {
       .eq('merchant_id', order.merchant_id)
       .maybeSingle()
 
-    const epCallConfig = { 
-      apiKey: epConfig?.api_key || c.env.EASYPARCEL_API_KEY, 
-      authKey: epConfig?.auth_key || c.env.EASYPARCEL_AUTH_KEY,
-      environment: epConfig?.environment || 'sandbox' 
+    const epCallConfig = {
+      apiKey: (epConfig?.is_enabled && epConfig?.api_key) ? epConfig.api_key : c.env.EASYPARCEL_API_KEY,
+      authKey: (epConfig?.is_enabled && epConfig?.auth_key) ? epConfig.auth_key : c.env.EASYPARCEL_AUTH_KEY,
+      environment: (epConfig?.is_enabled && epConfig?.environment) ? epConfig.environment : "sandbox"
     }
 
     if (!epCallConfig.apiKey || !epCallConfig.authKey) {
@@ -272,10 +272,10 @@ easyparcel.post('/sync-status', async (c) => {
       .eq('merchant_id', shipment.merchant_id)
       .maybeSingle()
 
-    const epCallConfig = { 
-      apiKey: epConfig?.api_key || c.env.EASYPARCEL_API_KEY, 
-      authKey: epConfig?.auth_key || c.env.EASYPARCEL_AUTH_KEY,
-      environment: epConfig?.environment || 'sandbox' 
+    const epCallConfig = {
+      apiKey: (epConfig?.is_enabled && epConfig?.api_key) ? epConfig.api_key : c.env.EASYPARCEL_API_KEY,
+      authKey: (epConfig?.is_enabled && epConfig?.auth_key) ? epConfig.auth_key : c.env.EASYPARCEL_AUTH_KEY,
+      environment: (epConfig?.is_enabled && epConfig?.environment) ? epConfig.environment : "sandbox"
     }
 
     const trackData = await callEasyParcel(supabase, order_id, 'MPTrackingBulk', {

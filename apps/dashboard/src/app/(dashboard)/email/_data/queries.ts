@@ -6,7 +6,7 @@ export type EmailLog = {
   resend_id: string | null;
   template: string;
   recipient: string;
-  status: 'sent' | 'delivered' | 'failed' | 'bounced' | 'complained';
+  status: 'received' | 'sent' | 'delivered' | 'failed' | 'bounced' | 'complained';
   error: string | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
@@ -15,6 +15,7 @@ export type EmailLog = {
 export type EmailKpis = {
   total: number;
   delivered: number;
+  received: number;
   failed: number;
   bounced: number;
 };
@@ -45,13 +46,14 @@ export async function getEmailKpis(): Promise<EmailKpis> {
 
   if (error) {
     console.error('[queries] getEmailKpis error:', error.message);
-    return { total: 0, delivered: 0, failed: 0, bounced: 0 };
+    return { total: 0, delivered: 0, received: 0, failed: 0, bounced: 0 };
   }
 
   const rows = data ?? [];
   return {
-    total:     rows.length,
+    total:     rows.filter(r => r.status !== 'received').length, // Total outbound
     delivered: rows.filter((r) => r.status === 'delivered').length,
+    received:  rows.filter((r) => r.status === 'received').length,
     failed:    rows.filter((r) => r.status === 'failed').length,
     bounced:   rows.filter((r) => r.status === 'bounced').length,
   };

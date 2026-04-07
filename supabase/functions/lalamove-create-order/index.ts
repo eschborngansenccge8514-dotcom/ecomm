@@ -44,6 +44,18 @@ serve(async (req) => {
 
     if (orderError || !order) return err('Order not found')
 
+    // ── Pre-booking Balance Check ──────────────────────────────────────────
+    const { data: wallet } = await supabase
+      .from('merchant_wallets')
+      .select('balance')
+      .eq('merchant_id', order.merchant_id)
+      .single()
+
+    if (!wallet || Number(wallet.balance) < 10) {
+      return err('Insufficient wallet balance. Please top up at least RM 10.00 to book deliveries.')
+    }
+    // ──────────────────────────────────────────────────────────────────────
+
     const { data: llConfig } = await supabase
       .from('merchant_lalamove_config')
       .select('*')
@@ -55,11 +67,10 @@ serve(async (req) => {
     }
 
     // ── SECRETS ──────────────────────────────────────────────────────────
-    // Reverted to global secrets as requested
-    const apiKey    = Deno.env.get('LALAMOVE_API_KEY')
-    const apiSecret = Deno.env.get('LALAMOVE_API_SECRET')
-    const market    = Deno.env.get('LALAMOVE_MARKET') || 'MY'
-    const env       = Deno.env.get('DELIVERY_ENV')   || 'sandbox'
+    const apiKey    = (llConfig?.is_enabled && llConfig?.api_key) ? llConfig.api_key : Deno.env.get('LALAMOVE_API_KEY')
+    const apiSecret = (llConfig?.is_enabled && llConfig?.api_secret) ? llConfig.api_secret : Deno.env.get('LALAMOVE_API_SECRET')
+    const market    = llConfig?.market || Deno.env.get('LALAMOVE_MARKET') || 'MY'
+    const env       = (llConfig?.is_enabled && llConfig?.environment) ? llConfig.environment : (Deno.env.get('DELIVERY_ENV') || 'sandbox')
     const baseUrl   = getLalamoveBaseUrl(env)
 
     if (!apiKey || !apiSecret) {
@@ -211,6 +222,21 @@ serve(async (req) => {
 
     const lalamoveOrderId = createData.data?.orderId
     const lalamoveData = createData.data
+    const totalFee = Number(lalamoveData?.priceBreakdown?.total || 0)
+
+    // 4.5 Deduct from wallet
+    if (totalFee > 0) {
+      try {
+        await supabase.rpc('deduct_shipping_wallet_balance', {
+          p_merchant_id: order.merchant_id,
+          p_amount:      totalFee,
+          p_order_id:    orderId,
+          p_description: `Lalamove booking for order ${order.order_number}`
+        })
+      } catch (deductErr: any) {
+        console.error('[lalamove-create-order] Wallet deduction failed:', deductErr.message)
+      }
+    }
 
     // 5. Update order record
     const { error: updateError } = await supabase.from('orders').update({

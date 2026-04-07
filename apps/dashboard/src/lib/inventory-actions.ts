@@ -154,7 +154,7 @@ export async function searchProducts(query: string) {
 
   const { data, error } = await supabase
     .from('products')
-    .select('id, name, sku, stock_quantity, product_variants(id, name, sku, stock_quantity)')
+    .select('id, name, sku, stock_quantity, track_inventory, barcode, cost_price, description, weight_grams, product_variants(id, name, sku, stock_quantity)')
     .eq('merchant_id', merchant.id)
     .or(`name.ilike.%${query}%,sku.ilike.%${query}%`)
     .limit(10)
@@ -185,3 +185,27 @@ export async function getOutlets() {
   if (error) throw error
   return data
 }
+
+export async function getSuppliers() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data: merchant } = await supabase
+    .from('merchants')
+    .select('id')
+    .eq('owner_id', user.id)
+    .single()
+
+  if (!merchant) throw new Error('Merchant not found')
+
+  const { data, error } = await supabase
+    .from('suppliers')
+    .select('*')
+    .eq('merchant_id', merchant.id)
+    .order('name', { ascending: true })
+
+  if (error) throw error
+  return data
+}
+

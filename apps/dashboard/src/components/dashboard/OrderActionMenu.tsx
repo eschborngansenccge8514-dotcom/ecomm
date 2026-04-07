@@ -139,6 +139,13 @@ export function OrderActionMenu({
               <span className="font-semibold">Start Preparing</span>
             </DropdownMenuItem>
           )}
+
+          {['confirmed', 'preparing', 'ready_for_pickup'].includes(status) && order.fulfilment_status !== 'fulfilled' && (
+             <DropdownMenuItem onClick={() => router.push(`/orders/${order.id}?action=create-fulfilment`)} className="rounded-xl focus:bg-blue-50 focus:text-blue-600 cursor-pointer">
+                <Package className="mr-2 h-4 w-4 text-blue-500" />
+                <span className="font-semibold text-blue-600">Create Fulfilment 📦</span>
+             </DropdownMenuItem>
+          )}
           {(status === 'preparing' && provider !== 'lalamove') && (
             <DropdownMenuItem onClick={() => handleUpdateStatus('ready_for_pickup')} className="rounded-xl focus:bg-cyan-50 focus:text-cyan-600 cursor-pointer">
               <Truck className="mr-2 h-4 w-4 text-cyan-500" />

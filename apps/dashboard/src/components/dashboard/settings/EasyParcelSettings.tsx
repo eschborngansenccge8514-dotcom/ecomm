@@ -102,6 +102,9 @@ export function EasyParcelSettings({ config: initial, merchantId, merchant }: {
     preferred_courier:    initial?.preferred_courier   ?? '',
     collection_type:      initial?.collection_type     ?? 'pickup',
     auto_book_on_ready:   initial?.auto_book_on_ready  ?? false,
+    is_enabled:           initial?.is_enabled          ?? false,
+    api_key:              initial?.api_key             ?? '',
+    auth_key:             initial?.auth_key            ?? '',
   })
 
   const [saving, setSaving] = useState(false)
@@ -124,6 +127,10 @@ export function EasyParcelSettings({ config: initial, merchantId, merchant }: {
   }
 
   const handleSave = async () => {
+    if (form.is_enabled && (!form.api_key || !form.auth_key)) {
+      toast.error('API Key and Auth Key are required to use your own EasyParcel account')
+      return
+    }
     setSaving(true)
     const { error } = await supabase
       .from('merchant_easyparcel_config')
@@ -140,6 +147,66 @@ export function EasyParcelSettings({ config: initial, merchantId, merchant }: {
 
   return (
     <div className="space-y-4 pt-1">
+      <Section
+        title="Custom Account"
+        subtitle="Choose between using the platform's account or your own EasyParcel account."
+      >
+        <div className="flex items-center justify-between p-4 bg-blue-50 rounded-2xl border border-blue-100">
+          <div className="space-y-0.5">
+            <Label className="text-base font-bold text-blue-900">Use Custom EasyParcel Account</Label>
+            <p className="text-xs text-blue-700">Enable this to use your own API Key and Auth Key. Otherwise, the platform's account will be used.</p>
+          </div>
+          <Switch
+            checked={form.is_enabled}
+            onCheckedChange={v => set('is_enabled', v)}
+          />
+        </div>
+
+        {!form.is_enabled && (
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 flex gap-2.5 items-start">
+            <AlertTriangle size={15} className="text-gray-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-gray-500 leading-relaxed">
+              <strong>Platform Managed:</strong> Shipments are currently processed using the platform's global EasyParcel account. 
+              You do not need to provide credentials unless you want to use your own account for billing.
+            </p>
+          </div>
+        )}
+
+        {form.is_enabled && (
+          <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>API Key</Label>
+                <Input
+                  value={form.api_key}
+                  onChange={e => set('api_key', e.target.value)}
+                  placeholder="ep-..."
+                  className="mt-1.5 font-mono text-sm"
+                />
+              </div>
+              <div>
+                <Label>Auth Key</Label>
+                <Input
+                  value={form.auth_key}
+                  onChange={e => set('auth_key', e.target.value)}
+                  placeholder="Paste your EasyParcel Auth Key"
+                  className="mt-1.5 font-mono text-sm"
+                />
+              </div>
+            </div>
+            <a
+              href="https://easyparcel.com/my/en/integration/api-key/"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
+            >
+              <ExternalLink size={12} />
+              Find your keys in EasyParcel Dashboard
+            </a>
+          </div>
+        )}
+      </Section>
+
       <Section
         title="Sender Details"
         subtitle="These appear on the AWB (airway bill) as the sender. Must match your EasyParcel account details."

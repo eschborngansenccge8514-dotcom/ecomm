@@ -9,8 +9,8 @@ export const searchKnowledgeBase = tool({
   parameters: z.object({
     query: z.string().describe('The regulatory question to search for')
   }),
-  execute: async ({ query }) => ({
+  execute: async ({ query }: any) => ({
     search_query: query,
     instruction: 'Answer using the connected File Search store. Cite the source document and section.'
   })
-})
+} as any)

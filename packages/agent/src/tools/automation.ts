@@ -127,14 +127,28 @@ export const pushDashboardAlert = (merchantId: string, sessionId: string) =>
 // Tool 5: Get merchant context snapshot — low risk
 export const getMerchantSnapshot = (merchantId: string, sessionId: string) =>
   tool({
-    description: 'Get a full context snapshot of current business state: pending orders, unshipped items, unpaid invoices, low stock, and pending approvals. Use at the start of any scheduled run.',
+    description: 'Get a full context snapshot of current business state: pending orders, stock alerts, and financial summary (including expenses).',
     parameters: z.object({
-      include: z.array(z.enum([
-        'pending_orders', 'unshipped_orders', 'pending_approvals',
-        'unpaid_invoices', 'low_stock', 'failed_payments', 'all'
-      ])).default(['all'])
+      daysLookback: z.number().default(30).describe('How many days back to include in the snapshot')
     }),
     execute: (input: any) =>
       executeWithGuard('get_merchant_snapshot', input, { riskLevel: 'low' }, merchantId, sessionId,
-        () => edgeCall('merchant-snapshot', { ...input, merchant_id: merchantId }))
+        async () => {
+          const supabase = createClient(
+            process.env.SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+          )
+          const now = new Date()
+          const start = new Date(now.getTime() - (input.daysLookback * 24 * 60 * 60 * 1000)).toISOString().split('T')[0]
+          const end   = now.toISOString().split('T')[0]
+          
+          const { data, error } = await supabase.rpc('get_dashboard_overview', {
+            p_merchant_id: merchantId,
+            p_start: start,
+            p_end: end
+          })
+          if (error) throw new Error(`Failed to get merchant snapshot: ${error.message}`)
+          return data
+        })
   } as any)
+

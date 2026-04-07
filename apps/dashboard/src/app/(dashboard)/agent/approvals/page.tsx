@@ -60,9 +60,9 @@ export default function ApprovalsPage() {
         <div className="space-y-1">
           <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <ShieldAlert className="w-5 h-5 text-amber-500" />
-            Security Approvals
+            Human in the Loop
           </h1>
-          <p className="text-xs text-slate-500">Approve or reject high-risk autonomous actions.</p>
+          <p className="text-xs text-slate-500">Approve or reject actions requiring merchant intervention.</p>
         </div>
         {approvals.length > 0 && (
           <div className="bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-400 px-3 py-1 rounded-full text-xs font-bold tracking-wide animate-pulse">
@@ -77,7 +77,7 @@ export default function ApprovalsPage() {
             <CheckCircle2 className="w-8 h-8 text-green-500" />
           </div>
           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">All clear!</p>
-          <p className="text-xs text-slate-500 mt-1">There are no agent actions awaiting your approval.</p>
+          <p className="text-xs text-slate-500 mt-1">There are no agent actions awaiting your review.</p>
         </div>
       ) : (
         <div className="grid gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -95,7 +95,7 @@ export default function ApprovalsPage() {
         <div className="bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30">
           <p className="text-[11px] leading-relaxed text-blue-700/80 dark:text-blue-400/80">
             <span className="font-bold uppercase tracking-widest mr-1">Trust & Safety:</span>
-            MerchantMind will never execute high-risk operations (like logistics bookings or order cancellations) without your explicit permission here.
+            MerchantMind will never execute high-risk operations (like logistics bookings or order cancellations) without your explicit permission here. This "human in the loop" verification ensures your business stays under your control.
           </p>
         </div>
       </div>

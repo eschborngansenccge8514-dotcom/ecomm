@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import type { EmailLog } from './_data/queries';
 
 const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  received:   'default',
   sent:       'secondary',
   delivered:  'default',
   failed:     'destructive',
@@ -104,7 +105,7 @@ export function EmailLogTable({ initialData }: { initialData: EmailLog[] }) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
-            {['sent', 'delivered', 'failed', 'bounced', 'complained'].map((s) => (
+            {['received', 'sent', 'delivered', 'failed', 'bounced', 'complained'].map((s) => (
               <SelectItem key={s} value={s}>{s}</SelectItem>
             ))}
           </SelectContent>

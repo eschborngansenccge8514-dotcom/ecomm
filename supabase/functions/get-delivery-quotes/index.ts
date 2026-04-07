@@ -161,12 +161,17 @@ serve(async (req) => {
   }
 
   const weightKg = Math.max(Number(totalWeightKg) || 0.5, 0.1)
-  const isProd    = Deno.env.get('DELIVERY_ENV') === 'production'
-  const lalaBase  = isProd ? 'https://rest.lalamove.com' : 'https://rest.sandbox.lalamove.com'
+  const { data: llConfig } = await supabase
+    .from('merchant_lalamove_config')
+    .select('*')
+    .eq('merchant_id', merchantId)
+    .maybeSingle()
+
+  const lalaKey   = (llConfig?.is_enabled && llConfig?.api_key) ? llConfig.api_key : Deno.env.get('LALAMOVE_API_KEY')
+  const lalaSec   = (llConfig?.is_enabled && llConfig?.api_secret) ? llConfig.api_secret : Deno.env.get('LALAMOVE_API_SECRET')
+  const lalaEnv   = (llConfig?.is_enabled && llConfig?.environment) ? llConfig.environment : (Deno.env.get('DELIVERY_ENV') || 'sandbox')
+  const lalaBase  = (lalaEnv === 'production') ? 'https://rest.lalamove.com' : 'https://rest.sandbox.lalamove.com'
   const lalaPath  = '/v3/quotations'
-  const lalaKey   = Deno.env.get('LALAMOVE_API_KEY')   ?? ''
-  const lalaSec   = Deno.env.get('LALAMOVE_API_SECRET') ?? ''
-  const epKey     = Deno.env.get('EASYPARCEL_API_KEY')  ?? ''
 
   const runInstant = !mode || mode === 'all' || mode === 'instant'
   const runCourier = !mode || mode === 'all' || mode === 'courier' || mode === 'merchant'
@@ -261,8 +266,9 @@ serve(async (req) => {
         .single()
 
       const epCallConfig = { 
-        apiKey:      epConfig?.api_key || Deno.env.get('EASYPARCEL_API_KEY'), 
-        environment: epConfig?.environment || 'sandbox' 
+        apiKey:      (epConfig?.is_enabled && epConfig?.api_key) ? epConfig.api_key : Deno.env.get('EASYPARCEL_API_KEY'), 
+        authKey:     (epConfig?.is_enabled && (epConfig?.auth_key || epConfig?.api_secret)) ? (epConfig.auth_key || epConfig.api_secret) : Deno.env.get('EASYPARCEL_AUTH_KEY'),
+        environment: (epConfig?.is_enabled && epConfig?.environment) ? epConfig.environment : (Deno.env.get('DELIVERY_ENV') || 'sandbox')
       }
 
       const weightKgStr = Math.max(Number(weightKg || 0.5), 0.1).toFixed(1)

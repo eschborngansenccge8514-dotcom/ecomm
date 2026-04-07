@@ -1,18 +1,12 @@
 import { tool } from 'ai'
 import { z } from 'zod'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  return createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
+import { SupabaseClient } from '@supabase/supabase-js'
 
 export const buildSupportTools = (
-  merchantId: string, 
-  ownerId: string, 
+  merchantId: string | null, 
+  ownerId: string | null, 
   sessionId: string,
+  supabase: SupabaseClient,
   customerId?: string // The authenticated customer's user UUID
 ) => ({
   /**
@@ -24,10 +18,10 @@ export const buildSupportTools = (
     parameters: z.object({
       order_id: z.string().describe('The order number (e.g., ORD-2026-01063 or just 01063)')
     }),
-    execute: async ({ order_id }: { order_id: string }) => {
+    execute: async ({ order_id }: any) => {
       if (!order_id) return { error: 'Missing order_id' }
+      if (!merchantId) return { error: 'Order lookup is not available for platform support.' }
       
-      const supabase = getSupabase()
       let query = supabase
         .from('orders')
         .select(`
@@ -54,7 +48,7 @@ export const buildSupportTools = (
 
       return { order: data }
     }
-  }) as any,
+  } as any),
 
   /**
    * Get shipment tracking details for an order.
@@ -64,9 +58,10 @@ export const buildSupportTools = (
     parameters: z.object({
       order_id: z.string().describe('The order number')
     }),
-    execute: async ({ order_id }: { order_id: string }) => {
+    execute: async ({ order_id }: any) => {
       if (!order_id) return { error: 'Missing order_id' }
-      const supabase = getSupabase()
+      if (!merchantId) return { error: 'Shipment tracking is not available for platform support.' }
+
       let query = supabase
         .from('orders')
         .select('delivery_status, tracking_number, tracking_url, delivery_provider')
@@ -88,7 +83,7 @@ export const buildSupportTools = (
         provider: data.delivery_provider
       }
     }
-  }) as any,
+  } as any),
 
   /**
    * Search the merchant's frequently asked questions and policies.
@@ -98,8 +93,9 @@ export const buildSupportTools = (
     parameters: z.object({
       query: z.string().describe('The question or topic to search for')
     }),
-    execute: async ({ query }: { query: string }) => {
-      const supabase = getSupabase()
+    execute: async ({ query }: any) => {
+      if (!ownerId) return { message: 'No FAQ information available for platform support.' }
+      
       const { data, error } = await supabase
         .from('support_configs')
         .select('knowledge_base_text')
@@ -122,7 +118,7 @@ export const buildSupportTools = (
           : 'I couldn\'t find a specific answer in our policies. Would you like to speak with a human?'
       }
     }
-  }) as any,
+  } as any),
 
   /**
    * List all recent orders for this customer at this store.
@@ -131,8 +127,7 @@ export const buildSupportTools = (
     description: 'List the customer\'s recent orders at this store.',
     parameters: z.object({}),
     execute: async () => {
-      if (!customerId) return { error: 'Customer identity not available.' }
-      const supabase = getSupabase()
+      if (!merchantId || !customerId) return { error: 'Order list is not available.' }
       const { data, error } = await supabase
         .from('orders')
         .select('order_number, status, total_amount, created_at, delivery_status')
@@ -145,7 +140,7 @@ export const buildSupportTools = (
       if (!data || data.length === 0) return { message: 'No orders found at this store.' }
       return { orders: data }
     }
-  }) as any,
+  } as any),
 
   /**
    * Submit a return request for an order.
@@ -156,10 +151,10 @@ export const buildSupportTools = (
       order_id: z.string().describe('The order number'),
       reason: z.string().describe('Reason for the return')
     }),
-    execute: async ({ order_id, reason }: { order_id: string; reason: string }) => {
+    execute: async ({ order_id, reason }: any) => {
       if (!order_id) return { error: 'Missing order_id' }
+      if (!merchantId) return { error: 'Return requests are not available for platform support.' }
 
-      const supabase = getSupabase()
       let query = supabase
         .from('orders')
         .select('id')
@@ -184,7 +179,7 @@ export const buildSupportTools = (
       if (error) return { error: 'Failed to submit return request.' }
       return { success: true, message: 'Your return request has been submitted. Our team will review it shortly.' }
     }
-  }) as any,
+  } as any),
 
   /**
    * Escalate the conversation to a human support agent.
@@ -194,9 +189,7 @@ export const buildSupportTools = (
     parameters: z.object({
       reason: z.string().describe('A brief explanation of why escalation is needed')
     }),
-    execute: async ({ reason }: { reason: string }) => {
-      const supabase = getSupabase()
-      
+    execute: async ({ reason }: any) => {
       const { error: escError } = await supabase.from('support_escalations').insert({
         session_id: sessionId,
         merchant_id: ownerId,
@@ -212,12 +205,20 @@ export const buildSupportTools = (
 
       if (sessError) return { error: 'Failed to update session status.' }
 
+      // NEW: Notify merchant via WhatsApp
+      const { informMerchantViaWhatsApp } = await import('../utils/whatsapp-notifier')
+      await informMerchantViaWhatsApp(
+        ownerId,
+        `🚨 *Support Escalation Alert*\n\nA customer is requesting human assistance.\n\n*Reason*: ${reason}\n*Session ID*: ${sessionId.slice(0, 8)}...\n\nPlease check your dashboard to take over.`,
+        supabase
+      )
+
       return { 
         success: true, 
         message: 'I have notified a human agent. They will get back to you as soon as possible. Feel free to leave more details here.' 
       }
     }
-  }) as any,
+  } as any),
 
   /**
    * Collect customer contact information for session persistence and follow-up.
@@ -228,8 +229,7 @@ export const buildSupportTools = (
       name: z.string().describe('The customer\'s name'),
       email: z.string().email().describe('The customer\'s email address')
     }),
-    execute: async ({ name, email }: { name: string; email: string }) => {
-      const supabase = getSupabase()
+    execute: async ({ name, email }: any) => {
       const { error } = await supabase
         .from('support_sessions')
         .update({ customer_name: name, customer_email: email })
@@ -238,5 +238,5 @@ export const buildSupportTools = (
       if (error) return { error: 'Failed to save contact information.' }
       return { success: true, message: `Thank you, ${name}. I've updated your contact information.` }
     }
-  }) as any
+  } as any)
 })

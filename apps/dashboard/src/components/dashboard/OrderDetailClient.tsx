@@ -1,6 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { format } from 'date-fns'
 import {
@@ -282,6 +282,13 @@ import {
   updateOrderStatus 
 } from '@/lib/order-actions'
 import { invokeWorker } from '@/lib/worker'
+import { 
+  getFulfilments, 
+  createFulfilment, 
+  updateFulfilmentStatus 
+} from '@/lib/fulfilment-actions'
+import { printPickList, printPackingSlip } from '@/lib/fulfilment-print'
+
 
 // ─── Modals ──────────────────────────────────────────────────────────────────
 
@@ -477,6 +484,112 @@ function CourierSelectionModal({
     </div>
   )
 }
+function CreateFulfilmentModal({
+  open,
+  order,
+  fulfilments = [],
+  onClose,
+  onCreate
+}: {
+  open: boolean
+  order: any
+  fulfilments?: any[]
+  onClose: () => void
+  onCreate: (items: any[]) => void
+}) {
+  // calculate fulfilled amounts per item id
+  const itemFulfilled = useMemo(() => {
+    const counts: Record<string, number> = {}
+    fulfilments.forEach(f => {
+      if (f.status === 'cancelled') return
+      f.fulfilment_items?.forEach((fi: any) => {
+        counts[fi.order_item_id] = (counts[fi.order_item_id] || 0) + fi.quantity
+      })
+    })
+    return counts
+  }, [fulfilments])
+
+  const [quantities, setQuantities] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    if (open) {
+      setQuantities(
+        Object.fromEntries(order.items?.map((i: any) => [
+          i.id, 
+          Math.max(0, i.quantity - (itemFulfilled[i.id] || 0))
+        ]) || [])
+      )
+    }
+  }, [open, order.items, itemFulfilled])
+
+  if (!open) return null
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Create New Fulfilment</DialogTitle>
+          <p className="text-sm text-gray-500">Select items and quantities to fulfil in this batch.</p>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto px-1">
+          {order.items?.map((item: any) => {
+            const qty = quantities[item.id] || 0
+            return (
+              <div key={item.id} className="flex items-center justify-between gap-4 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-gray-900">{item.product_name}</p>
+                  <p className="text-xs text-gray-400">{item.variant_name || 'No variant'}</p>
+                  <p className="text-[10px] text-gray-500 mt-1 uppercase font-bold tracking-tight">Ordered: {item.quantity}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button 
+                    className="w-8 h-8 bg-white border border-gray-200 rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors"
+                    onClick={() => setQuantities(q => ({ ...q, [item.id]: Math.max(0, q[item.id] - 1) }))}
+                  >
+                    −
+                  </button>
+                  <span className="w-6 text-center text-sm font-black text-blue-600">{qty}</span>
+                  <button 
+                    className="w-8 h-8 bg-white border border-gray-200 rounded-lg flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors"
+                    onClick={() => setQuantities(q => ({ ...q, [item.id]: Math.min(item.quantity - (itemFulfilled[item.id] || 0), q[item.id] + 1) }))}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <DialogFooter className="bg-gray-50 -mx-6 -mb-6 p-6 mt-2">
+          <Button variant="outline" className="rounded-xl border-gray-200" onClick={onClose}>Cancel</Button>
+          <Button 
+            className="bg-blue-600 hover:bg-blue-700 text-white border-0 rounded-xl px-6"
+            onClick={() => {
+              const selectedItems = order.items
+                .filter((i: any) => quantities[i.id] > 0)
+                .map((i: any) => ({
+                  order_item_id: i.id,
+                  quantity: quantities[i.id],
+                  product_id: i.product_id,
+                  variant_id: i.variant_id
+                }))
+              if (selectedItems.length === 0) {
+                toast.error('Select at least one item')
+                return
+              }
+              onCreate(selectedItems)
+            }}
+          >
+            Create Batch
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // Classification codes per LHDN MyInvois specification
 const CLASSIFICATION_CODES = [
   { code: '022', label: 'Others', desc: 'General retail goods/services with no specific category' },
@@ -965,9 +1078,13 @@ function IssueEInvoiceModal({
 export function OrderDetailClient({ order: initial, merchantId, customerOrderCount }: {
   order: any; merchantId: string; customerOrderCount: number
 }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [order, setOrder] = useState(initial)
   const [isUpdating, setIsUpdating] = useState(false)
   
+
+
   // Billplz Refund Modal State
   const [showBillplzRefund, setShowBillplzRefund] = useState(false)
   const [billplzRefundData, setBillplzRefundData] = useState({
@@ -993,6 +1110,11 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
   const [easyparcelShipment, setEasyparcelShipment] = useState<any>(null)
   const [showManifest, setShowManifest] = useState(false)
   const [copiedAwb, setCopiedAwb] = useState(false)
+  
+  const [fulfilments, setFulfilments] = useState<any[]>([])
+  const [loadingFulfilments, setLoadingFulfilments] = useState(false)
+  const [showFulfilmentModal, setShowFulfilmentModal] = useState(false)
+
 
   const copyAwb = (awb: string) => {
     navigator.clipboard.writeText(awb)
@@ -1000,9 +1122,6 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
     setTimeout(() => setCopiedAwb(false), 2000)
     toast.success('AWB copied to clipboard')
   }
-
-
-  const router = useRouter()
   const addr = order.delivery_address as any
   const actions = NEXT_ACTIONS[order.status] ?? []
 
@@ -1073,7 +1192,22 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
       if (data) setMerchantEinvoiceConfig(data)
     }
     fetchConfig()
+
+    // Fetch fulfilments
+    const fetchFulfilments = async () => {
+      setLoadingFulfilments(true)
+      try {
+        const data = await getFulfilments(order.id)
+        setFulfilments(data)
+      } catch (err) {
+        console.error('Failed to fetch fulfilments:', err)
+      } finally {
+        setLoadingFulfilments(false)
+      }
+    }
+    fetchFulfilments()
   }, [order.id, merchantId])
+
 
   // Fetch EasyParcel shipment details for troubleshooting
   const fetchEasyParcelShipment = useCallback(async () => {
@@ -1449,6 +1583,23 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
     )
   }
 
+  const handleCreateFulfilment = async (items: any[]) => {
+    setShowFulfilmentModal(false)
+    setIsUpdating(true)
+    const tId = toast.loading('Creating fulfilment batch...')
+    try {
+      await createFulfilment(order.id, items)
+      toast.success('Batch created!', { id: tId })
+      const data = await getFulfilments(order.id)
+      setFulfilments(data)
+      router.refresh()
+    } catch (err: any) {
+      toast.error(err.message, { id: tId })
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
   const handleBillplzRefund = async () => {
     if (!billplzRefundData.accountName || !billplzRefundData.accountNumber) {
       toast.error('Please fill in all bank details')
@@ -1550,6 +1701,16 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
     !order.lalamove_order_id &&
     !order.tracking_number &&
     ['confirmed', 'preparing', 'ready_for_pickup'].includes(order.status)
+
+  // Quick actions via URL
+  useEffect(() => {
+    const action = searchParams.get('action')
+    if (action === 'create-fulfilment' && order.status !== 'cancelled' && order.status !== 'unpaid') {
+      setShowFulfilmentModal(true)
+    } else if (action === 'book-courier' && order.delivery_provider === 'easyparcel') {
+      handleBookEasyParcel()
+    }
+  }, [searchParams, order.id, order.status, order.delivery_provider, handleBookEasyParcel])
 
   return (
     <>
@@ -1690,6 +1851,114 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
                 </div>
               </div>
             </SectionCard>
+
+            {/* Fulfilment */}
+            {order.status !== 'cancelled' && order.status !== 'unpaid' && (
+              <SectionCard 
+                title="Fulfilment" 
+                icon={<Package size={16} className="text-blue-500" />}
+              >
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-gray-400 uppercase">Fulfilment Status</p>
+                      <div className="flex gap-2 items-center mt-1">
+                        <span className={cn(
+                          "px-2.5 py-1 rounded-full text-xs font-bold",
+                          order.fulfilment_status === 'fulfilled' ? "bg-green-100 text-green-700" :
+                          order.fulfilment_status === 'partially_fulfilled' ? "bg-amber-100 text-amber-700" :
+                          "bg-gray-100 text-gray-500"
+                        )}>
+                          {(order.fulfilment_status || 'unfulfilled').replace('_', ' ')}
+                        </span>
+                      </div>
+                    </div>
+                    {order.fulfilment_status !== 'fulfilled' && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => setShowFulfilmentModal(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white border-0 h-9 px-4 rounded-xl shadow-md"
+                      >
+                        <Plus size={14} className="mr-1.5" />
+                        New Fulfilment
+                      </Button>
+                    )}
+                  </div>
+
+                  {fulfilments.length > 0 ? (
+                    <div className="space-y-3 pt-2">
+                      {fulfilments.map((f) => (
+                        <div key={f.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-bold text-gray-900">{f.fulfilment_number}</p>
+                            <span className={cn(
+                              "px-2 py-0.5 rounded-full text-[10px] font-black uppercase",
+                              f.status === 'shipped' ? "bg-green-100 text-green-700" :
+                              f.status === 'delivered' ? "bg-green-100 text-green-700" :
+                              "bg-blue-100 text-blue-700"
+                            )}>
+                              {f.status}
+                            </span>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            {f.fulfilment_items.map((item: any) => (
+                              <div key={item.id} className="flex justify-between text-xs">
+                                <span className="text-gray-500">{item.quantity}× {item.variant?.name || item.product?.name || 'Item'}</span>
+                                {item.picked && <span className="text-green-600 font-bold">Picked</span>}
+                              </div>
+                            ))}
+                          </div>
+
+                          {f.status === 'pending' && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="w-full text-xs h-8 rounded-lg"
+                              onClick={async () => {
+                                try {
+                                  await updateFulfilmentStatus(f.id, 'picking')
+                                  const data = await getFulfilments(order.id)
+                                  setFulfilments(data)
+                                  toast.success('Fulfilment moved to picking')
+                                } catch (err: any) {
+                                  toast.error(err.message)
+                                }
+                              }}
+                            >
+                              Start Picking
+                            </Button>
+                          )}
+                          
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="flex-1 text-[10px] h-7 bg-white border border-gray-100"
+                              onClick={() => printPickList(f)}
+                            >
+                              <Printer size={10} className="mr-1" /> Pick List
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="flex-1 text-[10px] h-7 bg-white border border-gray-100"
+                              onClick={() => printPackingSlip(f)}
+                            >
+                              <Printer size={10} className="mr-1" /> Packing Slip
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-6 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                      <p className="text-sm text-gray-400 font-medium">No fulfilments created yet</p>
+                    </div>
+                  )}
+                </div>
+              </SectionCard>
+            )}
 
             {/* Customer info */}
             <SectionCard title="Customer" icon={<User size={16} />}>
@@ -2403,6 +2672,13 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <CreateFulfilmentModal
+        open={showFulfilmentModal}
+        order={order}
+        fulfilments={fulfilments}
+        onClose={() => setShowFulfilmentModal(false)}
+        onCreate={handleCreateFulfilment}
+      />
     </>
   )
 }
