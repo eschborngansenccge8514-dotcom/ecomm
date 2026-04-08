@@ -41,6 +41,7 @@ import {
 } from '@/lib/order-utils'
 import { OrderActionMenu } from './OrderActionMenu'
 import { bulkUpdateOrderStatus, printInvoice } from '@/lib/order-actions'
+import { batchCreateFulfilments } from '@/lib/fulfilment-actions'
 import { Progress } from '@/components/ui/progress'
 import { FulfilmentClient } from './FulfilmentClient'
 
@@ -198,6 +199,19 @@ export function OrdersTable({
     })
   }
 
+  const bulkCreateFulfilments = async () => {
+    if (selectedIds.length === 0) return
+    const tid = toast.loading(`Creating fulfilments for ${selectedIds.length} orders...`)
+    try {
+      const results = await batchCreateFulfilments(selectedIds)
+      setSelectedIds([])
+      toast.success(`Created ${results.length} fulfilment(s)`, { id: tid })
+      startTransition(() => { router.refresh() })
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create fulfilments', { id: tid })
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* View Toggle */}
@@ -330,6 +344,11 @@ export function OrdersTable({
               onClick={() => bulkUpdateStatus('preparing')}>
               Start Prep
             </Button>
+            <Button size="sm" variant="ghost" className="text-emerald-400 hover:bg-emerald-900/30 rounded-xl"
+              onClick={bulkCreateFulfilments}>
+              <Package size={14} className="mr-2" />
+              Fulfil
+            </Button>
             <Button size="sm" variant="ghost" className="text-blue-400 hover:bg-blue-900/30 rounded-xl"
               onClick={bulkPrintInvoices}>
               <Printer size={14} className="mr-2" />
@@ -344,194 +363,183 @@ export function OrdersTable({
       )}
 
       {/* Table */}
-      <div 
-        ref={parentRef}
-        className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-auto max-h-[850px] no-scrollbar scroll-smooth"
-      >
-        <div className="w-full min-w-[800px]">
-          <table className="w-full border-collapse relative">
-            <thead className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm shadow-sm group-hover:z-20">
-              <tr className="border-b border-gray-100">
-                <th className="px-6 py-4 text-left w-12">
-                  <Checkbox 
-                    checked={selectedIds.length === orders.length && orders.length > 0}
-                    onCheckedChange={toggleSelectAll}
-                    className="rounded-md border-gray-300"
-                  />
-                </th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Order</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Customer</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Fulfillment</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Total</th>
-                <th className="px-5 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Status & Progress</th>
-                <th className="px-5 py-4 text-right"></th>
-              </tr>
-            </thead>
-            <tbody 
-              style={{
-                height: `${totalSize}px`,
-                width: '100%',
-                position: 'relative',
-              }}
-            >
-              {orders.length === 0 ? (
-                <tr className="absolute w-full">
-                  <td colSpan={7} className="text-center py-20">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center text-gray-300">
-                        <Box size={32} />
-                      </div>
-                      <div>
-                        <p className="text-gray-900 font-semibold">No orders found</p>
-                        <p className="text-sm text-gray-400">Try adjusting your filters or search query</p>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                virtualItems.map(virtualRow => {
-                  const order = orders[virtualRow.index]
-                  const statusInfo = ORDER_STATUS_CONFIG[order.status] || { 
-                    label: order.status, 
-                    color: 'bg-gray-100 text-gray-700 border-gray-200' 
-                  }
-                  const payInfo = PAYMENT_METHOD_CONFIG[order.payment_method] || { label: order.payment_method, icon: CreditCard }
-                  const delInfo = DELIVERY_TYPE_CONFIG[order.delivery_type] || { label: 'Standard', icon: Truck }
-                  
-                  const delProgress = getDeliveryProgress(order)
-                  const provider = order.delivery_provider
-                  const isCancelled = order.status === 'cancelled' || order.status === 'refunded'
-                  
-                  // Provider styling
-                  const providerTheme = provider === 'lalamove' ? 'text-orange-600 bg-orange-50 border-orange-100' 
-                                      : provider === 'easyparcel' ? 'text-pink-600 bg-pink-50 border-pink-100'
-                                      : order.delivery_type === 'pickup' ? 'text-cyan-600 bg-cyan-50 border-cyan-100'
-                                      : statusInfo.color
-
-                  return (
-                    <tr 
-                      key={virtualRow.key} 
-                      data-index={virtualRow.index}
-                      className="group hover:bg-gray-50/80 transition-all duration-200 absolute w-full flex items-center border-b border-gray-50"
-                      style={{
-                        height: `${virtualRow.size}px`,
-                        transform: `translateY(${virtualRow.start}px)`,
-                      }}
-                    >
-                      <td className="px-6 py-5 w-12 shrink-0">
-                        <Checkbox 
-                          checked={selectedIds.includes(order.id)}
-                          onCheckedChange={() => toggleSelect(order.id)}
-                          className="rounded-md border-gray-300"
-                        />
-                      </td>
-                      <td className="px-5 py-5 flex-1 min-w-[120px]">
-                        <div className="flex flex-col">
-                          <span className="font-black text-gray-900 text-sm tracking-tight">#{order.order_number}</span>
-                          <span className="text-[11px] text-gray-400 font-bold flex items-center gap-1 mt-0.5">
-                            <Clock size={10} />
-                            {format(new Date(order.created_at), 'd MMM, h:mm a')}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-5 flex-1 min-w-[180px]">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-500 font-black text-xs shadow-inner shrink-0">
-                            {(order.buyer_name || (order.delivery_address as any)?.recipient_name || 'Guest').charAt(0)}
-                          </div>
-                          <div className="flex flex-col truncate">
-                            <span className="font-bold text-gray-900 text-sm truncate">
-                              {order.buyer_name || (order.delivery_address as any)?.recipient_name || 'Guest Customer'}
-                            </span>
-                            <span className="text-[11px] text-gray-400 font-bold uppercase tracking-tighter truncate">
-                              {order.delivery_address ? `📍 ${(order.delivery_address as any).city}` : 'No Address'}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-5 w-44 shrink-0">
-                        <div className="flex flex-col gap-1.5">
-                           <div className="flex items-center gap-2">
-                             <delInfo.icon size={14} className="text-gray-400" />
-                             <span className="text-xs font-bold text-gray-700 capitalize">
-                                {provider?.replace('_', ' ') || order.delivery_type}
-                             </span>
-                           </div>
-                           <div className="flex flex-wrap gap-1">
-                             <span className={cn(
-                               "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter w-fit shadow-inner",
-                               order.fulfilment_status === 'fulfilled' ? "bg-emerald-50 text-emerald-600 border border-emerald-100/50" :
-                               order.fulfilment_status === 'partially_fulfilled' ? "bg-amber-50 text-amber-600 border border-amber-100/50" :
-                               "bg-gray-50 text-gray-400 border border-gray-100"
-                             )}>
-                               {(order.fulfilment_status || 'unfulfilled').replace('_', ' ')}
-                             </span>
-                             {order.delivery_provider === 'lalamove' && order.driver_name && (
-                               <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full w-fit">
-                                 🏍️ {order.driver_name}
-                               </span>
-                             )}
-                             {order.tracking_number && (
-                               <span className="text-[9px] font-bold text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full w-fit">
-                                 📦 {order.tracking_number}
-                               </span>
-                             )}
-                           </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-5 w-32 shrink-0">
-                        <div className="flex flex-col">
-                          <span className="font-black text-gray-900 text-sm">RM {Number(order.total_amount).toFixed(2)}</span>
-                          <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1 mt-0.5">
-                            <payInfo.icon size={10} />
-                            {payInfo.label}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-5 flex-1 min-w-[150px]">
-                        <div className="flex flex-col gap-3">
-                          <Badge variant="outline" className={cn(
-                            'px-3 py-1 rounded-xl border text-[10px] font-black uppercase tracking-widest w-fit shadow-sm',
-                            providerTheme
-                          )}>
-                            {statusInfo.label}
-                          </Badge>
-                          
-                          {/* Mini Progress Bar */}
-                          {!isCancelled && delProgress !== -1 && (
-                            <div className="flex flex-col gap-1.5">
-                              <div className="w-24 group-hover:w-32 transition-all duration-500">
-                                <Progress 
-                                  value={(delProgress + 1) * 25} 
-                                  className="h-1.5 bg-gray-100 rounded-full" 
-                                  indicatorClassName={cn(
-                                    "transition-all duration-700",
-                                    delProgress === 3 ? 'bg-emerald-500' : 'bg-blue-500'
-                                  )}
-                                />
-                              </div>
-                              <span className="text-[9px] font-black uppercase tracking-[0.1em] text-gray-400 animate-pulse">
-                                {provider === 'lalamove' ? 'Driver Finding' : 'In Progress'}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-5 py-5 text-right w-16 shrink-0">
-                        <OrderActionMenu 
-                          order={order} 
-                          merchant={merchant} 
-                          merchantEinvoiceConfig={merchantEinvoiceConfig} 
-                        />
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
+      <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden">
+        {/* Header */}
+        <div className="w-full min-w-[800px] overflow-x-auto">
+          <div className="flex items-center border-b border-gray-100 bg-gray-50/95 backdrop-blur-sm px-0">
+            <div className="px-6 py-4 w-12 shrink-0">
+              <Checkbox
+                checked={selectedIds.length === orders.length && orders.length > 0}
+                onCheckedChange={toggleSelectAll}
+                className="rounded-md border-gray-300"
+              />
+            </div>
+            <div className="px-5 py-4 flex-1 min-w-[120px] text-xs font-bold text-gray-400 uppercase tracking-wider">Order</div>
+            <div className="px-5 py-4 flex-1 min-w-[180px] text-xs font-bold text-gray-400 uppercase tracking-wider">Customer</div>
+            <div className="px-5 py-4 w-44 shrink-0 text-xs font-bold text-gray-400 uppercase tracking-wider">Fulfillment</div>
+            <div className="px-5 py-4 w-32 shrink-0 text-xs font-bold text-gray-400 uppercase tracking-wider">Total</div>
+            <div className="px-5 py-4 flex-1 min-w-[150px] text-xs font-bold text-gray-400 uppercase tracking-wider">Status & Progress</div>
+            <div className="px-5 py-4 w-16 shrink-0" />
+          </div>
         </div>
 
+        {/* Rows */}
+        <div
+          ref={parentRef}
+          className="overflow-auto max-h-[750px] no-scrollbar scroll-smooth min-w-[800px]"
+        >
+          {orders.length === 0 ? (
+            <div className="text-center py-20">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center text-gray-300">
+                  <Box size={32} />
+                </div>
+                <div>
+                  <p className="text-gray-900 font-semibold">No orders found</p>
+                  <p className="text-sm text-gray-400">Try adjusting your filters or search query</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ height: `${totalSize}px`, position: 'relative' }}>
+              {virtualItems.map(virtualRow => {
+                const order = orders[virtualRow.index]
+                const statusInfo = ORDER_STATUS_CONFIG[order.status] || {
+                  label: order.status,
+                  color: 'bg-gray-100 text-gray-700 border-gray-200'
+                }
+                const payInfo = PAYMENT_METHOD_CONFIG[order.payment_method] || { label: order.payment_method, icon: CreditCard }
+                const delInfo = DELIVERY_TYPE_CONFIG[order.delivery_type] || { label: 'Standard', icon: Truck }
+
+                const delProgress = getDeliveryProgress(order)
+                const provider = order.delivery_provider
+                const isCancelled = order.status === 'cancelled' || order.status === 'refunded'
+
+                const providerTheme = provider === 'lalamove' ? 'text-orange-600 bg-orange-50 border-orange-100'
+                                    : provider === 'easyparcel' ? 'text-pink-600 bg-pink-50 border-pink-100'
+                                    : order.delivery_type === 'pickup' ? 'text-cyan-600 bg-cyan-50 border-cyan-100'
+                                    : statusInfo.color
+
+                return (
+                  <div
+                    key={virtualRow.key}
+                    data-index={virtualRow.index}
+                    className="group hover:bg-gray-50/80 transition-all duration-200 absolute w-full flex items-center border-b border-gray-50"
+                    style={{
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <div className="px-6 py-5 w-12 shrink-0">
+                      <Checkbox
+                        checked={selectedIds.includes(order.id)}
+                        onCheckedChange={() => toggleSelect(order.id)}
+                        className="rounded-md border-gray-300"
+                      />
+                    </div>
+                    <div className="px-5 py-5 flex-1 min-w-[120px]">
+                      <div className="flex flex-col">
+                        <span className="font-black text-gray-900 text-sm tracking-tight">#{order.order_number}</span>
+                        <span className="text-[11px] text-gray-400 font-bold flex items-center gap-1 mt-0.5">
+                          <Clock size={10} />
+                          {format(new Date(order.created_at), 'd MMM, h:mm a')}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="px-5 py-5 flex-1 min-w-[180px]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-500 font-black text-xs shadow-inner shrink-0">
+                          {(order.buyer_name || (order.delivery_address as any)?.recipient_name || 'Guest').charAt(0)}
+                        </div>
+                        <div className="flex flex-col truncate">
+                          <span className="font-bold text-gray-900 text-sm truncate">
+                            {order.buyer_name || (order.delivery_address as any)?.recipient_name || 'Guest Customer'}
+                          </span>
+                          <span className="text-[11px] text-gray-400 font-bold uppercase tracking-tighter truncate">
+                            {order.delivery_address ? `📍 ${(order.delivery_address as any).city}` : 'No Address'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="px-5 py-5 w-44 shrink-0">
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <delInfo.icon size={14} className="text-gray-400" />
+                          <span className="text-xs font-bold text-gray-700 capitalize">
+                            {provider?.replace('_', ' ') || order.delivery_type}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          <span className={cn(
+                            "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter w-fit shadow-inner",
+                            order.fulfilment_status === 'fulfilled' ? "bg-emerald-50 text-emerald-600 border border-emerald-100/50" :
+                            order.fulfilment_status === 'partially_fulfilled' ? "bg-amber-50 text-amber-600 border border-amber-100/50" :
+                            "bg-gray-50 text-gray-400 border border-gray-100"
+                          )}>
+                            {(order.fulfilment_status || 'unfulfilled').replace('_', ' ')}
+                          </span>
+                          {order.delivery_provider === 'lalamove' && order.driver_name && (
+                            <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full w-fit">
+                              🏍️ {order.driver_name}
+                            </span>
+                          )}
+                          {order.tracking_number && (
+                            <span className="text-[9px] font-bold text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full w-fit">
+                              📦 {order.tracking_number}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="px-5 py-5 w-32 shrink-0">
+                      <div className="flex flex-col">
+                        <span className="font-black text-gray-900 text-sm">RM {Number(order.total_amount).toFixed(2)}</span>
+                        <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1 mt-0.5">
+                          <payInfo.icon size={10} />
+                          {payInfo.label}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="px-5 py-5 flex-1 min-w-[150px]">
+                      <div className="flex flex-col gap-3">
+                        <Badge variant="outline" className={cn(
+                          'px-3 py-1 rounded-xl border text-[10px] font-black uppercase tracking-widest w-fit shadow-sm',
+                          providerTheme
+                        )}>
+                          {statusInfo.label}
+                        </Badge>
+                        {!isCancelled && delProgress !== -1 && (
+                          <div className="flex flex-col gap-1.5">
+                            <div className="w-24 group-hover:w-32 transition-all duration-500">
+                              <Progress
+                                value={(delProgress + 1) * 25}
+                                className="h-1.5 bg-gray-100 rounded-full"
+                                indicatorClassName={cn(
+                                  "transition-all duration-700",
+                                  delProgress === 3 ? 'bg-emerald-500' : 'bg-blue-500'
+                                )}
+                              />
+                            </div>
+                            <span className="text-[9px] font-black uppercase tracking-[0.1em] text-gray-400 animate-pulse">
+                              {provider === 'lalamove' ? 'Driver Finding' : 'In Progress'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="px-5 py-5 text-right w-16 shrink-0">
+                      <OrderActionMenu
+                        order={order}
+                        merchant={merchant}
+                        merchantEinvoiceConfig={merchantEinvoiceConfig}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Pagination */}
         {totalPages > 1 && (
@@ -540,16 +548,16 @@ export function OrdersTable({
               Showing {Math.min(total, (page - 1) * pageSize + 1)}-{Math.min(total, page * pageSize)} of {total} orders
             </p>
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="rounded-2xl bg-white border-gray-200 h-10 px-4 text-xs font-bold"
                 disabled={page <= 1}
                 onClick={() => navigate({ page: String(page - 1) })}
               >
                 Previous
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="rounded-2xl bg-white border-gray-200 h-10 px-4 text-xs font-bold"
                 disabled={page >= totalPages}
                 onClick={() => navigate({ page: String(page + 1) })}

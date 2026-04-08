@@ -27,8 +27,18 @@ serve(async (req) => {
 
     if (error || !order) throw new Error('Order not found')
 
+    // Fetch Merchant Billplz Config
+    const { data: config } = await supabase
+      .from('merchant_billplz_config')
+      .select('collection_id, enabled')
+      .eq('merchant_id', order.merchant_id)
+      .maybeSingle()
+
     const apiKey        = Deno.env.get('BILLPLZ_API_KEY')!
-    const collectionId  = Deno.env.get('BILLPLZ_COLLECTION_ID')!
+    // Use merchant collection if enabled, otherwise fallback to global
+    const collectionId  = (config?.enabled && config?.collection_id) 
+      ? config.collection_id 
+      : Deno.env.get('BILLPLZ_COLLECTION_ID')!
     const supabaseUrl   = Deno.env.get('SUPABASE_URL')!
     const authHeader    = 'Basic ' + btoa(`${apiKey}:`)
 

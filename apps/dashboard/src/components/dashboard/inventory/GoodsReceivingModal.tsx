@@ -28,6 +28,7 @@ export function GoodsReceivingModal({ po, onClose }: GoodsReceivingModalProps) {
     po.purchase_order_items.map((i: any) => ({
       po_item_id: i.id,
       name: i.products?.name,
+      variantName: i.product_variants?.name ?? null,
       ordered: i.quantity_ordered,
       already_received: i.quantity_received,
       receiving: i.quantity_ordered - i.quantity_received
@@ -97,7 +98,12 @@ export function GoodsReceivingModal({ po, onClose }: GoodsReceivingModalProps) {
             </div>
             {items.map((item: any, i: number) => (
               <div key={item.po_item_id} className="flex px-4 py-3 items-center border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors gap-3">
-                <span className="flex-1 font-bold text-gray-900 text-sm truncate min-w-0">{item.name}</span>
+                <div className="flex-1 min-w-0">
+                  <span className="font-bold text-gray-900 text-sm truncate block">{item.name}</span>
+                  {item.variantName && (
+                    <span className="text-[10px] text-gray-400 font-medium">{item.variantName}</span>
+                  )}
+                </div>
                 <span className="w-12 text-center text-gray-500 font-bold text-sm shrink-0">{item.ordered}</span>
                 <span className="w-12 text-center font-black text-blue-600 text-sm shrink-0">{item.already_received}</span>
                 <Input

@@ -26,10 +26,11 @@ import { listPurchaseOrders, getPurchaseOrderDetails,
          createPurchaseOrder, sendPurchaseOrder,
          listSuppliers, receiveGoods }            from './procurement'
 import { sendEmailTool }          from './communication'
+import { sendMarketingCampaignTool } from './marketing'
 import { whatsappSendTextTool, whatsappCheckNumberTool } from './whatsapp'
 import { recordExpense, listExpenses, getExpenseDetails } from './expenses'
 
-export const buildTools = (merchantId: string, sessionId: string) => ({
+export const buildTools = (merchantId: string, sessionId: string, instanceName?: string) => ({
   // Orders (6)
   list_orders:                    listOrders(merchantId, sessionId),
   get_order_details:              getOrderDetails(merchantId, sessionId),
@@ -100,10 +101,11 @@ export const buildTools = (merchantId: string, sessionId: string) => ({
   list_suppliers:                 listSuppliers(merchantId, sessionId),
   receive_goods:                  receiveGoods(merchantId, sessionId),
 
-  // Communication (3)
+  // Communication & Marketing (4)
   send_email:                     sendEmailTool(merchantId, sessionId),
-  whatsapp_send_text:             whatsappSendTextTool(merchantId, sessionId),
-  whatsapp_check_number:          whatsappCheckNumberTool(merchantId, sessionId),
+  send_marketing_campaign:        sendMarketingCampaignTool(merchantId, sessionId),
+  whatsapp_send_text:             whatsappSendTextTool(merchantId, sessionId, instanceName),
+  whatsapp_check_number:          whatsappCheckNumberTool(merchantId, sessionId, instanceName),
 
   // Expenses (3)
   record_expense:                 recordExpense(merchantId, sessionId),

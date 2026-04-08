@@ -1,3 +1,4 @@
+'use client'
 import { PosProduct } from '@project1/domain'
 import { Plus } from 'lucide-react'
 import Image from 'next/image'

@@ -11,7 +11,7 @@ const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://functions-work
  */
 
 // Tool 1: Send a text message — high risk (needs approval)
-export const whatsappSendTextTool = (merchantId: string, sessionId: string) =>
+export const whatsappSendTextTool = (merchantId: string, sessionId: string, instanceName?: string) =>
   tool({
     description: 'Send a WhatsApp message to a phone number. Use this for customer outreach, notifications, or responding to inquiries.',
     parameters: z.object({
@@ -36,7 +36,8 @@ export const whatsappSendTextTool = (merchantId: string, sessionId: string) =>
             body: JSON.stringify({
               ...input,
               merchant_id: merchantId,
-              session_id: sessionId
+              session_id: sessionId,
+              ...(instanceName && { instance: instanceName })
             })
           })
 
@@ -62,7 +63,7 @@ export const whatsappSendTextTool = (merchantId: string, sessionId: string) =>
   } as any)
 
 // Tool 2: Check if a number is on WhatsApp — low risk (no approval)
-export const whatsappCheckNumberTool = (merchantId: string, sessionId: string) =>
+export const whatsappCheckNumberTool = (merchantId: string, sessionId: string, instanceName?: string) =>
   tool({
     description: 'Check if a phone number is registered on WhatsApp.',
     parameters: z.object({
@@ -78,7 +79,8 @@ export const whatsappCheckNumberTool = (merchantId: string, sessionId: string) =
         merchantId,
         sessionId,
         async () => {
-          const response = await fetch(`${WORKER_URL}/whatsapp/status`, {
+          const statusParams = instanceName ? `?instance=${encodeURIComponent(instanceName)}` : ''
+          const response = await fetch(`${WORKER_URL}/whatsapp/status${statusParams}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
           })

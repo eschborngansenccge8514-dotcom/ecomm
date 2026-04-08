@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react'
-
 import EventSource from 'react-native-sse'
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  FlatList, 
-  TextInput, 
-  KeyboardAvoidingView, 
-  Platform, 
-  ActivityIndicator,
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  FlatList,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet
 } from 'react-native'
 import { useLocalSearchParams, router } from 'expo-router'
@@ -17,20 +15,17 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuthStore } from '@/stores/authStore'
 import { BlurView } from 'expo-blur'
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated'
+import Animated, { FadeInDown } from 'react-native-reanimated'
 
 export default function SupportChatScreen() {
-  const { merchantId, storeName, orderId } = useLocalSearchParams<{ merchantId: string; storeName: string; orderId: string }>()
+  const { merchantId, storeName, orderId, sessionId: sessionIdParam } = useLocalSearchParams<{ merchantId: string; storeName: string; orderId: string; sessionId: string }>()
   const insets = useSafeAreaInsets()
   const { profile, user } = useAuthStore()
-  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(sessionIdParam ?? null)
   const [resolvedMerchantId, setResolvedMerchantId] = useState<string>(merchantId)
   const flatListRef = useRef<FlatList>(null)
 
   const [messages, setMessages] = useState<any[]>([])
-  const [pastSessions, setPastSessions] = useState<any[]>([])
-  const [historyView, setHistoryView] = useState(false)
-  const [isHistoryLoading, setIsHistoryLoading] = useState(false)
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
@@ -38,47 +33,11 @@ export default function SupportChatScreen() {
   const startNewChat = async () => {
     setMessages([])
     setSessionId(null)
-    setHistoryView(false)
     await initSession()
   }
 
   // API URL - use local IP for physical devices/emulators to reach the host
   const API_URL = process.env.EXPO_PUBLIC_DASHBOARD_URL ?? 'http://192.168.1.102:3000'
-
-  const loadHistorySessions = async () => {
-    if (!user?.email) return
-    setIsHistoryLoading(true)
-    try {
-      const resp = await fetch(`${API_URL}/api/support/session?customerEmail=${user.email}`)
-      const data = await resp.json()
-      if (Array.isArray(data)) setPastSessions(data)
-    } catch (e) {
-      console.error('Failed to load history sessions', e)
-    } finally {
-      setIsHistoryLoading(false)
-    }
-  }
-
-  const loadSessionMessages = async (sid: string) => {
-    setIsHistoryLoading(true)
-    try {
-      const resp = await fetch(`${API_URL}/api/support/session/${sid}/messages`)
-      const data = await resp.json()
-      if (Array.isArray(data)) {
-        setMessages(data.map(m => ({
-          id: m.id,
-          role: m.role,
-          content: m.content
-        })))
-        setSessionId(sid)
-        setHistoryView(false)
-      }
-    } catch (e) {
-      console.error('Failed to load session messages', e)
-    } finally {
-      setIsHistoryLoading(false)
-    }
-  }
 
   const handleSubmit = () => {
     const text = input.trim()
@@ -180,16 +139,27 @@ export default function SupportChatScreen() {
     }
   }
 
-  // Initialize session and load history
+  // Initialize session (only if no sessionId passed in)
   useEffect(() => {
-    initSession()
-    loadHistorySessions()
+    if (!sessionIdParam) {
+      initSession()
+    } else {
+      // Load messages for the provided session
+      fetch(`${API_URL}/api/support/session/${sessionIdParam}/messages`)
+        .then(r => r.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            setMessages(data.map((m: any) => ({ id: m.id, role: m.role, content: m.content })))
+          }
+        })
+        .catch(e => console.error('Failed to load session messages', e))
+    }
   }, [merchantId, user?.email])
 
   const renderMessage = ({ item, index }: { item: any, index: number }) => {
     const isUser = item.role === 'user' || item.role === 'customer'
     return (
-      <Animated.View 
+      <Animated.View
         entering={FadeInDown.delay(index * 50).springify()}
         style={[
           styles.messageBubble,
@@ -203,12 +173,6 @@ export default function SupportChatScreen() {
     )
   }
 
-  const Badge = ({ text, color }: { text: string, color: string }) => (
-    <View style={[styles.badge, { backgroundColor: color + '20', borderColor: color + '40' }]}>
-      <Text style={[styles.badgeText, { color }]}>{text.toUpperCase()}</Text>
-    </View>
-  )
-
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -219,25 +183,17 @@ export default function SupportChatScreen() {
             <Ionicons name="chevron-back" size={24} color="#0f172a" />
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>
-              {historyView ? 'Chat History' : (storeName || 'Support')}
-            </Text>
-            {!historyView && (
-              <View style={styles.statusIndicator}>
-                <View style={styles.statusDot} />
-                <Text style={styles.statusText}>AI Assistant</Text>
-              </View>
-            )}
+            <Text style={styles.headerTitle}>{storeName || 'Support'}</Text>
+            <View style={styles.statusIndicator}>
+              <View style={styles.statusDot} />
+              <Text style={styles.statusText}>AI Assistant</Text>
+            </View>
           </View>
-          <TouchableOpacity 
-            onPress={() => setHistoryView(!historyView)} 
+          <TouchableOpacity
+            onPress={() => router.push('/(customer)/chat-history')}
             style={styles.historyToggleButton}
           >
-            <Ionicons 
-              name={historyView ? "chatbubble-ellipses" : "time-outline"} 
-              size={22} 
-              color="#2563eb" 
-            />
+            <Ionicons name="time-outline" size={22} color="#2563eb" />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={startNewChat}
@@ -248,53 +204,7 @@ export default function SupportChatScreen() {
         </View>
       </View>
 
-      {historyView ? (
-        <FlatList
-          data={pastSessions}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.historyList}
-          renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={styles.historyItem}
-              onPress={() => loadSessionMessages(item.id)}
-            >
-              <View style={styles.historyItemHeader}>
-                <Text style={styles.historyStoreName}>
-                  {item.merchants?.store_name || 'Support Session'}
-                </Text>
-                <Text style={styles.historyDate}>
-                  {new Date(item.updated_at).toLocaleDateString()}
-                </Text>
-              </View>
-              <View style={styles.historyStatusRow}>
-                <Badge 
-                  text={item.status} 
-                  color={item.status === 'open' ? '#10b981' : '#64748b'} 
-                />
-                {item.id === sessionId && (
-                  <Text style={styles.currentSessionLabel}>Current</Text>
-                )}
-              </View>
-            </TouchableOpacity>
-          )}
-          ListHeaderComponent={
-            <Text style={styles.historyListTitle}>Previous Conversations</Text>
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              {isHistoryLoading ? (
-                <ActivityIndicator color="#2563eb" />
-              ) : (
-                <Text style={styles.emptyText}>No previous chats found.</Text>
-              )}
-            </View>
-          }
-          refreshing={isHistoryLoading}
-          onRefresh={loadHistorySessions}
-        />
-      ) : (
-        <>
-          <FlatList
+      <FlatList
             ref={flatListRef}
             data={messages}
             keyExtractor={(item, index) => item.id || index.toString()}
@@ -344,8 +254,6 @@ export default function SupportChatScreen() {
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
-        </>
-      )}
     </View>
   )
 }
@@ -499,54 +407,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#2563eb',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  historyList: {
-    padding: 16,
-    gap: 12,
-  },
-  historyListTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748b',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  historyItem: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  historyItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  historyStoreName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  historyDate: {
-    fontSize: 12,
-    color: '#94a3b8',
-  },
-  historyStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  currentSessionLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#2563eb',
-    backgroundColor: '#eff6ff',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
   },
   badge: {
     paddingHorizontal: 8,

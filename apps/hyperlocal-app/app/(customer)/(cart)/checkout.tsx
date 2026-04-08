@@ -103,14 +103,13 @@ function AddressPicker({
 }
 
 // ─── Payment picker ────────────────────────────────────────────────────────────
-type PaymentMethod = 'razorpay' | 'billplz' | 'cod' | 'manual'
+type PaymentMethod = 'razorpay' | 'billplz' | 'manual'
 
 const PAYMENT_OPTIONS: {
   id: PaymentMethod; label: string; subtitle: string; emoji: string
 }[] = [
   { id: 'razorpay', emoji: '💳', label: 'Card / E-wallet',      subtitle: 'Visa, Mastercard, Touch \'n Go, GrabPay' },
   { id: 'billplz',  emoji: '🏦', label: 'Online Banking (FPX)', subtitle: 'Maybank, CIMB, RHB, Public Bank & more'   },
-  { id: 'cod',      emoji: '💵', label: 'Cash on Delivery',     subtitle: 'Pay when your order arrives'              },
   { id: 'manual',   emoji: '🧪', label: 'Manual Payment (Test)', subtitle: 'Instantly pays for testing purposes'     },
 ]
 
@@ -324,7 +323,7 @@ export default function CheckoutScreen() {
         supabase.from('merchant_razorpay_config').select('use_global_key, key_id').eq('merchant_id', merchantId).maybeSingle(),
       ])
       return {
-        billplz: bp.data?.enabled ?? false,
+        billplz: true, // Always available, backend handles fallback to global key
         razorpay: rp.data ? (rp.data.use_global_key || !!rp.data.key_id) : true, // Default to true if not configured yet (using global)
       }
     },
@@ -351,7 +350,7 @@ export default function CheckoutScreen() {
   const hasDelivery    = !!deliveryOption
 
   const disabledPayments = useMemo(() => {
-    const disabled = isSelfPickup ? ['cod'] : []
+    const disabled = []
     if (paymentSettings) {
       if (!paymentSettings.billplz) disabled.push('billplz')
       if (!paymentSettings.razorpay) disabled.push('razorpay')
@@ -467,7 +466,7 @@ export default function CheckoutScreen() {
       // ─── 4. Post-creation flow ────────────────────────────────────────────────
       clearCart()
 
-      if (paymentMethod === 'cod' || paymentMethod === 'manual' || grandTotal === 0) {
+      if (paymentMethod === 'manual' || grandTotal === 0) {
         if (grandTotal === 0 || paymentMethod === 'manual') {
           await supabase
             .from('orders')
@@ -710,7 +709,7 @@ export default function CheckoutScreen() {
           </Text>
         </View>
         <Button onPress={handlePlaceOrder} disabled={!canPlace} loading={isPlacing}>
-          {paymentMethod === 'cod' || paymentMethod === 'manual' || isSelfPickup
+          {paymentMethod === 'manual' || isSelfPickup
             ? 'Place Order'
             : 'Continue to Payment →'}
         </Button>

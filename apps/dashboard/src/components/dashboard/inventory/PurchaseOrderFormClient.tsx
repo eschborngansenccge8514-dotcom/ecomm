@@ -16,7 +16,8 @@ import {
   Minus,
   AlertCircle,
   Building2,
-  FileText
+  FileText,
+  XCircle
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -193,7 +194,7 @@ export function PurchaseOrderFormClient({
           notes: notes || undefined,
           items: items.map(i => ({
             product_id: i.product_id,
-            variant_id: i.variant_id,
+            variant_id: i.variant_id ?? undefined,
             quantity_ordered: i.quantity_ordered,
             unit_cost: i.unit_cost
           }))
@@ -263,7 +264,7 @@ export function PurchaseOrderFormClient({
                 <div className="space-y-2">
                   <Label className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">Supplier / Vendor</Label>
                   <Select
-                    onValueChange={(val: string) => setSupplierId(val)}
+                    onValueChange={(val: string | null) => setSupplierId(val || '')}
                     value={supplierId}
                   >
                     <SelectTrigger className={cn(

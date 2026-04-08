@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { PosTransactionPayload } from '@project1/domain'
+import { PosTransactionPayload, PosProduct } from '@project1/domain'
 
 export interface PendingTransaction {
   id: string // Local temporary ID
@@ -10,6 +10,15 @@ export interface PendingTransaction {
   timestamp: number
   status: 'pending' | 'syncing' | 'failed'
   error?: string
+}
+
+export interface CachedSession {
+  outletId: string
+  sessionId: string
+  outletName: string
+  userName: string
+  merchantName: string
+  taxRate: number
 }
 
 interface OfflineState {
@@ -20,6 +29,12 @@ interface OfflineState {
   removePending: (id: string) => void
   updateStatus: (id: string, status: 'pending' | 'syncing' | 'failed', error?: string) => void
   clearSynced: () => void
+  
+  // Cache for offline operation
+  cachedProducts: PosProduct[]
+  cachedSession: CachedSession | null
+  lastSyncedAt: number | null
+  setCachedData: (products: PosProduct[], session: CachedSession) => void
 }
 
 export const usePosOffline = create<OfflineState>()(
@@ -50,6 +65,14 @@ export const usePosOffline = create<OfflineState>()(
       clearSynced: () => set((state) => ({
         pendingTransactions: state.pendingTransactions.filter((t) => t.status !== 'syncing' && t.status !== 'pending')
       })),
+      cachedProducts: [],
+      cachedSession: null,
+      lastSyncedAt: null,
+      setCachedData: (products, session) => set({
+        cachedProducts: products,
+        cachedSession: session,
+        lastSyncedAt: Date.now()
+      }),
     }),
     {
       name: 'pos-offline-storage',

@@ -1,16 +1,21 @@
 import { getAuthContext } from "@/lib/utils.server";
 import { getExpenses, getExpenseSummary } from "./actions";
 import { ExpensesTable } from "./_components/ExpensesTable";
+import { ExpenseCharts } from "./_components/ExpenseCharts";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { 
   Receipt, 
   Wallet, 
   TrendingUp, 
   Plus,
-  ArrowUpRight
+  ArrowUpRight,
+  Zap,
+  ShieldCheck,
+  ChevronRight
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export default async function ExpensesPage({
   searchParams,
@@ -21,6 +26,7 @@ export default async function ExpensesPage({
     startDate?: string;
     endDate?: string;
     page?: string;
+    status?: string;
   }>
 }) {
   const { 
@@ -28,7 +34,8 @@ export default async function ExpensesPage({
     search = "", 
     startDate, 
     endDate, 
-    page = "1" 
+    page = "1",
+    status = "all"
   } = await searchParams;
   const { merchant } = await getAuthContext();
 
@@ -45,109 +52,117 @@ export default async function ExpensesPage({
 
   const stats = [
     {
-      title: "Total Spent",
-      value: `RM ${summary?.totalSpent.toFixed(2) || "0.00"}`,
-      icon: <Receipt size={20} />,
+      title: "Gross Spend",
+      value: `RM ${summary?.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+      icon: <Receipt size={22} />,
       iconBg: "bg-blue-50",
       iconColor: "text-blue-600",
     },
     {
-      title: "Tax Deductible",
-      value: `RM ${summary?.totalDeductible.toFixed(2) || "0.00"}`,
-      icon: <TrendingUp size={20} />,
+      title: "Net Deductible",
+      value: `RM ${summary?.totalDeductible.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+      icon: <TrendingUp size={22} />,
       iconBg: "bg-emerald-50",
       iconColor: "text-emerald-600",
+      change: "Tax Savings RM " + (summary?.estTaxSavings.toFixed(2)),
+      positive: true
     },
     {
-      title: "Est. Tax Savings",
-      value: `RM ${summary?.estTaxSavings.toFixed(2) || "0.00"}`,
-      icon: <Wallet size={20} />,
+      title: "Tax Benefits",
+      value: `RM ${summary?.estTaxSavings.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+      icon: <Wallet size={22} />,
       iconBg: "bg-amber-50",
       iconColor: "text-amber-600",
     },
     {
        title: "SST Total",
-       value: `RM ${summary?.totalSst.toFixed(2) || "0.00"}`,
-       icon: <ArrowUpRight size={20} />,
+       value: `RM ${summary?.totalSst.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+       icon: <ArrowUpRight size={22} />,
        iconBg: "bg-indigo-50",
        iconColor: "text-indigo-600",
     }
   ];
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Expenses</h1>
-          <p className="text-gray-500 font-medium mt-1">Manage your business spend and AI-extracted receipts</p>
+    <div className="p-8 max-w-[1600px] mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* Premium Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 mb-2">
+            <Badge variant="outline" className="rounded-full bg-indigo-50 text-indigo-600 border-indigo-100 font-black text-[10px] uppercase tracking-widest py-1 px-3">
+              Accounting OS
+            </Badge>
+            <div className="flex items-center gap-1 text-[10px] font-black text-emerald-500 uppercase tracking-widest px-2 py-1 bg-emerald-50 rounded-full">
+              <ShieldCheck size={12} />
+              Tax Ready
+            </div>
+          </div>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight leading-none">Business Expenses</h1>
+          <p className="text-gray-500 font-bold text-sm">Automated tax extraction and spend analysis</p>
         </div>
-        <Link href="/expenses/upload">
-          <Button className="rounded-2xl h-12 px-6 bg-gray-900 hover:bg-gray-800 text-white font-bold shadow-lg shadow-gray-200 gap-2">
-            <Plus size={20} />
-            Upload Receipt
-          </Button>
-        </Link>
+
+        <div className="flex items-center gap-4">
+           <Link href="/expenses/upload">
+              <Button size="lg" className="rounded-[24px] h-14 px-8 bg-gray-900 hover:bg-gray-800 text-white font-black shadow-2xl shadow-gray-200 gap-3 group transition-all hover:scale-105 active:scale-95">
+                <Plus size={22} className="group-hover:rotate-90 transition-transform" />
+                Capture Receipt
+              </Button>
+           </Link>
+        </div>
       </div>
+
+      {/* Review Callout - Actionable Banner */}
+      {summary && summary.pendingReview > 0 && (
+        <div className="bg-indigo-600 rounded-[32px] p-1 shadow-xl shadow-indigo-200 overflow-hidden relative group">
+          <div className="bg-white/10 backdrop-blur-md px-8 py-6 rounded-[31px] flex flex-col md:flex-row items-center justify-between gap-6">
+             <div className="flex items-center gap-6">
+                <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-indigo-600 shadow-xl group-hover:scale-110 transition-transform">
+                   <Zap size={32} className="fill-indigo-600" />
+                </div>
+                <div>
+                   <h3 className="text-xl font-black text-white tracking-tight">
+                     {summary?.pendingReview} Receipts require review
+                   </h3>
+                   <p className="text-indigo-100 font-bold text-sm">AI has extracted data but needs your final confirmation for tax filing.</p>
+                </div>
+             </div>
+             <Link href="/expenses?status=ai_review">
+                <Button variant="secondary" className="rounded-2xl h-12 px-6 font-black bg-white text-indigo-600 hover:bg-indigo-50 shadow-lg gap-2">
+                  Review Now
+                  <ChevronRight size={18} />
+                </Button>
+             </Link>
+          </div>
+          <div className="absolute top-0 right-0 -mr-12 -mt-12 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+        </div>
+      )}
+
+      {/* Visualizations Section */}
+      <ExpenseCharts trends={summary?.trends || []} categories={summary?.categories || []} />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((s, i) => (
-          <StatCard key={i} {...s} />
+          <div key={i} className="group transition-all hover:-translate-y-1">
+            <StatCard {...s} />
+          </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-        {/* Main Content */}
-        <div className="lg:col-span-3">
-          <ExpensesTable 
-            expenses={expenses} 
-            totalCount={expenses.length}
-            currentCategory={category}
-          />
+      {/* Main Table */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 px-2">
+           <Receipt size={20} className="text-gray-400" />
+           <h2 className="text-xl font-black text-gray-900 tracking-tight">Ledger entries</h2>
+           <span className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-auto">
+             Showing {totalCount} items
+           </span>
         </div>
-
-        {/* Sidebar / Categories */}
-        <aside className="space-y-6">
-          <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
-            <h3 className="font-black text-gray-900 flex items-center gap-2">
-              <span className="w-1.5 h-6 bg-blue-500 rounded-full" />
-              Category Spend
-            </h3>
-            <div className="space-y-4">
-              {summary?.categories?.slice(0, 5).map((c: any) => (
-                <div key={c.name} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-tight">
-                    <span className="text-gray-500 truncate mr-2">{c.name.replace(/_/g, ' ')}</span>
-                    <span className="text-gray-900 shrink-0">RM {c.value.toFixed(2)}</span>
-                  </div>
-                  <div className="h-2 w-full bg-gray-50 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-blue-500 rounded-full transition-all duration-1000"
-                      style={{ width: `${c.percentage}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-              {(!summary?.categories?.length) && (
-                <p className="text-sm text-gray-400 italic">No data yet</p>
-              )}
-            </div>
-          </div>
-          
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-6 rounded-[32px] text-white shadow-xl">
-             <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center mb-4 text-blue-400">
-               <TrendingUp size={24} />
-             </div>
-             <h4 className="font-bold text-lg mb-2">Automated Tax Tracking</h4>
-             <p className="text-xs text-gray-400 font-medium leading-relaxed">
-               All your expenses are automatically categorised and tax-deductible amounts are calculated based on Malaysian ITA 1967.
-             </p>
-             <Link href="/expenses/learn" className="inline-flex items-center gap-2 text-xs font-bold text-blue-400 mt-4 hover:underline">
-               Learn more <ArrowUpRight size={14} />
-             </Link>
-          </div>
-        </aside>
+        <ExpensesTable 
+          expenses={expenses} 
+          totalCount={totalCount}
+          currentCategory={category}
+        />
       </div>
     </div>
   );

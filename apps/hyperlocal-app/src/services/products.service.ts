@@ -1,8 +1,11 @@
 import { supabase } from '@/lib/supabase'
 import type { InsertProduct, Merchant, ProductWithVariants, UpdateProduct } from '@/types/app.types'
 
+export type ProductAttribute = { key: string; value: string }
+
 export type ProductWithMerchant = ProductWithVariants & {
   merchant: Merchant
+  attributes?: ProductAttribute[]
 }
 
 export const productsService = {
@@ -39,11 +42,12 @@ export const productsService = {
         *,
         variants:product_variants(*),
         category:categories(*),
+        attributes:product_custom_attributes(key, value),
         merchant:merchants(*, operating_hours:merchant_operating_hours(*))
       `)
       .eq('id', id)
       .single()
-    if (error) return null
+    if (error) throw error
     return (data as any) as ProductWithMerchant
   },
 

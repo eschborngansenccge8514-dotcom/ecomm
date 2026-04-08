@@ -22,7 +22,7 @@ export async function getPurchaseOrders(filters?: { status?: string, dateFrom?: 
 
   let query = supabase
     .from('purchase_orders')
-    .select('*, suppliers(name)')
+    .select('*, suppliers(name), purchase_order_items(id, quantity_ordered, quantity_received)')
     .eq('merchant_id', merchantId)
     .order('created_at', { ascending: false })
 
@@ -230,31 +230,74 @@ export async function cancelPurchaseOrder(id: string) {
 export async function receiveGoods(poId: string, items: Array<{ po_item_id: string, quantity: number }>, notes?: string) {
   const supabase = await createClient()
   const merchantId = await getMerchantId(supabase)
-  
+
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  // 1. Create Goods Receipt
+  // 1. Create Goods Receipt header
   const { data: receipt, error: receiptError } = await supabase
     .from('goods_receipts')
-    .insert({
-      po_id: poId,
-      merchant_id: merchantId,
-      received_by: user.id,
-      notes
-    })
+    .insert({ po_id: poId, merchant_id: merchantId, received_by: user.id, notes })
     .select()
     .single()
-
   if (receiptError) throw receiptError
 
-  // 2. Call RPC to update PO items and stock
-  const { error: rpcError } = await supabase.rpc('receive_goods', {
-    p_receipt_id: receipt.id,
-    p_items: items
-  })
+  // 2. Fetch PO items to get product_id / variant_id for each po_item_id
+  const poItemIds = items.map(i => i.po_item_id)
+  const { data: poItems, error: poItemsError } = await supabase
+    .from('purchase_order_items')
+    .select('id, product_id, variant_id, quantity_received')
+    .in('id', poItemIds)
+  if (poItemsError) throw poItemsError
 
-  if (rpcError) throw rpcError
+  const poItemMap = Object.fromEntries((poItems ?? []).map((r: any) => [r.id, r]))
+
+  for (const item of items) {
+    const poItem = poItemMap[item.po_item_id]
+    if (!poItem) continue
+
+    // 3a. Increment quantity_received on PO item
+    const { error: qtyError } = await supabase
+      .from('purchase_order_items')
+      .update({ quantity_received: (poItem.quantity_received ?? 0) + item.quantity })
+      .eq('id', item.po_item_id)
+    if (qtyError) throw qtyError
+
+    // 3b. Create goods receipt item record
+    const { error: griError } = await supabase.from('goods_receipt_items').insert({
+      receipt_id: receipt.id,
+      po_item_id: item.po_item_id,
+      product_id: poItem.product_id,
+      variant_id: poItem.variant_id ?? null,
+      quantity_received: item.quantity
+    })
+    if (griError) throw griError
+
+    // 3c. Record inventory movement (trigger will handle stock increment)
+    const { error: movementError } = await supabase.from('inventory_movements').insert({
+      merchant_id: merchantId,
+      product_id: poItem.product_id,
+      variant_id: poItem.variant_id ?? null,
+      quantity_delta: item.quantity,
+      type: 'po_receive',
+      reference_id: receipt.id,
+      reference_type: 'goods_receipt',
+      metadata: { po_id: poId }
+    })
+    if (movementError) throw movementError
+  }
+
+  // 4. Update PO status based on whether all items are fully received
+  const { data: allItems } = await supabase
+    .from('purchase_order_items')
+    .select('quantity_ordered, quantity_received')
+    .eq('po_id', poId)
+
+  const allReceived = allItems?.every((i: any) => i.quantity_received >= i.quantity_ordered)
+  await supabase
+    .from('purchase_orders')
+    .update({ status: allReceived ? 'received' : 'partially_received', updated_at: new Date().toISOString() })
+    .eq('id', poId)
 
   revalidatePath('/inventory/purchase-orders')
   revalidatePath('/products')

@@ -24,12 +24,13 @@ export default function CustomerLayout() {
       tabBar={(props) => <TabBar {...props} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tabs.Screen name="(home)"    />
-      <Tabs.Screen name="(cart)"    />
-      <Tabs.Screen name="(orders)"  />
-      <Tabs.Screen name="(profile)" />
+      <Tabs.Screen name="(home)"        />
+      <Tabs.Screen name="chat-history"  />
+      <Tabs.Screen name="(orders)"      />
+      <Tabs.Screen name="(profile)"     />
 
       {/* Hidden from tab bar */}
+      <Tabs.Screen name="(cart)"    options={{ href: null }} />
       <Tabs.Screen name="(store)"   options={{ href: null }} />
       <Tabs.Screen name="support"   options={{ href: null }} />
     </Tabs>

@@ -1,15 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  FlatList, 
-  KeyboardAvoidingView, 
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
   Modal,
-  ScrollView
+  ScrollView,
+  Image,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -17,6 +18,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import Constants from 'expo-constants'
 import { useChat } from '@ai-sdk/react'
+import * as ImagePicker from 'expo-image-picker'
 
 interface Message {
   id: string
@@ -35,6 +37,9 @@ export default function MerchantMindScreen() {
   const [sessions, setSessions] = useState<any[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [pendingAttachment, setPendingAttachment] = useState<{ uri: string; base64?: string } | null>(null)
+  const [isAttachmentSheetVisible, setIsAttachmentSheetVisible] = useState(false)
+  const [confirmedAttachment, setConfirmedAttachment] = useState<{ uri: string; base64?: string; intent: 'extract_expenses' | 'ask_about' } | null>(null)
   const flatListRef = useRef<FlatList>(null)
 
   // Get host for local dev
@@ -138,35 +143,75 @@ export default function MerchantMindScreen() {
     }
   }
 
+  const pickAttachment = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (status !== 'granted') return
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      base64: true,
+    })
+
+    if (!result.canceled && result.assets[0]) {
+      setPendingAttachment({ uri: result.assets[0].uri, base64: result.assets[0].base64 ?? undefined })
+      // Delay to let the image picker fully dismiss before presenting the modal
+      setTimeout(() => setIsAttachmentSheetVisible(true), 500)
+    }
+  }
+
+  const handleAttachmentAction = (action: 'extract_expenses' | 'ask_about' | 'cancel') => {
+    setIsAttachmentSheetVisible(false)
+    if (action === 'cancel' || !pendingAttachment) {
+      setPendingAttachment(null)
+      return
+    }
+    setConfirmedAttachment({ ...pendingAttachment, intent: action })
+    setPendingAttachment(null)
+    if (action === 'extract_expenses') {
+      setInput('Extract expenses from this image')
+    }
+    // For ask_about, leave input empty so user types their own question
+  }
+
   const handleSendMessage = async () => {
-    if (!input.trim() || isLoading) return
+    const text = input.trim()
+    if (!text || isLoading) return
+
+    const imageDataUrl = confirmedAttachment?.base64
+      ? `data:image/jpeg;base64,${confirmedAttachment.base64}`
+      : undefined
 
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
-      content: input.trim(),
+      content: text,
     }
 
     setMessages(prev => [...prev, userMessage])
     setInput('')
+    setConfirmedAttachment(null)
     setIsLoading(true)
 
     try {
       // Get session for Bearer token
       const { data: { session } } = await supabase.auth.getSession()
-      
-      const response = await fetch(`${getBaseUrl()}/api/agent/chat`, { 
+
+      const body: Record<string, any> = {
+        newMessage: userMessage.content,
+        sessionId: sessionId,
+        messages: messages.map(m => ({ role: m.role, content: m.content })),
+        stream: false,
+      }
+      if (imageDataUrl) body.imageDataUrl = imageDataUrl
+
+      const response = await fetch(`${getBaseUrl()}/api/agent/chat`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`
         },
-        body: JSON.stringify({ 
-          newMessage: userMessage.content,
-          sessionId: sessionId,
-          messages: messages.map(m => ({ role: m.role, content: m.content })),
-          stream: false // CRITICAL: Disable streaming for mobile/RN compatibility
-        }),
+        body: JSON.stringify(body),
       })
 
       if (!response.ok) {
@@ -276,36 +321,113 @@ export default function MerchantMindScreen() {
           }
         />
 
-        <View 
-          className="px-4 py-4 bg-white border-t border-gray-100 flex-row items-center gap-3"
+        <View
+          className="px-4 bg-white border-t border-gray-100"
           style={{ paddingBottom: Math.max(insets.bottom, 24) }}
         >
-          <TouchableOpacity className="w-10 h-10 bg-gray-50 rounded-full items-center justify-center">
-            <Ionicons name="attach-outline" size={24} color="#64748b" />
-          </TouchableOpacity>
-          <View className="flex-1 bg-gray-100 rounded-2xl px-4 py-2 flex-row items-center">
-            <TextInput
-              placeholder="Type your question..."
-              className="flex-1 text-sm font-medium py-1"
-              value={input}
-              onChangeText={setInput}
-              multiline
-              maxLength={500}
-            />
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#2563eb" />
-            ) : (
-              <TouchableOpacity 
-                disabled={!input.trim()} 
-                onPress={handleSendMessage}
-                className={`ml-2 w-8 h-8 rounded-full items-center justify-center ${input.trim() ? 'bg-primary-600' : 'bg-gray-300'}`}
-              >
-                <Ionicons name="arrow-up" size={18} color="#fff" />
-              </TouchableOpacity>
-            )}
+          {confirmedAttachment && (
+            <View className="pt-3 flex-row items-center gap-2">
+              <View className="relative">
+                <Image
+                  source={{ uri: confirmedAttachment.uri }}
+                  className="w-14 h-14 rounded-xl"
+                  resizeMode="cover"
+                />
+                <TouchableOpacity
+                  onPress={() => setConfirmedAttachment(null)}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-800 rounded-full items-center justify-center"
+                >
+                  <Ionicons name="close" size={11} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              <Text className="text-xs text-gray-400 font-medium flex-1">
+                {confirmedAttachment.intent === 'extract_expenses' ? 'Ready to extract expenses' : 'Image attached — type your question'}
+              </Text>
+            </View>
+          )}
+          <View className="flex-row items-center gap-3 pt-3">
+            <TouchableOpacity onPress={pickAttachment} className="w-10 h-10 bg-gray-50 rounded-full items-center justify-center">
+              <Ionicons name="attach-outline" size={24} color="#64748b" />
+            </TouchableOpacity>
+            <View className="flex-1 bg-gray-100 rounded-2xl px-4 py-2 flex-row items-center">
+              <TextInput
+                placeholder={confirmedAttachment?.intent === 'ask_about' ? 'Ask about this image...' : 'Type your question...'}
+                className="flex-1 text-sm font-medium py-1"
+                value={input}
+                onChangeText={setInput}
+                multiline
+                maxLength={500}
+              />
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#2563eb" />
+              ) : (
+                <TouchableOpacity
+                  disabled={!input.trim()}
+                  onPress={() => handleSendMessage()}
+                  className={`ml-2 w-8 h-8 rounded-full items-center justify-center ${input.trim() ? 'bg-primary-600' : 'bg-gray-300'}`}
+                >
+                  <Ionicons name="arrow-up" size={18} color="#fff" />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Attachment Action Sheet */}
+      <Modal visible={isAttachmentSheetVisible} animationType="slide" transparent>
+        <View className="flex-1 bg-black/50 justify-end">
+          <View
+            className="bg-white rounded-t-[32px] p-6"
+            style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+          >
+            {pendingAttachment && (
+              <Image
+                source={{ uri: pendingAttachment.uri }}
+                className="w-full h-40 rounded-2xl mb-5"
+                resizeMode="cover"
+              />
+            )}
+            <Text className="text-lg font-black text-gray-900 mb-1">What would you like to do?</Text>
+            <Text className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-5">Choose an action for this attachment</Text>
+
+            <TouchableOpacity
+              onPress={() => handleAttachmentAction('extract_expenses')}
+              className="flex-row items-center gap-4 p-4 bg-primary-50 rounded-2xl border border-primary-100 mb-3"
+            >
+              <View className="w-10 h-10 bg-primary-100 rounded-xl items-center justify-center">
+                <Ionicons name="receipt-outline" size={20} color="#2563eb" />
+              </View>
+              <View className="flex-1">
+                <Text className="font-bold text-gray-900">Extract Expenses</Text>
+                <Text className="text-xs text-gray-500 mt-0.5">Scan and log all expenses from this image</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => handleAttachmentAction('ask_about')}
+              className="flex-row items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 mb-3"
+            >
+              <View className="w-10 h-10 bg-gray-200 rounded-xl items-center justify-center">
+                <Ionicons name="chatbubble-ellipses-outline" size={20} color="#475569" />
+              </View>
+              <View className="flex-1">
+                <Text className="font-bold text-gray-900">Ask About Image</Text>
+                <Text className="text-xs text-gray-500 mt-0.5">Let AI analyse and describe this image</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => handleAttachmentAction('cancel')}
+              className="items-center py-4"
+            >
+              <Text className="text-sm font-bold text-gray-400">Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={isHistoryVisible} animationType="slide" transparent>
         <View className="flex-1 bg-black/50 justify-end">

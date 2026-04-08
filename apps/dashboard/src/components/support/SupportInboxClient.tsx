@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow } from 'date-fns'
 import { 
@@ -37,7 +38,8 @@ import {
   CheckCircle2, 
   MoreVertical,
   Tag,
-  Filter
+  Filter,
+  Settings
 } from 'lucide-react'
 import { 
   DropdownMenu, 
@@ -75,6 +77,7 @@ export function SupportInboxClient({ userId, initialSessions, defaultSessionId }
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   
+  const router = useRouter()
   const supabase = createClient()
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -260,8 +263,8 @@ export function SupportInboxClient({ userId, initialSessions, defaultSessionId }
       {/* Sessions List */}
       <div className="flex flex-col w-80 bg-white/40 border-r border-slate-200/60 backdrop-blur-md overflow-hidden h-full shadow-inner">
         <div className="flex flex-col border-b border-slate-200/50 bg-white/80 sticky top-0 z-10 backdrop-blur-xl">
-          <div className="p-4 pb-2">
-            <div className="relative group">
+          <div className="p-4 pb-2 flex items-center gap-2">
+            <div className="relative group flex-1">
               <Search className="absolute w-4 h-4 text-slate-400 left-3 top-3 group-focus-within:text-primary transition-colors" />
               <Input 
                 placeholder="Search conversations..." 
@@ -270,6 +273,15 @@ export function SupportInboxClient({ userId, initialSessions, defaultSessionId }
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => router.push('/support/settings')}
+              className="h-10 w-10 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100/50 flex-shrink-0"
+              title="Support Settings"
+            >
+              <Settings size={20} strokeWidth={2} />
+            </Button>
           </div>
           
           <div className="px-4 pb-4 space-y-2">
@@ -567,9 +579,16 @@ export function SupportInboxClient({ userId, initialSessions, defaultSessionId }
             </div>
             <div className="space-y-3 max-w-md">
               <h3 className="text-3xl font-black text-slate-800 tracking-tighter">Support Inbox</h3>
-              <p className="text-base font-semibold text-slate-400 leading-relaxed">
+              <p className="text-base font-semibold text-slate-400 leading-relaxed mb-6">
                  Select a customer conversation from the list to view order details, message history, and take over from the AI assistant.
               </p>
+              <Button 
+                onClick={() => router.push('/support/settings')}
+                className="rounded-2xl h-12 px-8 gap-2 font-bold shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95"
+              >
+                <Settings size={18} />
+                Configure Support Settings
+              </Button>
             </div>
           </div>
         )}

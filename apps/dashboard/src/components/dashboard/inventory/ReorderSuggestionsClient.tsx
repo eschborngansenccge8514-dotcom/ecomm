@@ -111,11 +111,15 @@ export function ReorderSuggestionsClient({ recommendations }: { recommendations:
               <TableHead>Avg Daily Sales</TableHead>
               <TableHead>Days Remaining</TableHead>
               <TableHead>Suggested Qty</TableHead>
+              <TableHead>Unit Cost</TableHead>
+              <TableHead>Est. Value</TableHead>
               <TableHead>Preferred Supplier</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {recommendations.length > 0 ? recommendations.map((rec) => {
+            {recommendations.length > 0 ? (
+              <>
+              {recommendations.map((rec) => {
               const id = rec.product_id + (rec.variant_id ?? '')
               const isSelected = selectedIds.includes(id)
               const isLowStock = rec.days_remaining < 7
@@ -149,6 +153,20 @@ export function ReorderSuggestionsClient({ recommendations }: { recommendations:
                     </div>
                   </TableCell>
                   <TableCell className="font-bold text-gray-900">{rec.suggested_qty}</TableCell>
+                  <TableCell className="text-gray-700">
+                    {rec.unit_cost > 0 ? (
+                      <span>RM {rec.unit_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    ) : (
+                      <span className="text-gray-300 text-xs italic">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="font-bold text-gray-900">
+                    {rec.unit_cost > 0 ? (
+                      <span className="text-blue-700">RM {(rec.unit_cost * rec.suggested_qty).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    ) : (
+                      <span className="text-gray-300 text-xs italic">—</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {rec.preferred_supplier_name ? (
                       <div className="flex items-center gap-1.5 text-gray-700">
@@ -161,9 +179,27 @@ export function ReorderSuggestionsClient({ recommendations }: { recommendations:
                   </TableCell>
                 </TableRow>
               )
-            }) : (
+              })}
+              {(() => {
+                const selectedRecs = recommendations.filter(r => selectedIds.includes(r.product_id + (r.variant_id ?? '')))
+                const totalValue = selectedRecs.reduce((sum, r) => sum + (r.unit_cost > 0 ? r.unit_cost * r.suggested_qty : 0), 0)
+                if (selectedRecs.length === 0) return null
+                return (
+                  <TableRow className="bg-blue-50 border-t-2 border-blue-100">
+                    <TableCell colSpan={6} className="pl-6 font-black text-blue-700 text-sm">
+                      {selectedRecs.length} item{selectedRecs.length !== 1 ? 's' : ''} selected
+                    </TableCell>
+                    <TableCell className="font-black text-blue-700">
+                      {totalValue > 0 ? `RM ${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                    </TableCell>
+                    <TableCell colSpan={2} />
+                  </TableRow>
+                )
+              })()}
+              </>
+            ) : (
               <TableRow>
-                <TableCell colSpan={7} className="h-64 text-center">
+                <TableCell colSpan={9} className="h-64 text-center">
                   <div className="flex flex-col items-center justify-center gap-3 text-gray-500">
                     <CheckCircle2 size={40} className="text-green-500" />
                     <div>

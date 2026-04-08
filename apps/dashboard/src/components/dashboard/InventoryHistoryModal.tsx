@@ -158,17 +158,13 @@ export function InventoryHistoryModal({ product, onClose }: Props) {
 
                                 <div className="flex items-center justify-between border-t border-gray-50 pt-2.5 mt-auto">
                                     <div className="flex items-center gap-2 text-[10px] font-extrabold text-gray-400 uppercase tracking-tighter">
-                                        {m.pos_transactions?.receipt_number && (
-                                            <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md">
-                                                Receipt: {m.pos_transactions.receipt_number}
+                                        {m.reference_id ? (
+                                            <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md capitalize">
+                                                {m.reference_type?.replace('_', ' ')}: {m.reference_id.slice(0, 8)}
                                             </span>
+                                        ) : (
+                                            <span>Manual Adjustment</span>
                                         )}
-                                        {m.orders?.order_number && (
-                                            <span className="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md">
-                                                Order: {m.orders.order_number}
-                                            </span>
-                                        )}
-                                        {!m.pos_transactions && !m.orders && <span>Manual Adjustment</span>}
                                     </div>
                                     <span className="text-[10px] font-mono text-gray-300">ID: {m.id.slice(0, 8)}</span>
                                 </div>

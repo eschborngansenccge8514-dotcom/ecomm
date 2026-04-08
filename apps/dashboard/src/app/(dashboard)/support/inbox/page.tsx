@@ -8,14 +8,14 @@ export default async function SupportInboxPage() {
     return <div>Unauthorized</div>
   }
 
-  // Fetch all support sessions for this merchant (and platform support)
+  // Fetch support sessions — RLS ensures merchants only see their own sessions.
+  // Admins also see platform-level sessions (merchant_id IS NULL) via RLS policy.
   const { data: sessions } = await supabase
     .from('support_sessions')
     .select(`
       *,
       support_messages (count)
     `)
-    .or(`merchant_id.eq.${user.id},merchant_id.is.null`)
     .order('updated_at', { ascending: false })
 
   return (

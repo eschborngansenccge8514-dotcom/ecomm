@@ -8,15 +8,14 @@ import Animated, {
   withSpring,
   interpolate,
 } from 'react-native-reanimated'
-import { useCartStore } from '@/stores/cartStore'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 // Map each route name to its icons
 const TAB_ICONS: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap; label: string }> = {
-  '(home)':    { active: 'home',           inactive: 'home-outline',           label: 'Home'    },
-  '(cart)':    { active: 'bag',            inactive: 'bag-outline',             label: 'Cart'    },
-  '(orders)':  { active: 'receipt',        inactive: 'receipt-outline',         label: 'Orders'  },
-  '(profile)': { active: 'person-circle',  inactive: 'person-circle-outline',   label: 'Profile' },
+  '(home)':       { active: 'home',              inactive: 'home-outline',           label: 'Home'    },
+  'chat-history': { active: 'chatbubbles',        inactive: 'chatbubbles-outline',    label: 'Chats'   },
+  '(orders)':     { active: 'receipt',            inactive: 'receipt-outline',        label: 'Orders'  },
+  '(profile)':    { active: 'person-circle',      inactive: 'person-circle-outline',  label: 'Profile' },
 }
 
 function TabItem({
@@ -31,8 +30,6 @@ function TabItem({
   onLongPress: () => void
 }) {
   const icons = TAB_ICONS[route.name]
-  const cartCount = useCartStore(s => s.getItemCount())
-  const isCart = route.name === '(cart)'
 
   const scale = useSharedValue(1)
 
@@ -73,29 +70,6 @@ function TabItem({
             size={24}
             color={isFocused ? '#2563eb' : '#9ca3af'}
           />
-          {/* Cart badge */}
-          {isCart && cartCount > 0 && (
-            <View
-              style={{
-                position: 'absolute',
-                top: -5,
-                right: -8,
-                backgroundColor: '#ef4444',
-                borderRadius: 10,
-                minWidth: 18,
-                height: 18,
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingHorizontal: 3,
-                borderWidth: 1.5,
-                borderColor: '#fff',
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
-                {cartCount > 99 ? '99+' : cartCount}
-              </Text>
-            </View>
-          )}
         </View>
 
         {/* Label */}

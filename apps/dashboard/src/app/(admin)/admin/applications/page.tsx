@@ -11,13 +11,7 @@ export default async function AdminApplicationsPage() {
   // Fetch all applications using admin client
   const { data: applications, error: applicationsError } = await supabaseAdmin
     .from('merchant_applications')
-    .select(`
-      *,
-      profiles!user_id (
-        full_name,
-        phone
-      )
-    `)
+    .select('*')
     .order('created_at', { ascending: false })
 
   if (applicationsError) {
@@ -29,6 +23,24 @@ export default async function AdminApplicationsPage() {
     })
   }
 
+  // Fetch profiles separately (no FK relationship between merchant_applications.user_id and profiles)
+  let applicationsWithProfiles = applications || []
+  if (applications && applications.length > 0) {
+    const userIds = applications.map((a: any) => a.user_id)
+    const { data: profiles } = await supabaseAdmin
+      .from('profiles')
+      .select('id, full_name, phone')
+      .in('id', userIds)
+
+    if (profiles) {
+      const profileMap = Object.fromEntries(profiles.map((p: any) => [p.id, p]))
+      applicationsWithProfiles = applications.map((a: any) => ({
+        ...a,
+        profiles: profileMap[a.user_id] || null
+      }))
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
@@ -38,7 +50,7 @@ export default async function AdminApplicationsPage() {
         </p>
       </div>
       
-      <MerchantApplicationsClient initialApplications={applications || []} />
+      <MerchantApplicationsClient initialApplications={applicationsWithProfiles} />
     </div>
   )
 }

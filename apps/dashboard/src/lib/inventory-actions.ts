@@ -51,11 +51,7 @@ export async function getInventoryHistory(productId: string, variantId?: string 
   
   let query = supabase
     .from('inventory_movements')
-    .select(`
-      *,
-      pos_transactions (receipt_number),
-      orders (order_number)
-    `)
+    .select('*')
     .eq('product_id', productId)
     .order('created_at', { ascending: false })
 

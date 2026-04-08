@@ -1,5 +1,4 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
 
 export type EmailLog = {
   id: string;
@@ -20,29 +19,12 @@ export type EmailKpis = {
   bounced: number;
 };
 
-// Internal admin client using service role for log access
-async function createAdminClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: (toSet) => {
-          try { toSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) }
-          catch { /* Server Component */ }
-        },
-      },
-    }
-  );
-}
-
-export async function getEmailKpis(): Promise<EmailKpis> {
-  const supabase = await createAdminClient();
+export async function getEmailKpis(merchantId: string): Promise<EmailKpis> {
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('email_logs')
-    .select('status');
+    .select('status')
+    .eq('merchant_id', merchantId);
 
   if (error) {
     console.error('[queries] getEmailKpis error:', error.message);
@@ -51,7 +33,7 @@ export async function getEmailKpis(): Promise<EmailKpis> {
 
   const rows = data ?? [];
   return {
-    total:     rows.filter(r => r.status !== 'received').length, // Total outbound
+    total:     rows.filter(r => r.status !== 'received').length,
     delivered: rows.filter((r) => r.status === 'delivered').length,
     received:  rows.filter((r) => r.status === 'received').length,
     failed:    rows.filter((r) => r.status === 'failed').length,
@@ -59,15 +41,16 @@ export async function getEmailKpis(): Promise<EmailKpis> {
   };
 }
 
-export async function getEmailLogs(opts?: {
+export async function getEmailLogs(merchantId: string, opts?: {
   status?: string;
   template?: string;
   limit?: number;
 }): Promise<EmailLog[]> {
-  const supabase = await createAdminClient();
+  const supabase = await createClient();
   let query = supabase
     .from('email_logs')
     .select('*')
+    .eq('merchant_id', merchantId)
     .order('created_at', { ascending: false })
     .limit(opts?.limit ?? 100);
 
@@ -75,12 +58,11 @@ export async function getEmailLogs(opts?: {
   if (opts?.template) query = query.eq('template', opts.template);
 
   const { data, error } = await query;
-  
+
   if (error) {
     console.error('[queries] getEmailLogs error:', error.message);
     return [];
   }
 
-  console.log(`[queries] getEmailLogs success count: ${data?.length || 0}`);
   return (data ?? []) as EmailLog[];
 }

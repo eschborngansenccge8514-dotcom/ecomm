@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { productsService } from '@/services/products.service'
 import { useCartStore } from '@/stores/cartStore'
 import { VariantSelector } from '@/components/product/VariantSelector'
+import { ProductAttributes } from '@/components/product/ProductAttributes'
 import { Button } from '@/components/ui/Button'
 import { formatCurrency } from '@/lib/utils'
 import { isStoreOpen } from '@/lib/merchant-utils'
@@ -19,12 +20,27 @@ export default function ProductDetailScreen() {
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [quantity, setQuantity] = useState(1)
 
-  const { data: product, isLoading } = useQuery({
+  const { data: product, isLoading, isError } = useQuery({
     queryKey: ['product', productId],
     queryFn:  () => productsService.getById(productId) as Promise<ProductWithMerchant>,
+    enabled:  !!productId,
   })
 
-  if (isLoading || !product) return null
+  if (isLoading) return (
+    <View className="flex-1 bg-white items-center justify-center">
+      <Text className="text-gray-400">Loading product...</Text>
+    </View>
+  )
+
+  if (isError || !product) return (
+    <View className="flex-1 bg-white items-center justify-center px-8">
+      <Text className="text-lg font-bold text-gray-900 mb-2">Product not found</Text>
+      <Text className="text-gray-500 text-center mb-6">This product may no longer be available.</Text>
+      <TouchableOpacity onPress={() => router.back()} className="px-6 py-3 bg-gray-900 rounded-full">
+        <Text className="text-white font-bold">Go Back</Text>
+      </TouchableOpacity>
+    </View>
+  )
 
   const selectedVariant = product.variants.find(v => v.id === selectedVariantId) ?? null
   const finalPrice = product.price + (selectedVariant?.price_modifier ?? 0)
@@ -99,6 +115,14 @@ export default function ProductDetailScreen() {
               <Text className="text-gray-900 font-bold mb-3 uppercase tracking-widest text-xs">Product Details</Text>
               <Text className="text-gray-600 leading-relaxed text-base">{product.description}</Text>
             </View>
+          )}
+
+          {/* Type-specific attributes (e.g. Electronics Details) */}
+          {product.attributes && product.attributes.length > 0 && (
+            <ProductAttributes
+              attributes={product.attributes}
+              sectionTitle={`${product.merchant.industry?.charAt(0).toUpperCase()}${product.merchant.industry?.slice(1) ?? ''} Details`}
+            />
           )}
 
           {/* Variants */}

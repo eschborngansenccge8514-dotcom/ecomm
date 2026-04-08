@@ -176,17 +176,9 @@ BEGIN
             INSERT INTO public.goods_receipt_items (receipt_id, po_item_id, product_id, variant_id, quantity_received)
             VALUES (p_receipt_id, v_item.po_item_id, v_prod_id, v_var_id, v_item.quantity);
             
-            -- Create inventory movement
-            INSERT INTO public.inventory_movements (merchant_id, product_id, variant_id, quantity_delta, type, reference_id, reference_type)
+            -- Create inventory movement (trigger will handle stock update)
+            INSERT INTO public.inventory_movements (merchant_id, product_id, variant_id, quantity, type, reference_id, reference_type)
             VALUES (v_merchant_id, v_prod_id, v_var_id, v_item.quantity, 'po_receive', v_po_id, 'purchase_order');
-            
-            -- Update stock
-            IF v_var_id IS NOT NULL THEN
-                UPDATE public.product_variants SET stock_quantity = stock_quantity + v_item.quantity WHERE id = v_var_id;
-            END IF;
-            
-            -- Always update product stock (represents total or specific if no variants)
-            UPDATE public.products SET stock_quantity = stock_quantity + v_item.quantity WHERE id = v_prod_id;
         END;
     END LOOP;
     

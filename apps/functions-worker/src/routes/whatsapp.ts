@@ -15,7 +15,7 @@ const getHeaders = (env: Bindings) => ({
 
 // Connect/Get QR Code
 whatsapp.get('/qr', async (c) => {
-  const instanceName = c.env.WHATSAPP_INSTANCE_NAME || 'main'
+  const instanceName = c.req.query('instance') || c.env.WHATSAPP_INSTANCE_NAME || 'main'
   console.log(`[WhatsApp] Getting QR for ${instanceName}`)
   try {
     const statusRes = await fetch(`${c.env.EVOLUTION_API_URL}/instance/connectionState/${instanceName}`, {
@@ -60,7 +60,7 @@ whatsapp.get('/qr', async (c) => {
 
 // Check Status
 whatsapp.get('/status', async (c) => {
-  const instanceName = c.env.WHATSAPP_INSTANCE_NAME || 'main'
+  const instanceName = c.req.query('instance') || c.env.WHATSAPP_INSTANCE_NAME || 'main'
   try {
     const res = await fetch(`${c.env.EVOLUTION_API_URL}/instance/connectionState/${instanceName}`, {
       headers: getHeaders(c.env)
@@ -74,7 +74,8 @@ whatsapp.get('/status', async (c) => {
 
 // Logout
 whatsapp.post('/logout', async (c) => {
-  const instanceName = c.env.WHATSAPP_INSTANCE_NAME || 'main'
+  const body = await c.req.json().catch(() => ({}))
+  const instanceName = body.instance || c.env.WHATSAPP_INSTANCE_NAME || 'main'
   try {
     const res = await fetch(`${c.env.EVOLUTION_API_URL}/instance/logout/${instanceName}`, {
       method: 'DELETE',
@@ -91,9 +92,9 @@ whatsapp.post('/logout', async (c) => {
 
 // Send Text
 whatsapp.post('/send-text', async (c) => {
-  const instanceName = c.env.WHATSAPP_INSTANCE_NAME || 'main'
   try {
-    const body = await c.req.json(); 
+    const body = await c.req.json();
+    const instanceName = body.instance || c.env.WHATSAPP_INSTANCE_NAME || 'main'
     const number = body.number || body.phone_number;
     const text = body.text || body.message;
     const { merchant_id, session_id } = body;
@@ -320,7 +321,8 @@ whatsapp.post('/webhook/*', async (c) => {
             merchantId: merchant.id,
             userId: merchant.owner_id,
             merchantName: merchant.store_name,
-            sessionId
+            sessionId,
+            instanceName
           })
           replyText = res.replyText
 
@@ -351,7 +353,8 @@ whatsapp.post('/webhook/*', async (c) => {
             ownerId: merchant.owner_id,
             merchantName: merchant.store_name,
             sessionId: supportSessionId!,
-            knowledgeBase: config?.knowledge_base_text
+            knowledgeBase: config?.knowledge_base_text,
+            supabase
           })
           replyText = res.replyText
           sessionId = supportSessionId!

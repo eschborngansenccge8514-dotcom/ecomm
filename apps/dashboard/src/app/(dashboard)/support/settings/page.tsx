@@ -1,3 +1,5 @@
+import Link from 'next/link'
+import { ChevronLeft } from 'lucide-react'
 import { getAuthContext } from '@/lib/utils.server'
 import { SupportSettingsClient } from '@/components/support/SupportSettingsClient'
 
@@ -17,9 +19,15 @@ export default async function SupportSettingsPage() {
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Support Settings</h2>
-      </div>
+        <div className="flex items-center gap-4">
+          <Link 
+            href="/support/inbox" 
+            className="p-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600"
+          >
+            <ChevronLeft size={24} />
+          </Link>
+          <h2 className="text-3xl font-bold tracking-tight">Support Settings</h2>
+        </div>
       <SupportSettingsClient 
         userId={user.id}
         initialConfig={supportConfig} 

@@ -1,7 +1,7 @@
-"use client"
+'use client'
 
 import { useEffect, useState } from "react"
-import { Play, Pause, Clock, CheckCircle2, AlertCircle, Plus, ChevronRight, Settings } from "lucide-react"
+import { Play, Pause, Clock, CheckCircle2, AlertCircle, Plus, ChevronRight, Settings, Zap, Workflow } from "lucide-react"
 
 export default function PlaybooksPage({ merchantId }: { merchantId: string }) {
   const [playbooks, setPlaybooks] = useState<any[]>([])
@@ -21,9 +21,10 @@ export default function PlaybooksPage({ merchantId }: { merchantId: string }) {
 
   const togglePlaybook = async (id: string, active: boolean) => {
     // simplified update
-    await fetch(`/api/agent/playbooks/${id}`, { 
-      method: "PATCH", 
-      body: JSON.stringify({ is_active: !active }) 
+    await fetch(`/api/agent/playbooks/${id}`, {
+      method: "PATCH",
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !active })
     })
     fetchPlaybooks()
   }
@@ -150,42 +151,3 @@ export default function PlaybooksPage({ merchantId }: { merchantId: string }) {
   )
 }
 
-function Zap(props: any) {
-  return (
-    <svg 
-      {...props}
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-    >
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-    </svg>
-  )
-}
-
-function Workflow(props: any) {
-  return (
-    <svg 
-      {...props}
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-    >
-      <rect width="8" height="8" x="3" y="3" rx="2" />
-      <path d="M7 11v4a2 2 0 0 0 2 2h4" />
-      <rect width="8" height="8" x="13" y="13" rx="2" />
-    </svg>
-  )
-}

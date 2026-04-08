@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   CheckCircle2, 
@@ -102,8 +102,8 @@ export function MerchantApplicationsClient({ initialApplications }: MerchantAppl
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filteredApps.map((app) => (
-                <>
-                  <tr key={app.id} className={cn(
+                <React.Fragment key={app.id}>
+                  <tr className={cn(
                     "hover:bg-gray-50/50 transition-colors cursor-pointer",
                     expandedRow === app.id && "bg-blue-50/10"
                   )} onClick={() => setExpandedRow(expandedRow === app.id ? null : app.id)}>
@@ -210,7 +210,7 @@ export function MerchantApplicationsClient({ initialApplications }: MerchantAppl
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               ))}
               {filteredApps.length === 0 && (
                 <tr>

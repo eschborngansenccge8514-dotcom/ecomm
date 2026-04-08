@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useState } from 'react'
 import { AgentSessionList } from '@/components/agent/AgentSessionList'
 import { AgentChatPanel }   from '@/components/agent/AgentChatPanel'

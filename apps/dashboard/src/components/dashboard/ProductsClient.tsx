@@ -39,6 +39,12 @@ import {
 import { InventoryAdjustmentModal } from './InventoryAdjustmentModal'
 import { InventoryHistoryModal } from './InventoryHistoryModal'
 import { cn } from '@/lib/utils'
+import { 
+  Tooltip, 
+  TooltipContent, 
+  TooltipProvider, 
+  TooltipTrigger 
+} from '@/components/ui/tooltip'
 import { openBarcodePrintWindow } from './BarcodeLabelPrint'
 
 
@@ -83,17 +89,23 @@ export function ProductsClient({
   const supabase = createClient()
 
   const filteredAndSorted = useMemo(() => {
+    const effectiveStock = (p: any) =>
+      p.variants?.length > 0
+        ? p.variants.reduce((sum: number, v: any) => sum + (v.stock_quantity ?? 0), 0)
+        : (p.stock_quantity ?? 0)
+
     let result = products.filter(p => {
-      const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || 
+      const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
                           (p.sku?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
                           (p.barcode?.toLowerCase().includes(search.toLowerCase()) ?? false)
 
       const matchCat    = catFilter === 'all' || p.category_id === catFilter
       const matchStatus = statusFilter === 'all' || p.status === statusFilter
-      const matchStock  = stockFilter === 'all' || 
-                          (stockFilter === 'low' && p.stock_quantity <= (p.low_stock_alert ?? 5) && p.stock_quantity > 0) ||
-                          (stockFilter === 'out' && p.stock_quantity <= 0)
-      
+      const stock = effectiveStock(p)
+      const matchStock  = stockFilter === 'all' ||
+                          (stockFilter === 'low' && stock <= (p.low_stock_alert ?? 5) && stock > 0) ||
+                          (stockFilter === 'out' && stock <= 0)
+
       return matchSearch && matchCat && matchStatus && matchStock
     })
 
@@ -102,8 +114,8 @@ export function ProductsClient({
       if (sortBy === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       if (sortBy === 'price-asc') return Number(a.price) - Number(b.price)
       if (sortBy === 'price-desc') return Number(b.price) - Number(a.price)
-      if (sortBy === 'stock-asc') return (a.stock_quantity || 0) - (b.stock_quantity || 0)
-      if (sortBy === 'stock-desc') return (b.stock_quantity || 0) - (a.stock_quantity || 0)
+      if (sortBy === 'stock-asc') return effectiveStock(a) - effectiveStock(b)
+      if (sortBy === 'stock-desc') return effectiveStock(b) - effectiveStock(a)
       return 0
     })
 
@@ -191,7 +203,8 @@ export function ProductsClient({
   }
 
   return (
-    <div className="space-y-6 flex flex-col h-full overflow-hidden">
+    <TooltipProvider delay={200}>
+      <div className="space-y-6 flex flex-col h-full overflow-hidden">
       {/* Advanced Toolbar */}
       {!hideHeader && (
         <div className="bg-white/80 backdrop-blur-md sticky top-0 z-30 py-4 border-b border-gray-100 -mx-4 px-4 sm:-mx-8 sm:px-8">
@@ -595,8 +608,9 @@ export function ProductsClient({
           onClose={() => setHistorying(null)}
         />
       )}
-    </div>
-  )
+      </div>
+    </TooltipProvider>
+  );
 }
 
 function ProductCardItem({ product, isSelected, onSelect, onToggle, onDelete, onEdit, onAdjust, onHistory }: any) {
@@ -725,17 +739,72 @@ function ProductCardItem({ product, isSelected, onSelect, onToggle, onDelete, on
 }
 
 function StockIndicator({ product }: any) {
-  const isOutOfStock = product.stock_quantity <= 0
-  const isLowStock = product.stock_quantity <= (product.low_stock_alert ?? 5)
-  return (
-    <div className="flex flex-col">
-      <span className="text-[10px] font-bold text-gray-400 uppercase">Stock</span>
-      <div className="flex items-center gap-1.5">
-        <div className={cn("w-2 h-2 rounded-full", isOutOfStock ? "bg-red-500" : isLowStock ? "bg-amber-500" : "bg-green-500")} />
-        <span className={cn("text-xs font-bold", isOutOfStock ? "text-red-600" : isLowStock ? "text-amber-600" : "text-gray-700")}>
-          {product.stock_quantity}
-        </span>
+  const hasVariants = product.variants?.length > 0
+  const stockQty = hasVariants
+    ? (product.variants as any[]).reduce((sum: number, v: any) => sum + (v.stock_quantity ?? 0), 0)
+    : (product.stock_quantity ?? 0)
+  const isOutOfStock = stockQty <= 0
+  const isLowStock = stockQty <= (product.low_stock_alert ?? 5)
+
+  const content = (
+    <div className="flex flex-col gap-1 py-1">
+      <div className="flex items-center justify-between gap-10">
+        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Availability</span>
+        <div className={cn("w-2 h-2 rounded-full", isOutOfStock ? "bg-red-500" : isLowStock ? "bg-amber-500" : "bg-emerald-500")} />
       </div>
+      
+      <div className="flex items-baseline gap-1">
+        <span className={cn("text-xl font-black tracking-tight", isOutOfStock ? "text-red-600" : isLowStock ? "text-amber-600" : "text-gray-900")}>
+          {stockQty}
+        </span>
+        <span className="text-[10px] font-bold text-gray-400 uppercase">Units</span>
+      </div>
+
+      {hasVariants && (
+        <div className="flex flex-col mt-2 pt-2 border-t border-gray-50 gap-1.5">
+          <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1">Variant Breakdown</p>
+          <div className="grid grid-cols-1 gap-1">
+            {(product.variants as any[]).map((v: any) => (
+              <div key={v.id} className="flex items-center justify-between gap-4 text-[10px] font-bold">
+                <span className="text-gray-500 truncate max-w-[100px]">{v.name}</span>
+                <span className={cn("px-1.5 py-0.5 rounded-md", (v.stock_quantity ?? 0) <= 2 ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-700")}>
+                  {v.stock_quantity ?? 0}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Stock Level</span>
+      <Tooltip>
+        <TooltipTrigger>
+          <div className="inline-flex items-center gap-2 cursor-help group/stock">
+            <div className={cn(
+              "flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all",
+              isOutOfStock ? "bg-rose-50 border-rose-100 text-rose-600" :
+              isLowStock ? "bg-amber-50 border-amber-100 text-amber-600" :
+              "bg-emerald-50 border-emerald-100 text-emerald-700"
+            )}>
+              <span className="text-xs font-black">{stockQty}</span>
+              <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", isOutOfStock ? "bg-rose-500" : isLowStock ? "bg-amber-500" : "bg-emerald-500")} />
+            </div>
+            
+            {hasVariants && (
+              <span className="text-[10px] font-bold text-gray-400 group-hover/stock:text-blue-500 transition-colors whitespace-nowrap">
+                {product.variants.length} var.
+              </span>
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="bg-white border-gray-100 text-gray-900 shadow-2xl p-4 min-w-[180px] rounded-2xl">
+          {content}
+        </TooltipContent>
+      </Tooltip>
     </div>
   )
 }

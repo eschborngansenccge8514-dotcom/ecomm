@@ -8,7 +8,7 @@ import { cn }         from '@/lib/utils'
 import { STORE_TYPES, type StoreType, DEFAULT_APPEARANCE, DEFAULT_CONFIG } from '@/lib/store-types'
 import { MultiImageUpload } from '@/components/dashboard/MultiImageUpload'
 import { 
-  CheckCircle2, ChevronRight, ChevronLeft, Loader2, Store, MapPin, 
+  CheckCircle2, ChevronRight, ChevronLeft, Loader2, MapPin, 
   Truck, Settings2, Package, Rocket, Info, Shield, Plus, X, Pencil, Trash
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -22,7 +22,7 @@ const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 // ─── Step components ──────────────────────────────────────────────────────────
 
 function OnboardingProgress({ step, total }: { step: number; total: number }) {
-  const labels = ['Store Brand', 'Contact Info', 'Operating Hours', 'Delivery Zones', 'First Product', 'Launch!']
+  const labels = ['Contact Info', 'Operating Hours', 'Delivery Zones', 'First Product', 'Launch!']
   return (
     <div className="flex flex-col gap-4 mb-10">
       <div className="flex items-center gap-2">
@@ -58,20 +58,19 @@ export function OnboardingWizard({ merchant }: { merchant: any }) {
     setSaving(true)
     try {
       const data: any = { onboarding_step: nextStep ?? step }
-      if (step === 0) data.appearance = appearance
-      if (step === 1) {
+      if (step === 0) {
         data.store_config = config
         data.lat = config.lat
         data.lng = config.lng
       }
-      if (step === 2) {
+      if (step === 1) {
         // Save hours separate table
         await supabase.from('merchant_operating_hours').delete().eq('merchant_id', merchant.id)
         if (hours.length > 0) {
           await supabase.from('merchant_operating_hours').insert(hours.map(h => ({ ...h, merchant_id: merchant.id })))
         }
       }
-      if (step === 3) {
+      if (step === 2) {
         // Save zones separate table
         await supabase.from('delivery_zones').delete().eq('merchant_id', merchant.id)
         if (zones.length > 0) {
@@ -84,7 +83,7 @@ export function OnboardingWizard({ merchant }: { merchant: any }) {
           })))
         }
       }
-      if (step === 4) {
+      if (step === 3) {
         // Create first product
         if (product.name) {
           await supabase.from('products').insert({
@@ -97,7 +96,7 @@ export function OnboardingWizard({ merchant }: { merchant: any }) {
           })
         }
       }
-      if (step === 5) {
+      if (step === 4) {
         data.onboarding_completed = true
         data.onboarding_completed_at = new Date().toISOString()
       }
@@ -109,7 +108,7 @@ export function OnboardingWizard({ merchant }: { merchant: any }) {
         setStep(nextStep)
         toast.success(`Progress saved!`)
       }
-      if (step === 5) {
+      if (step === 4) {
         toast.success('Congratulations! Your store is ready.')
         router.refresh()
         router.push('/')
@@ -126,112 +125,15 @@ export function OnboardingWizard({ merchant }: { merchant: any }) {
 
   return (
     <div className="max-w-4xl mx-auto py-12 px-6">
-      <OnboardingProgress step={step} total={6} />
+      <OnboardingProgress step={step} total={5} />
 
       <div className="bg-white rounded-[2rem] shadow-xl shadow-blue-900/5 border border-gray-100 overflow-hidden min-h-[500px] flex flex-col">
         <div className="p-8 md:p-12 flex-1">
 
-          {/* ── Step 0: Brand Identity ───────────────────────────────────── */}
+
+
+          {/* ── Step 0: Contact Info ─────────────────────────────────────── */}
           {step === 0 && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex items-center gap-4 mb-2">
-                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
-                  <Store className="text-white" size={24} />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Define Your Brand</h2>
-                  <p className="text-sm text-gray-400 mt-1">First impressions matter. Let's make your store look amazing.</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                <div className="space-y-6">
-                  <div>
-                    <label className="text-sm font-bold text-gray-700 block mb-2">Store Logo</label>
-                    <div className="flex items-start gap-4">
-                       <div className="group relative w-32 h-32 rounded-3xl border-2 border-dashed border-gray-100 bg-gray-50 flex items-center justify-center overflow-hidden hover:border-blue-400 transition-all cursor-pointer">
-                         {appearance.logoUrl ? (
-                           <Image src={appearance.logoUrl} alt="Logo" fill className="object-cover" />
-                         ) : <Plus className="text-gray-300" />}
-                         <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={async (e) => {
-                            const file = e.target.files?.[0]
-                            if (!file) return
-                            try {
-                              const { uploadToR2 } = await import('@/lib/storage')
-                              const publicUrl = await uploadToR2(file, `merchant-assets/${merchant.id}/logos/${Date.now()}-${file.name}`)
-                              setAppearance((p: any) => ({ ...p, logoUrl: publicUrl }))
-                            } catch (err: any) {
-                              toast.error(err.message)
-                            }
-                         }} />
-                       </div>
-                       <div className="flex-1 space-y-2">
-                         <p className="text-xs text-gray-400 leading-relaxed">
-                           Recommend 512x512px. Transparent background (PNG/WebP) works best on all layouts.
-                         </p>
-                         {appearance.logoUrl && (
-                           <button onClick={() => setAppearance((p: any) => ({ ...p, logoUrl: '' }))} className="text-[10px] uppercase tracking-wider font-bold text-red-500 hover:text-red-600">Remove logo</button>
-                         )}
-                       </div>
-                    </div>
-                  </div>
-
-                  <div>
-                     <label className="text-sm font-bold text-gray-700 block mb-2">Primary Color</label>
-                     <div className="flex items-center gap-3">
-                        <input type="color" value={appearance.primaryColor} onChange={(e) => setAppearance((p: any) => ({ ...p, primaryColor: e.target.value }))}
-                          className="w-12 h-12 rounded-xl border-none p-0 cursor-pointer overflow-hidden shadow-sm" />
-                        <Input value={appearance.primaryColor} onChange={(e) => setAppearance((p: any) => ({ ...p, primaryColor: e.target.value }))} className="font-mono text-sm uppercase w-32" />
-                        <div className="text-[10px] text-gray-400 uppercase font-bold tracking-widest ml-auto">Brand Accent</div>
-                     </div>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-bold text-gray-700 block mb-2">Tagline</label>
-                    <Input value={appearance.tagline} onChange={(e) => setAppearance((p: any) => ({ ...p, tagline: e.target.value }))}
-                      placeholder="e.g. Authentic Thai street food in the heart of PJ" />
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 rounded-[2rem] p-6 flex flex-col border border-gray-100">
-                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-4">Real-time Preview</span>
-                  <div className="flex-1 bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden relative group">
-                    <div className="h-20 bg-gray-100 animate-pulse relative">
-                       {appearance.bannerUrl && <Image src={appearance.bannerUrl} alt="Banner" fill className="object-cover" />}
-                       <label className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
-                          <input type="file" className="hidden" onChange={async (e) => {
-                             const file = e.target.files?.[0]
-                             if (!file) return
-                             try {
-                               const { uploadToR2 } = await import('@/lib/storage')
-                               const publicUrl = await uploadToR2(file, `merchant-assets/${merchant.id}/banners/${Date.now()}-${file.name}`)
-                               setAppearance((p: any) => ({ ...p, bannerUrl: publicUrl }))
-                             } catch (err: any) {
-                               toast.error(err.message)
-                             }
-                          }} />
-                          <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-[10px] font-bold text-gray-900 border border-white">CHANGE BANNER</div>
-                       </label>
-                    </div>
-                    <div className="p-4 flex flex-col items-center">
-                       <div className="w-16 h-16 rounded-2xl bg-white shadow-xl -mt-10 mb-3 border-2 border-white overflow-hidden relative">
-                          {appearance.logoUrl ? <Image src={appearance.logoUrl} alt="Logo" fill className="object-cover" /> : <div className="w-full h-full bg-gray-50 flex items-center justify-center"><Store size={20} className="text-gray-200" /></div>}
-                       </div>
-                       <div className="h-3 w-32 bg-gray-900 rounded-full mb-2" style={{ backgroundColor: appearance.primaryColor }} />
-                       <div className="h-2 w-24 bg-gray-100 rounded-full" />
-                    </div>
-                    <div className="p-4 border-t border-gray-50 flex gap-2">
-                       <div className="flex-1 h-32 bg-gray-50 rounded-2xl border border-gray-100" />
-                       <div className="flex-1 h-32 bg-gray-50 rounded-2xl border border-gray-100" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── Step 1: Contact Info ─────────────────────────────────────── */}
-          {step === 1 && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                <div className="flex items-center gap-4 mb-2">
                 <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
@@ -318,8 +220,8 @@ export function OnboardingWizard({ merchant }: { merchant: any }) {
             </div>
           )}
 
-          {/* ── Step 2: Hours ────────────────────────────────────────────── */}
-          {step === 2 && (
+          {/* ── Step 1: Hours ────────────────────────────────────────────── */}
+          {step === 1 && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                <div className="flex items-center gap-4 mb-2">
                 <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
@@ -360,8 +262,8 @@ export function OnboardingWizard({ merchant }: { merchant: any }) {
             </div>
           )}
 
-          {/* ── Step 3: Delivery Zones ───────────────────────────────────── */}
-          {step === 3 && (
+          {/* ── Step 2: Delivery Zones ───────────────────────────────────── */}
+          {step === 2 && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                <div className="flex items-center gap-4 mb-2">
                 <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
@@ -421,8 +323,8 @@ export function OnboardingWizard({ merchant }: { merchant: any }) {
             </div>
           )}
 
-          {/* ── Step 4: First Product ────────────────────────────────────── */}
-          {step === 4 && (
+          {/* ── Step 3: First Product ────────────────────────────────────── */}
+          {step === 3 && (
              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex items-center gap-4 mb-2">
                   <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
@@ -475,8 +377,8 @@ export function OnboardingWizard({ merchant }: { merchant: any }) {
              </div>
           )}
 
-          {/* ── Step 5: Launch ───────────────────────────────────────────── */}
-          {step === 5 && (
+          {/* ── Step 4: Launch ───────────────────────────────────────────── */}
+          {step === 4 && (
             <div className="h-full flex flex-col items-center justify-center py-12 space-y-10 animate-in zoom-in-95 duration-700">
                <div className="relative">
                   <div className="absolute inset-0 bg-blue-400 rounded-full blur-3xl opacity-20 animate-pulse" />
@@ -528,8 +430,8 @@ export function OnboardingWizard({ merchant }: { merchant: any }) {
            <div className="flex gap-4">
              <Button variant="ghost" onClick={() => saveStep()} className="text-sm font-bold text-blue-600 rounded-2xl hover:bg-blue-50">Save Draft</Button>
              <Button onClick={next} disabled={saving} className="rounded-2xl px-10 h-14 bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-200 text-base">
-                {saving ? <Loader2 size={18} className="animate-spin" /> : step === 5 ? 'Launch Dashboard' : 'Continue'}
-                {!saving && step < 5 && <ChevronRight size={18} className="ml-2" />}
+                {saving ? <Loader2 size={18} className="animate-spin" /> : step === 4 ? 'Launch Dashboard' : 'Continue'}
+                {!saving && step < 4 && <ChevronRight size={18} className="ml-2" />}
              </Button>
            </div>
         </div>

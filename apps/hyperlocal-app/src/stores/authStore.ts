@@ -77,8 +77,17 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   },
 
   signOut: async () => {
-    await supabase.auth.signOut()
-    set({ session: null, user: null, profile: null, merchant: null })
+    try {
+      set({ isLoading: true })
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('[AuthStore] supabase.auth.signOut error:', error)
+      }
+    } catch (error) {
+      console.error('[AuthStore] signOut logout error:', error)
+    } finally {
+      set({ session: null, user: null, profile: null, merchant: null, isLoading: false })
+    }
   },
 
   refreshProfile: async () => {

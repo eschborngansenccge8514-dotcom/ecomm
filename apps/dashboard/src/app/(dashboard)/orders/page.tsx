@@ -34,7 +34,7 @@ export default async function OrdersPage({
     { data: merchantData },
     { data: einvoiceConfig },
     { data: statusCountsData },
-    { data: fulfilments }
+    { data: fulfilments, error: fulfilmentsError }
   ] = await Promise.all([
     statsQuery,
     pendingStatsQuery,
@@ -42,14 +42,17 @@ export default async function OrdersPage({
     merchant ? supabase.from('merchants').select('*').eq('id', merchant.id).single() : Promise.resolve({ data: null }),
     merchant ? supabase.from('merchant_einvoice_config').select('*').eq('merchant_id', merchant.id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.rpc('get_order_status_counts', { p_merchant_id: merchant?.id || null }),
-    supabase.from('fulfilments')
-      .select(`
-        *,
-        order:orders(*, customer:customers(*)),
-        fulfilment_items(*, product:products(name, sku), variant:product_variants(name, sku))
-      `)
-      .in('status', ['pending', 'picking', 'picked', 'packing', 'packed'])
-      .order('created_at', { ascending: false })
+    merchant
+      ? supabase.from('fulfilments')
+          .select(`
+            *,
+            order:orders(order_number, buyer_name),
+            fulfilment_items(*, product:products(name, sku), variant:product_variants(name, sku))
+          `)
+          .eq('merchant_id', merchant.id)
+          .in('status', ['pending', 'picking', 'picked', 'packing', 'packed', 'shipped'])
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [], error: null })
   ])
 
   const revenueToday = (revenueData || []).reduce((acc, curr) => acc + Number(curr.total_amount), 0)
@@ -87,13 +90,15 @@ export default async function OrdersPage({
   const { data: orders, count, error: ordersError } = await query
   if (ordersError) console.error('Orders Query Error:', ordersError)
 
-  console.log('OrdersPage:', { 
+  console.log('OrdersPage:', {
     merchantId: merchant?.id,
     isAdmin,
-    ordersCount: orders?.length, 
+    ordersCount: orders?.length,
     totalCount: count,
     statusFilter: status,
-    hasError: !!ordersError
+    hasError: !!ordersError,
+    fulfilmentsCount: fulfilments?.length ?? 'null',
+    fulfilmentsError: fulfilmentsError?.message ?? null,
   })
 
   return (

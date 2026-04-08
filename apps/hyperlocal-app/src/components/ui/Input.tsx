@@ -6,24 +6,25 @@ interface InputProps extends TextInputProps {
   error?:     string
   hint?:      string
   className?: string
+  containerClassName?: string
 }
 
-export function Input({ label, error, hint, className, ...props }: InputProps) {
+export function Input({ label, error, hint, className, containerClassName, ...props }: InputProps) {
   return (
-    <View className="mb-4">
-      {label && <Text className="text-sm font-semibold text-gray-700 mb-1">{label}</Text>}
+    <View className={cn("mb-4", containerClassName)}>
+      {label ? <Text className="text-sm font-semibold text-gray-700 mb-1 ml-1">{label}</Text> : null}
       <TextInput
         className={cn(
-          'border rounded-xl px-4 py-3 text-gray-900 text-base bg-white',
-          error ? 'border-red-400' : 'border-gray-200',
+          'border rounded-2xl px-4 py-4 text-gray-900 text-base bg-white/80',
+          error ? 'border-red-400 bg-red-50/50' : 'border-gray-200 focus:border-primary-500',
           className,
         )}
-        placeholderTextColor="#9ca3af"
+        placeholderTextColor="#94a3b8"
         {...props}
         value={props.value ?? ''}
       />
-      {error && <Text className="text-red-500 text-xs mt-1">{error}</Text>}
-      {hint && !error && <Text className="text-gray-400 text-xs mt-1">{hint}</Text>}
+      {error ? <Text className="text-red-500 text-xs mt-1 ml-1 font-medium">{error}</Text> : null}
+      {hint && !error ? <Text className="text-gray-400 text-xs mt-1 ml-1 leading-tight">{hint}</Text> : null}
     </View>
   )
 }

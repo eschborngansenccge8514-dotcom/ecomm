@@ -522,8 +522,6 @@ function CreateFulfilmentModal({
     }
   }, [open, order.items, itemFulfilled])
 
-  if (!open) return null
-
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-xl">
@@ -1592,7 +1590,6 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
       toast.success('Batch created!', { id: tId })
       const data = await getFulfilments(order.id)
       setFulfilments(data)
-      router.refresh()
     } catch (err: any) {
       toast.error(err.message, { id: tId })
     } finally {
@@ -1702,7 +1699,7 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
     !order.tracking_number &&
     ['confirmed', 'preparing', 'ready_for_pickup'].includes(order.status)
 
-  // Quick actions via URL
+  // Quick actions via URL — run once on mount only
   useEffect(() => {
     const action = searchParams.get('action')
     if (action === 'create-fulfilment' && order.status !== 'cancelled' && order.status !== 'unpaid') {
@@ -1710,7 +1707,8 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
     } else if (action === 'book-courier' && order.delivery_provider === 'easyparcel') {
       handleBookEasyParcel()
     }
-  }, [searchParams, order.id, order.status, order.delivery_provider, handleBookEasyParcel])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <>

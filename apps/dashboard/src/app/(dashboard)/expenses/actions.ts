@@ -138,7 +138,7 @@ export async function getExpenseSummary(year?: number) {
 
   const { data: expenses, error } = await supabase
     .from("expenses")
-    .select("total_amount, deductible_amount, sst_amount, category")
+    .select("total_amount, deductible_amount, sst_amount, category, receipt_date, status")
     .eq("merchant_id", merchant.id)
     .gte("receipt_date", startDate)
     .lte("receipt_date", endDate);
@@ -152,6 +152,21 @@ export async function getExpenseSummary(year?: number) {
   const totalDeductible = expenses.reduce((sum, e) => sum + Number(e.deductible_amount || 0), 0);
   const totalSst        = expenses.reduce((sum, e) => sum + Number(e.sst_amount || 0), 0);
   const estTaxSavings   = totalDeductible * 0.17; // 17% SME rate
+  const pendingReview   = expenses.filter(e => e.status === 'ai_review').length;
+
+  // Monthly trends for chart
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const trendMap: Record<string, number> = {};
+  months.forEach(m => trendMap[m] = 0);
+
+  expenses.forEach(e => {
+    if (e.receipt_date) {
+      const month = new Date(e.receipt_date).toLocaleString('default', { month: 'short' });
+      trendMap[month] = (trendMap[month] || 0) + Number(e.total_amount || 0);
+    }
+  });
+
+  const trends = months.map(name => ({ name, amount: trendMap[name] }));
 
   const categoryMap: Record<string, number> = {};
   expenses.forEach((e) => {
@@ -169,8 +184,26 @@ export async function getExpenseSummary(year?: number) {
     totalDeductible,
     totalSst,
     estTaxSavings,
+    pendingReview,
+    trends,
     categories,
   };
+}
+
+export async function confirmExpense(id: string) {
+  const { supabase, merchant } = await getAuthContext();
+  if (!merchant) throw new Error("Unauthorized");
+
+  const { error } = await supabase
+    .from("expenses")
+    .update({ status: 'confirmed', updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("merchant_id", merchant.id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/expenses");
+  revalidatePath(`/expenses/${id}`);
 }
 
 export async function getExpenseById(id: string) {

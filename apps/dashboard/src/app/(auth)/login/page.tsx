@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input }  from '@/components/ui/input'
 import { Label }  from '@/components/ui/label'
 import toast      from 'react-hot-toast'
+import { Mail, Lock, ArrowRight, Loader2, Store } from 'lucide-react'
 
 function LoginContent() {
   const router = useRouter()
@@ -29,7 +30,6 @@ function LoginContent() {
       return
     }
 
-    // After login, check the user's role in the profiles table
     const { data: profile, error: profileErr } = await supabase
       .from('profiles')
       .select('role')
@@ -53,7 +53,6 @@ function LoginContent() {
       return
     }
 
-    // Now check if they have an active merchant record
     const { data: merchant } = await supabase
       .from('merchants')
       .select('id')
@@ -61,7 +60,6 @@ function LoginContent() {
       .single()
 
     if (!merchant && isMerchant) {
-      // Allow login but redirect to application/onboarding
       toast.success('Login successful! Redirecting to application...')
       router.push(next || '/apply')
     } else {
@@ -74,39 +72,116 @@ function LoginContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-sm p-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Merchant Dashboard</h1>
-          <p className="text-gray-500 text-sm mt-1">Sign in to manage your store</p>
+    <div className="min-h-screen flex flex-col md:flex-row bg-slate-50 text-slate-900 overflow-hidden">
+      {/* Visual Side */}
+      <div className="hidden md:flex md:w-1/2 relative p-12 flex-col justify-between overflow-hidden group border-r border-slate-200">
+        <div 
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 group-hover:scale-105"
+          style={{ backgroundImage: 'url("/auth-light-bg.png")' }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-transparent" />
+        
+        <div className="relative z-10 flex items-center gap-2">
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
+            <Store className="w-6 h-6 text-white" />
+          </div>
+          <span className="text-2xl font-bold tracking-tight text-slate-900">Go-Buy</span>
         </div>
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={email}
-              onChange={e => setEmail(e.target.value)} placeholder="you@store.com" required />
-          </div>
-          <div>
-            <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" value={password}
-              onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
-          </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In'}
-          </Button>
-        </form>
 
-        <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-          <p className="text-gray-500 text-sm">
-            New to Go-Buy?{' '}
-            <button
-              onClick={() => router.push('/register')}
-              type="button"
-              className="text-primary-600 font-semibold hover:underline"
-            >
-              Apply to be a merchant
-            </button>
+        <div className="relative z-10 max-w-md animate-in fade-in slide-in-from-left duration-700">
+          <h2 className="text-4xl lg:text-5xl font-bold mb-6 leading-tight text-slate-900">
+            Empower Your <span className="text-primary tracking-tighter">Business</span> Growth
+          </h2>
+          <p className="text-slate-600 text-lg leading-relaxed font-medium">
+            Manage your store, track performance, and reach more customers with our premium merchant dashboard.
           </p>
+        </div>
+
+        <div className="relative z-10 text-slate-500 text-sm font-medium">
+          © {new Date().getFullYear()} Go-Buy Marketplace. All rights reserved.
+        </div>
+      </div>
+
+      {/* Form Side */}
+      <div className="flex-1 flex items-center justify-center p-6 md:p-12 bg-white/50 backdrop-blur-3xl relative">
+        {/* Subtle background glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
+        
+        <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom duration-700 delay-200 relative z-10">
+          <div className="md:hidden flex items-center gap-2 mb-12 justify-center">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+              <Store className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-xl font-bold">Go-Buy</span>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-xl border border-slate-200/60 rounded-3xl p-8 lg:p-10 shadow-2xl shadow-slate-200/50">
+            <div className="mb-10 text-center md:text-left">
+              <h1 className="text-3xl font-bold mb-2 tracking-tight">Welcome back</h1>
+              <p className="text-slate-500 font-medium">Enter your credentials to access your dashboard</p>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-slate-700 ml-1 font-semibold">Email address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    value={email}
+                    onChange={e => setEmail(e.target.value)} 
+                    placeholder="you@store.com" 
+                    required 
+                    className="bg-slate-50/50 border-slate-200 h-12 pl-12 focus:ring-primary focus:border-primary text-slate-900 transition-all placeholder:text-slate-400 font-medium rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between ml-1">
+                  <Label htmlFor="password" className="text-slate-700 font-semibold">Password</Label>
+                  <button type="button" className="text-xs text-primary hover:underline font-bold">Forgot password?</button>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <Input 
+                    id="password" 
+                    type="password" 
+                    value={password}
+                    onChange={e => setPassword(e.target.value)} 
+                    placeholder="••••••••" 
+                    required 
+                    className="bg-slate-50/50 border-slate-200 h-12 pl-12 focus:ring-primary focus:border-primary text-slate-900 transition-all placeholder:text-slate-400 font-medium rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <Button type="submit" className="w-full h-12 text-base font-bold group rounded-xl bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20" disabled={loading}>
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    Sign In
+                    <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-10 pt-8 border-t border-slate-100 text-center">
+              <p className="text-slate-500 font-medium">
+                New to Go-Buy?{' '}
+                <button
+                  onClick={() => router.push('/register')}
+                  type="button"
+                  className="text-primary font-bold hover:text-primary/80 transition-colors ml-1"
+                >
+                  Apply to be a merchant
+                </button>
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -115,8 +190,9 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">Loading...</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-900"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>}>
       <LoginContent />
     </Suspense>
   )
 }
+

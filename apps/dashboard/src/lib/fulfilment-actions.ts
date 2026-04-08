@@ -55,6 +55,7 @@ export async function createFulfilment(orderId: string, items: { order_item_id: 
   if (fiError) throw fiError
 
   revalidatePath(`/orders/${orderId}`)
+  revalidatePath('/orders')
   revalidatePath('/fulfilment')
   return fulfilment
 }
@@ -129,6 +130,7 @@ export async function updateFulfilmentStatus(
     .eq('id', fulfilment.order_id)
 
   revalidatePath(`/orders/${fulfilment.order_id}`)
+  revalidatePath('/orders')
   revalidatePath('/fulfilment')
   return { success: true }
 }

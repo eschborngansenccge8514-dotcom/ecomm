@@ -96,18 +96,14 @@ BEGIN
     -- Get tracking info again
     SELECT track_inventory INTO v_track_inventory FROM public.products WHERE id = v_item.product_id;
 
-    -- Decrement stock if tracked
-    IF v_track_inventory THEN
-      IF v_item.variant_id IS NOT NULL THEN
-        UPDATE public.product_variants 
-        SET stock_quantity = stock_quantity - v_item.quantity
-        WHERE id = v_item.variant_id;
-      ELSE
-        UPDATE public.products 
-        SET stock_quantity = stock_quantity - v_item.quantity
-        WHERE id = v_item.product_id;
-      END IF;
-    END IF;
+    -- Record inventory movement (trigger will handle stock decrement)
+    INSERT INTO public.inventory_movements (
+      merchant_id, product_id, variant_id, quantity_delta, type, 
+      reference_id, reference_type, metadata
+    ) VALUES (
+      p_merchant_id, v_item.product_id, v_item.variant_id, -v_item.quantity, 'sale', 
+      v_order_id, 'order', jsonb_build_object('order_number', p_order_number)
+    );
   END LOOP;
 
   -- 4. Lock the cart

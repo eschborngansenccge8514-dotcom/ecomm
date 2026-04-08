@@ -15,11 +15,11 @@ export default async function PurchasingPage() {
   ])
 
   return (
-    <PurchasingPageClient 
-      suppliers={suppliers}
-      purchaseOrders={purchaseOrders}
-      goodsReceipts={goodsReceipts}
-      payments={payments}
+    <PurchasingPageClient
+      suppliers={suppliers ?? []}
+      purchaseOrders={purchaseOrders ?? []}
+      goodsReceipts={goodsReceipts ?? []}
+      payments={payments ?? []}
     />
   )
 }

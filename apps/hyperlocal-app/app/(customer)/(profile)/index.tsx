@@ -4,6 +4,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Platform,
 } from 'react-native'
 import { router } from 'expo-router'
 import { Image } from 'expo-image'
@@ -79,17 +80,35 @@ function Separator() {
 // ─── Main screen ───────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets()
-  const { profile, signOut } = useAuthStore()
+  const { profile, signOut, isLoading } = useAuthStore()
 
   const handleSignOut = () => {
-    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: signOut,
-      },
-    ])
+    const performSignOut = async () => {
+      try {
+        await signOut()
+      } catch (error) {
+        if (Platform.OS === 'web') {
+          window.alert('Failed to sign out. Please try again.')
+        } else {
+          Alert.alert('Error', 'Failed to sign out. Please try again.')
+        }
+      }
+    }
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to sign out?')) {
+        performSignOut()
+      }
+    } else {
+      Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign out',
+          style: 'destructive',
+          onPress: performSignOut,
+        },
+      ])
+    }
   }
 
   return (

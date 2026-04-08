@@ -1,7 +1,8 @@
 'use client'
 import dynamic from 'next/dynamic'
-import { useState }     from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter }    from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { format, parseISO, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns'
 
 const AreaChart = dynamic(() => import('recharts').then(mod => mod.AreaChart), { ssr: false })
@@ -24,9 +25,11 @@ import { cn }      from '@/lib/utils'
 import {
   Users, UserPlus, UserCheck, UserX, TrendingUp,
   ShoppingBag, Star, ShoppingCart, RefreshCw, ChevronDown, Download,
-  AlertCircle, ShieldAlert, Search, Clock, Zap, Target, Heart
+  AlertCircle, ShieldAlert, Search, Clock, Zap, Target, Heart, User, ArrowRight, Calendar
 } from 'lucide-react'
 import { CustomerEditSheet } from './CustomerEditSheet'
+import { CustomerDetailsView } from './CustomerDetailsView'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -262,7 +265,7 @@ export function CustomersClient({
   allCustomers:        any[]
 }) {
   const router = useRouter()
-  const [tab, setTab] = useState<'overview'|'segments'|'retention'|'patterns'|'satisfaction'|'management'>('overview')
+  const [tab, setTab] = useState<'overview'|'segments'|'retention'|'patterns'|'satisfaction'|'management'>('management')
   const [showPresets, setShowPresets] = useState(false)
   const [customFrom, setCustomFrom]   = useState(dateRange.from)
   const [customTo,   setCustomTo]     = useState(dateRange.to)
@@ -270,6 +273,61 @@ export function CustomersClient({
   const [kpiSearch,  setKpiSearch]    = useState('')
   const [mgtSearch,  setMgtSearch]    = useState('')
   const [editingCustomer, setEditingCustomer] = useState<any>(null)
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
+  const [showDetails, setShowDetails] = useState(false)
+  const [timeline, setTimeline] = useState<any[]>([])
+  const [loadingTimeline, setLoadingTimeline] = useState(false)
+
+  // ── Derived Data for selection ─────────────────────────────────────────────
+  
+  // customerKpis comes from a SECURITY DEFINER function (bypasses RLS). 
+  // allCustomers adds any customers missing from kpis (e.g. loyalty-only).
+  const kpiIds = new Set(customerKpis.map(k => k.customer_id))
+  const extraProfiles = allCustomers.filter(p => !kpiIds.has(p.id))
+
+  const masterList = [
+    ...customerKpis.map(kpi => ({
+      id:         kpi.customer_id,
+      full_name:  kpi.full_name  || 'Anonymous',
+      email:      kpi.email      || '—',
+      phone:      kpi.phone      || '—',
+      created_at: kpi.registered_at || new Date().toISOString(),
+      last_active: kpi.last_order_date || kpi.registered_at,
+      orders_count: kpi.lifetime_orders,
+      lifetime_value: kpi.lifetime_value,
+    })),
+    ...extraProfiles.map(profile => ({
+      id:         profile.id,
+      full_name:  profile.full_name || 'Anonymous',
+      email:      profile.email     || '—',
+      phone:      profile.phone     || '—',
+      created_at: profile.created_at,
+      last_active: profile.created_at,
+      orders_count: 0,
+      lifetime_value: 0,
+    })),
+  ]
+
+  const selectedCustomer = masterList.find(c => c.id === selectedCustomerId) || masterList[0]
+
+  useEffect(() => {
+    if (selectedCustomerId && selectedCustomer) {
+      const fetchTimeline = async () => {
+        setLoadingTimeline(true)
+        const supabase = createClient()
+        const { data, error } = await supabase.rpc('get_customer_activity_timeline', {
+          p_customer_id: selectedCustomerId,
+          p_merchant_id: merchantId,
+          p_customer_email: selectedCustomer.email === '—' ? null : selectedCustomer.email,
+          p_customer_phone: selectedCustomer.phone === '—' ? null : selectedCustomer.phone
+        })
+        if (!error) setTimeline(data || [])
+        else console.error('Timeline error:', error.message, error.details, error.hint)
+        setLoadingTimeline(false)
+      }
+      fetchTimeline()
+    }
+  }, [selectedCustomerId, selectedCustomer?.email, selectedCustomer?.phone, merchantId])
 
   const applyRange = (from: string, to: string) => {
     router.push(`/customers?from=${from}&to=${to}`)
@@ -329,36 +387,7 @@ export function CustomersClient({
                : 0,
   }))
 
-  // Master Directory List
-  // customerKpis comes from a SECURITY DEFINER function (bypasses RLS) so it's
-  // always reliable. allCustomers adds any customers missing from kpis (e.g. loyalty-only).
-  const kpiIds = new Set(customerKpis.map(k => k.customer_id))
-  const extraProfiles = allCustomers.filter(p => !kpiIds.has(p.id))
-
-  const masterList = [
-    // Primary: customers with order history (from SECURITY DEFINER RPC)
-    ...customerKpis.map(kpi => ({
-      id:         kpi.customer_id,
-      full_name:  kpi.full_name  || 'Anonymous',
-      email:      kpi.email      || '—',
-      phone:      kpi.phone      || '—',
-      created_at: kpi.registered_at || new Date().toISOString(),
-      last_active: kpi.last_order_date || kpi.registered_at,
-      orders_count: kpi.lifetime_orders,
-      lifetime_value: kpi.lifetime_value,
-    })),
-    // Secondary: loyalty-only customers not yet in orders (from direct profiles query)
-    ...extraProfiles.map(profile => ({
-      id:         profile.id,
-      full_name:  profile.full_name || 'Anonymous',
-      email:      profile.email     || '—',
-      phone:      profile.phone     || '—',
-      created_at: profile.created_at,
-      last_active: profile.created_at,
-      orders_count: 0,
-      lifetime_value: 0,
-    })),
-  ]
+  // (masterList moved up)
 
   // Filtered Management list
   const filteredMgt = masterList.filter(c =>
@@ -368,6 +397,8 @@ export function CustomersClient({
     c.phone?.toLowerCase().includes(mgtSearch.toLowerCase())
   )
 
+  // (selectedCustomer moved up)
+
   const totalDays = Math.round((new Date(dateRange.to).getTime() - new Date(dateRange.from).getTime()) / 86400000) + 1
 
   return (
@@ -375,8 +406,8 @@ export function CustomersClient({
       {/* ── Header & Date Range ──────────────────────────────────────────────── */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 transition-all">
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Customer Analytics</h1>
-          <p className="text-gray-500 font-medium">Deep insights into your community and purchase behaviour.</p>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Customers Directory</h1>
+          <p className="text-gray-500 font-medium">Manage relationships and track customer lifetime value.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-[24px] border border-gray-100 shadow-sm transition-all hover:shadow-md">
@@ -387,7 +418,7 @@ export function CustomersClient({
               onClick={() => setShowPresets(v => !v)}
               className="flex items-center gap-2 h-10 px-4 rounded-xl font-bold text-gray-700 hover:bg-gray-50"
             >
-              <span className="text-blue-500 text-lg">📅</span>
+              <Calendar size={18} className="text-blue-500" />
               {format(parseISO(dateRange.from), 'd MMM')} — {format(parseISO(dateRange.to), 'd MMM yyyy')}
               <Badge variant="outline" className="ml-1 bg-gray-50 border-gray-100 text-gray-400 font-bold px-1.5 py-0">
                 {totalDays}D
@@ -471,12 +502,12 @@ export function CustomersClient({
       <div className="sticky top-0 z-40 -mx-4 px-4 py-4 bg-gray-50/80 backdrop-blur-md border-b border-gray-100 transition-all">
         <div className="flex gap-1.5 p-1.5 bg-gray-200/50 rounded-[20px] w-fit mx-auto lg:mx-0 overflow-x-auto no-scrollbar max-w-full">
           {[
-            { key: 'overview',     label: 'Overview', icon: '👤' },
-            { key: 'management',   label: 'Directory', icon: '📇' },
-            { key: 'segments',     label: 'Segmentation', icon: '🎯' },
-            { key: 'retention',    label: 'Retention', icon: '📈' },
-            { key: 'patterns',     label: 'Purchase Patterns', icon: '⏰' },
-            { key: 'satisfaction', label: 'Satisfaction', icon: '⭐' },
+            { key: 'management',   label: 'Directory' },
+            { key: 'overview',     label: 'Overview' },
+            { key: 'segments',     label: 'Segmentation' },
+            { key: 'retention',    label: 'Retention' },
+            { key: 'patterns',     label: 'Purchase Patterns' },
+            { key: 'satisfaction', label: 'Satisfaction' },
           ].map(t => (
             <button 
               key={t.key} 
@@ -488,7 +519,6 @@ export function CustomersClient({
                   : 'text-gray-400 hover:text-gray-800 hover:bg-white/50'
               )}
             >
-              <span className="text-base">{t.icon}</span>
               {t.label}
             </button>
           ))}
@@ -496,22 +526,21 @@ export function CustomersClient({
       </div>
 
       {/* ══════ MANAGEMENT TAB ══════════════════════════════════════════════ */}
+      {/* ══════ DIRECTORY TAB (SIMPLE LIST) ═════════════════════════════════ */}
       {tab === 'management' && (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <Section 
-            title="Customer Directory" 
+            title="Overview" 
             icon={Users}
             action={
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <Input 
-                    placeholder="Search by name, email or phone..." 
-                    value={mgtSearch}
-                    onChange={e => setMgtSearch(e.target.value)}
-                    className="h-10 pl-9 pr-4 w-72 text-[12px] font-bold rounded-xl border-gray-100 bg-gray-50 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all font-medium" 
-                  />
-                </div>
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <Input 
+                  placeholder="Search directory..." 
+                  value={mgtSearch}
+                  onChange={e => setMgtSearch(e.target.value)}
+                  className="h-10 pl-9 pr-4 w-72 text-[12px] font-bold rounded-xl border-gray-100 bg-gray-50 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all font-medium" 
+                />
               </div>
             }
           >
@@ -519,15 +548,19 @@ export function CustomersClient({
               <table className="w-full border-separate border-spacing-y-2">
                 <thead>
                   <tr className="text-left text-[11px] font-black text-gray-400 uppercase tracking-widest">
-                    <th className="py-4 px-6">Customer Profile</th>
-                    <th className="py-4 px-6">Communication</th>
-                    <th className="py-4 px-6">Joined Date</th>
+                    <th className="py-4 px-6">Customer</th>
+                    <th className="py-4 px-6">Contact</th>
+                    <th className="py-4 px-6">Lifetime Spend</th>
                     <th className="py-4 px-6 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredMgt.map(c => (
-                    <tr key={c.id} className="group bg-white hover:bg-gray-50/50 transition-all duration-300 rounded-[24px] border border-transparent hover:border-gray-100 shadow-sm hover:shadow-xl hover:shadow-gray-200/30">
+                    <tr 
+                      key={c.id} 
+                      onClick={() => { setSelectedCustomerId(c.id); setShowDetails(true) }}
+                      className="group bg-white hover:bg-gray-50/50 transition-all duration-300 rounded-[24px] border border-transparent hover:border-gray-100 shadow-sm hover:shadow-xl hover:shadow-gray-200/30 cursor-pointer"
+                    >
                       <td className="py-4 px-6 rounded-l-[24px]">
                         <div className="flex items-center gap-4">
                           <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 font-black text-sm group-hover:scale-110 group-hover:bg-blue-50 group-hover:text-blue-600 transition-all">
@@ -535,36 +568,36 @@ export function CustomersClient({
                           </div>
                           <div className="min-w-0">
                             <p className="font-black text-gray-900 truncate max-w-[200px]">{c.full_name || 'Anonymous'}</p>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">ID: {c.id.slice(0, 8)}...</p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Member since {format(new Date(c.created_at), 'MMM yyyy')}</p>
                           </div>
                         </div>
                       </td>
                       <td className="py-4 px-6">
                         <div className="space-y-0.5">
                           <p className="text-sm font-bold text-gray-900">{c.email}</p>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">{c.phone || 'No phone linked'}</p>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">{c.phone || 'No phone'}</p>
                         </div>
                       </td>
                       <td className="py-4 px-6">
                         <div className="space-y-0.5">
-                          <p className="text-sm font-black text-gray-700">{format(new Date(c.created_at), 'd MMM yyyy')}</p>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">{format(new Date(c.created_at), 'HH:mm')}</p>
+                          <p className="text-sm font-black text-emerald-600">{rm(c.lifetime_value)}</p>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">{c.orders_count} orders</p>
                         </div>
                       </td>
                       <td className="py-4 px-6 text-right rounded-r-[24px]">
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          onClick={() => setEditingCustomer(c)}
-                          className="h-9 px-4 rounded-xl font-black text-[10px] uppercase tracking-widest text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-all"
+                          className="h-9 w-9 p-0 rounded-xl hover:bg-blue-50 text-gray-300 group-hover:text-blue-600 transition-all"
                         >
-                          Edit Profile
+                          <ArrowRight size={18} />
                         </Button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              
               {filteredMgt.length === 0 && (
                 <div className="py-20 text-center space-y-4">
                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto text-gray-300">
@@ -1025,6 +1058,22 @@ export function CustomersClient({
           setEditingCustomer(null)
         }}
       />
+
+      <Sheet open={showDetails} onOpenChange={setShowDetails}>
+        <SheetContent className="data-[side=right]:sm:max-w-3xl bg-white border-l border-gray-100 p-0 overflow-hidden flex flex-col transition-all duration-500">
+          <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+            <CustomerDetailsView 
+              customer={selectedCustomer} 
+              onEdit={(c: any) => { 
+                setEditingCustomer(c); 
+                setShowDetails(false) 
+              }} 
+              timeline={timeline}
+              loadingTimeline={loadingTimeline}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

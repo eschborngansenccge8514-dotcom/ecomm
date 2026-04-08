@@ -1,4 +1,6 @@
-import { useEffect, useState, useCallback } from 'react'
+'use client'
+
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 interface Session {
@@ -15,17 +17,11 @@ interface Props {
 export function AgentSessionList({ activeId, userId, onSelect, onNewChat }: Props) {
   const [sessions, setSessions] = useState<Session[]>([])
 
-  const fetchSessions = useCallback(async () => {
-    const res = await fetch('/api/agent/sessions')
-    if (res.ok) {
-      const data = await res.json()
-      setSessions(data)
-    }
-  }, [])
-
   useEffect(() => {
-    fetchSessions()
-  }, [fetchSessions])
+    fetch('/api/agent/sessions')
+      .then(res => res.ok ? res.json() : [])
+      .then(setSessions)
+  }, [])
 
   useEffect(() => {
     if (!userId) return
@@ -33,22 +29,34 @@ export function AgentSessionList({ activeId, userId, onSelect, onNewChat }: Prop
     const supabase = createClient()
     const channel = supabase
       .channel('agent-sessions-list')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
         table: 'agent_sessions',
         filter: `merchant_id=eq.${userId}`
       }, (payload) => {
-        console.log('[AgentChat] Session Change Detected:', payload)
-        // Refresh full list to keep sorting/titles accurate
-        fetchSessions()
+        const s = payload.new as Session
+        setSessions(prev => [s, ...prev])
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'agent_sessions',
+        filter: `merchant_id=eq.${userId}`
+      }, (payload) => {
+        const s = payload.new as Session
+        setSessions(prev =>
+          prev
+            .map(existing => existing.id === s.id ? s : existing)
+            .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+        )
       })
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [userId, fetchSessions])
+  }, [userId])
 
   return (
     <div className="flex flex-col h-full border-r bg-background w-56 shrink-0">

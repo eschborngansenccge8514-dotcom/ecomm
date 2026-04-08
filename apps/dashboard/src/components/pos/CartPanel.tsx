@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { usePosCart, PosCartState } from '@/stores/pos-cart'
 import { Trash2, Plus, Minus, UserIcon, Tag, CreditCard, Receipt, MoreHorizontal } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
@@ -10,6 +11,7 @@ import { CartItem } from '@project1/domain'
 import { DiscountModal } from './DiscountModal'
 
 export function CartPanel() {
+  const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const { items, updateQty, removeItem, getTotals, customerName, clearCart, taxRate } = usePosCart(
     useShallow((s: PosCartState) => ({
@@ -166,13 +168,14 @@ export function CartPanel() {
         </div>
 
         <div className="grid grid-cols-1 gap-3 pt-2">
-          <Link
-            href="/pos/checkout"
+          <button
+            onClick={() => router.push('/pos/checkout')}
+            disabled={items.length === 0}
             className="flex items-center justify-center gap-3 h-16 rounded-2xl bg-slate-900 text-white hover:bg-slate-800 transition-all font-black text-lg shadow-xl shadow-slate-200 disabled:opacity-50 disabled:grayscale"
           >
              <CreditCard size={22} />
              Review & Pay
-          </Link>
+          </button>
         </div>
       </div>
 

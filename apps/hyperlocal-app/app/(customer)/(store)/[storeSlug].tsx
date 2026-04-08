@@ -1,4 +1,4 @@
-import { View, Text, SectionList, TouchableOpacity, Dimensions, StyleSheet } from 'react-native'
+import { View, Text, SectionList, TouchableOpacity, Dimensions, StyleSheet, Modal, FlatList, Animated as RNAnimated } from 'react-native'
 import { useLocalSearchParams, router } from 'expo-router'
 import { useQuery } from '@tanstack/react-query'
 import { Image } from 'expo-image'
@@ -14,6 +14,8 @@ import { BlurView } from 'expo-blur'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Linking, Alert } from 'react-native'
+import { useRef, useState } from 'react'
+import { Swipeable } from 'react-native-gesture-handler'
 
 import { merchantsService } from '@/services/merchants.service'
 import { productsService } from '@/services/products.service'
@@ -21,6 +23,7 @@ import { ProductCard } from '@/components/product/ProductCard'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { formatCurrency } from '@/lib/utils'
 import { isStoreOpen, formatOperatingHour, getDayName } from '@/lib/merchant-utils'
+import { useCartStore } from '@/stores/cartStore'
 import type { ProductWithVariants } from '@/types/app.types'
 
 const AnimatedSectionList = createAnimatedComponent(SectionList)
@@ -29,10 +32,154 @@ const { width, height } = Dimensions.get('window')
 const HEADER_MIN_HEIGHT = 100
 const HEADER_MAX_HEIGHT = 280
 
+// ─── Swipeable delete row (cart panel) ────────────────────────────────────────
+function CartDeleteAction(
+  progress: RNAnimated.AnimatedInterpolation<number>,
+  _dragX: RNAnimated.AnimatedInterpolation<number>,
+  onDelete: () => void
+) {
+  const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1], extrapolate: 'clamp' })
+  return (
+    <TouchableOpacity
+      onPress={onDelete}
+      style={{ backgroundColor: '#ef4444', justifyContent: 'center', alignItems: 'center', borderRadius: 16, marginLeft: 8, paddingHorizontal: 20, marginBottom: 8 }}
+    >
+      <RNAnimated.View style={{ transform: [{ scale }] }}>
+        <Ionicons name="trash-outline" size={20} color="#fff" />
+      </RNAnimated.View>
+    </TouchableOpacity>
+  )
+}
+
+// ─── Cart panel modal ──────────────────────────────────────────────────────────
+function CartPanel({ visible, onClose, merchantName }: { visible: boolean; onClose: () => void; merchantName: string }) {
+  const insets = useSafeAreaInsets()
+  const { items, updateQuantity, removeItem, clearCart, getTotal, getItemCount, merchantId: cartMerchantId } = useCartStore()
+
+  const handleClearCart = () => {
+    Alert.alert('Clear cart?', 'Remove all items?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Clear', style: 'destructive', onPress: clearCart },
+    ])
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        {/* Header */}
+        <View style={{ backgroundColor: '#fff', paddingTop: insets.top + 8, paddingBottom: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View>
+            <Text style={{ fontSize: 22, fontWeight: '700', color: '#0f172a' }}>Your Cart</Text>
+            <Text style={{ fontSize: 13, color: '#94a3b8', marginTop: 2 }}>{merchantName} · {getItemCount()} item{getItemCount() !== 1 ? 's' : ''}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {items.length > 0 && (
+              <TouchableOpacity onPress={handleClearCart} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fef2f2', borderRadius: 20 }}>
+                <Ionicons name="trash-outline" size={14} color="#ef4444" />
+                <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '600' }}>Clear</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={onClose} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="close" size={20} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {items.length === 0 ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <Ionicons name="bag-outline" size={40} color="#2563eb" />
+            </View>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#0f172a', textAlign: 'center' }}>Cart is empty</Text>
+            <Text style={{ color: '#94a3b8', marginTop: 8, textAlign: 'center', fontSize: 14 }}>Add products from the store below.</Text>
+            <TouchableOpacity onPress={onClose} style={{ marginTop: 20, backgroundColor: '#2563eb', borderRadius: 20, paddingHorizontal: 24, paddingVertical: 10 }}>
+              <Text style={{ color: '#fff', fontWeight: '600' }}>Browse Products</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <FlatList
+              data={items}
+              keyExtractor={(i) => `${i.productId}-${i.variantId ?? 'none'}`}
+              contentContainerStyle={{ padding: 16, paddingBottom: 160 }}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => {
+                const swipeRef = { current: null as any }
+                return (
+                  <Swipeable
+                    ref={swipeRef}
+                    friction={2}
+                    rightThreshold={40}
+                    renderRightActions={(prog, drag) => CartDeleteAction(prog, drag, () => removeItem(item.productId, item.variantId))}
+                  >
+                    <View style={{ backgroundColor: '#fff', borderRadius: 16, flexDirection: 'row', gap: 12, padding: 12, marginBottom: 8, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 }}>
+                      <Image
+                        source={item.imageUrl ? { uri: item.imageUrl } : require('../../../assets/placeholder-logo.png')}
+                        style={{ width: 68, height: 68, borderRadius: 12 }}
+                        contentFit="cover"
+                      />
+                      <View style={{ flex: 1, justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: '#0f172a' }} numberOfLines={2}>{item.productName}</Text>
+                        {item.variantName && (
+                          <View style={{ backgroundColor: '#f1f5f9', alignSelf: 'flex-start', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, marginTop: 2 }}>
+                            <Text style={{ fontSize: 11, color: '#64748b' }}>{item.variantName}</Text>
+                          </View>
+                        )}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                          <Text style={{ color: '#2563eb', fontWeight: '700', fontSize: 15 }}>{formatCurrency(item.price)}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#f8fafc', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4 }}>
+                            <TouchableOpacity
+                              onPress={() => updateQuantity(item.productId, item.variantId, item.quantity - 1)}
+                              style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowOpacity: 0.06, shadowRadius: 2, elevation: 1 }}
+                            >
+                              <Ionicons name={item.quantity === 1 ? 'trash-outline' : 'remove'} size={13} color={item.quantity === 1 ? '#ef4444' : '#374151'} />
+                            </TouchableOpacity>
+                            <Text style={{ fontWeight: '700', color: '#0f172a', fontSize: 14, minWidth: 18, textAlign: 'center' }}>{item.quantity}</Text>
+                            <TouchableOpacity
+                              onPress={() => updateQuantity(item.productId, item.variantId, item.quantity + 1)}
+                              style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              <Ionicons name="add" size={13} color="#fff" />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  </Swipeable>
+                )
+              }}
+            />
+
+            {/* Checkout bar */}
+            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f1f5f9', padding: 20, paddingBottom: insets.bottom + 16 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+                <Text style={{ color: '#64748b', fontSize: 14 }}>Estimated Total</Text>
+                <Text style={{ fontSize: 24, fontWeight: '700', color: '#0f172a' }}>{formatCurrency(getTotal())}</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => { onClose(); router.push('/(customer)/(cart)/checkout') }}
+                style={{ backgroundColor: '#2563eb', borderRadius: 16, paddingVertical: 16, alignItems: 'center' }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Proceed to Checkout →</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </View>
+    </Modal>
+  )
+}
+
 export default function StoreScreen() {
   const { storeSlug } = useLocalSearchParams<{ storeSlug: string }>()
   const insets = useSafeAreaInsets()
   const scrollY = useSharedValue(0)
+  const [cartVisible, setCartVisible] = useState(false)
 
   const { data: merchant, isLoading: loadingMerchant } = useQuery({
     queryKey: ['merchant', storeSlug],
@@ -60,6 +207,9 @@ export default function StoreScreen() {
       scrollY.value = event.contentOffset.y
     },
   })
+
+  const { items: cartItems, getItemCount, getTotal } = useCartStore()
+  const storeCartCount = cartItems.length
 
   const { isOpen, nextStatusChange } = merchant ? isStoreOpen(merchant) : { isOpen: true }
   const activeAnnouncement = merchant?.announcements?.find(a => a.is_active)
@@ -318,21 +468,42 @@ export default function StoreScreen() {
         refreshing={loadingProducts}
       />
 
-      {/* Floating Chat Button */}
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() => router.push({
-          pathname: '/(customer)/support',
-          params: { 
-            merchantId: merchant.owner_id, 
-            storeName: merchant.store_name 
-          }
-        })}
-        style={[styles.chatFAB, styles.shadowHeavy]}
-        className="bg-primary-600 w-14 h-14 rounded-full items-center justify-center absolute bottom-10 right-6 z-50 border-4 border-white"
-      >
-        <Ionicons name="chatbox-ellipses" size={24} color="#fff" />
-      </TouchableOpacity>
+      {/* FAB cluster: cart + chat */}
+      <View style={{ position: 'absolute', bottom: 32, right: 24, alignItems: 'center', gap: 12, zIndex: 50 }}>
+        {/* Chat FAB */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => router.push({
+            pathname: '/(customer)/support',
+            params: { merchantId: merchant.owner_id, storeName: merchant.store_name }
+          })}
+          style={[styles.chatFAB, styles.shadowHeavy, { position: 'relative', bottom: 0, right: 0 }]}
+          className="bg-white w-12 h-12 rounded-full items-center justify-center border border-gray-200"
+        >
+          <Ionicons name="chatbox-ellipses" size={22} color="#2563eb" />
+        </TouchableOpacity>
+
+        {/* Cart FAB */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setCartVisible(true)}
+          style={[styles.shadowHeavy, { position: 'relative' }]}
+          className="bg-primary-600 w-14 h-14 rounded-full items-center justify-center border-4 border-white"
+        >
+          <Ionicons name="bag" size={24} color="#fff" />
+          {storeCartCount > 0 && (
+            <View className="absolute -top-1 -right-1 bg-red-500 rounded-full min-w-[20px] h-5 items-center justify-center px-1">
+              <Text className="text-white text-[10px] font-bold">{storeCartCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <CartPanel
+        visible={cartVisible}
+        onClose={() => setCartVisible(false)}
+        merchantName={merchant.store_name}
+      />
     </View>
   )
 }

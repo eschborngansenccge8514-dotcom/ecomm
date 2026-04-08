@@ -33,11 +33,10 @@ billplz.post('/create-bill', async (c) => {
       .eq('merchant_id', order.merchant_id)
       .maybeSingle()
 
-    if (config && !config.enabled) {
-      throw new Error('Billplz is currently disabled for this merchant')
-    }
-
-    const collectionId = config?.collection_id || c.env.BILLPLZ_COLLECTION_ID
+    // Fallback to global collection if merchant config is disabled or missing collection_id
+    const collectionId = (config?.enabled && config?.collection_id) 
+      ? config.collection_id 
+      : c.env.BILLPLZ_COLLECTION_ID
     
     const authHeader = 'Basic ' + btoa(`${apiKey}:`)
     const amountInCents = Math.round(Number(order.total_amount) * 100)

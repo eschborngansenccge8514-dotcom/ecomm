@@ -1,9 +1,6 @@
-// @ts-nocheck
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-// @ts-ignore
-import { useChat } from '@ai-sdk/react'
 import { toast } from 'react-hot-toast'
 import { cn } from '@/lib/utils'
 import { Paperclip, Loader2 } from 'lucide-react'
@@ -13,9 +10,10 @@ import { analyseReceipt } from '@/app/(dashboard)/expenses/actions'
 interface Props {
   initialSessionId?: string
   hideHeader?: boolean
+  userId?: string
 }
 
-export function AgentChatPanel({ initialSessionId, hideHeader = false }: Props) {
+export function AgentChatPanel({ initialSessionId, hideHeader = false, userId }: Props) {
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -24,7 +22,9 @@ export function AgentChatPanel({ initialSessionId, hideHeader = false }: Props) 
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [streamErrorId, setStreamErrorId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -48,23 +48,8 @@ export function AgentChatPanel({ initialSessionId, hideHeader = false }: Props) 
       
       const payload = `[Attached Receipt - ${file.name}]\nExtracted details: ${JSON.stringify(result.extraction, null, 2)}\n\nPlease record this expense and let me know when it's done.`
       
-      toast.success("Receipt parsed! Summarizing and saving...", { id: "analyze" })
-      setInput(payload)
-      // We can auto-submit here, or let them press Enter
-      setTimeout(() => {
-         const fakeEvent = { preventDefault: () => {} } as any;
-         // Set input value then submit
-         setInput(prev => {
-            // Need to pass the updated value to handleSubmit somehow, or wait for state.
-            return payload;
-         })
-         // Trigger submit programmatically
-         requestAnimationFrame(() => {
-           if (inputRef.current) {
-             inputRef.current.form?.requestSubmit()
-           }
-         })
-      }, 100)
+      toast.success("Receipt parsed! Submitting to agent...", { id: "analyze" })
+      handleSubmit(undefined, payload)
 
     } catch (err: any) {
       toast.error(`Upload failed: ${err.message}`, { id: "analyze" })
@@ -74,13 +59,18 @@ export function AgentChatPanel({ initialSessionId, hideHeader = false }: Props) 
     }
   }
 
-  const handleSubmit = async (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent, overrideText?: string) => {
     e?.preventDefault()
-    if (!input.trim() || isLoading) return
-    
-    const text = input.trim()
+    const text = (overrideText ?? input).trim()
+    if (!text || isLoading) return
+
     setInput('')
     setIsLoading(true)
+
+    // Cancel any in-flight request before starting a new one
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
 
     const userMsgId = `user-${Date.now()}`
     setMessages(prev => [...prev, { id: userMsgId, role: 'user', content: text }])
@@ -93,6 +83,7 @@ export function AgentChatPanel({ initialSessionId, hideHeader = false }: Props) 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, newMessage: text, messages }),
+        signal: controller.signal,
       })
 
       const sid = res.headers.get('x-session-id')
@@ -163,8 +154,10 @@ export function AgentChatPanel({ initialSessionId, hideHeader = false }: Props) 
         }
       }
     } catch (err: any) {
+      if (err.name === 'AbortError') return
       console.error('[MerchantMind] Chat Error:', err)
       toast.error(`Agent error: ${err.message}`)
+      setStreamErrorId(assistantId)
     } finally {
       setIsLoading(false)
     }
@@ -206,7 +199,7 @@ export function AgentChatPanel({ initialSessionId, hideHeader = false }: Props) 
       }, (payload) => {
         // Deduplicate: If we already have this message (e.g. it was sent from dashboard), don't add
         setMessages(prev => {
-          const exists = prev.some(m => m.content === payload.new.content && m.role === payload.new.role)
+          const exists = prev.some(m => m.id === payload.new.id)
           if (exists) return prev
           
           return [...prev, {
@@ -229,6 +222,7 @@ export function AgentChatPanel({ initialSessionId, hideHeader = false }: Props) 
 
   useEffect(() => {
     return () => {
+      abortRef.current?.abort()
       if (sessionId) {
         navigator.sendBeacon(`/api/agent/sessions/${sessionId}/close`)
       }
@@ -281,7 +275,9 @@ export function AgentChatPanel({ initialSessionId, hideHeader = false }: Props) 
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-foreground'}`}
               >
-                {msg.content || (
+                {streamErrorId === msg.id ? (
+                  <span className="text-destructive opacity-80">⚠ Response interrupted. Please try again.</span>
+                ) : msg.content || (
                   <span className="animate-pulse opacity-60">Thinking…</span>
                 )}
               </div>

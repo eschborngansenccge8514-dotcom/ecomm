@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { usePosCart } from '@/stores/pos-cart'
 import { fetchPosProducts, getOrInitializeSession } from '@/lib/pos-actions'
 import { PosProduct } from '@project1/domain'
@@ -10,8 +11,10 @@ import { SearchBar } from '@/components/pos/SearchBar'
 import { ActionHeader } from '@/components/pos/ActionHeader'
 import { toast } from 'react-hot-toast'
 import { useShallow } from 'zustand/react/shallow'
+import { usePosOffline } from '@/stores/pos-offline'
 
 export default function PosPage() {
+  const router = useRouter()
   const [products, setProducts] = useState<PosProduct[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -31,10 +34,19 @@ export default function PosPage() {
       addItem: s.addItem
     }))
   )
+
+  const { cachedProducts, cachedSession, setCachedData, isOfflineMode } = usePosOffline()
   
   useEffect(() => {
     async function init() {
+      const isActuallyOffline = isOfflineMode || (typeof navigator !== 'undefined' && !navigator.onLine)
+
       try {
+        if (isActuallyOffline) {
+          throw new Error('OFFLINE_MODE')
+        }
+
+        // Try to get fresh session info
         const info = await getOrInitializeSession()
         setSession(info.outletId, info.sessionId)
         setTaxRate(info.taxRate)
@@ -46,17 +58,46 @@ export default function PosPage() {
           merchantName: info.merchantName
         })
         
+        // Try to get fresh products
         const data = await fetchPosProducts(info.outletId)
         setProducts(data)
-      } catch (err) {
-        toast.error('Failed to initialize POS')
-        console.error(err)
+
+        // Update cache for next offline use
+        setCachedData(data, info)
+      } catch (err: any) {
+        if (err?.message !== 'OFFLINE_MODE') {
+          console.error('POS Init Error:', err)
+        }
+        
+        // Avoid stale closures from the first mount by reading the latest state
+        const state = usePosOffline.getState()
+        
+        // Fallback to cache if available
+        if (state.cachedSession && state.cachedProducts.length > 0) {
+          toast.success('Running in Offline Mode (Cached Data)', { icon: '📶' })
+          
+          setSession(state.cachedSession.outletId, state.cachedSession.sessionId)
+          setTaxRate(state.cachedSession.taxRate)
+          setSessionInfo({
+            outletId: state.cachedSession.outletId,
+            sessionId: state.cachedSession.sessionId,
+            outletName: state.cachedSession.outletName,
+            userName: state.cachedSession.userName,
+            merchantName: state.cachedSession.merchantName
+          })
+          setProducts(state.cachedProducts)
+        } else {
+          toast.error('Failed to initialize POS. Please check your connection.')
+        }
       } finally {
         setIsLoading(false)
       }
     }
     init()
-  }, [setSession])
+
+    // Prefetch checkout page to ensure it's available offline
+    router.prefetch('/pos/checkout')
+  }, [setSession, router])
 
   const categories = useMemo(() => {
     const cats = new Set(products.map(p => p.category).filter(Boolean))

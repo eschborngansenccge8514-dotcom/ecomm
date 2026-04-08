@@ -13,7 +13,7 @@ import {
   type StoreType, type StoreAppearance, type StoreConfig,
 } from '@/lib/store-types'
 import { 
-  Save, Globe, Palette, Clock, Truck, Megaphone, FileText, 
+  Save, Globe, Clock, Truck, Megaphone, FileText, 
   Eye, Loader2, Plus, Trash2, GripVertical, MapPin, CreditCard, ShoppingBag
 } from 'lucide-react'
 
@@ -81,60 +81,7 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (v: string)
   )
 }
 
-function StorePreview({ appearance, storeName, storeType }: {
-  appearance: StoreAppearance; storeName: string; storeType: StoreType
-}) {
-  const meta = STORE_TYPES[storeType]
-  return (
-    <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm max-w-xs bg-white">
-      {/* Banner */}
-      <div className="h-16 flex items-center justify-center text-2xl relative bg-gray-50"
-        style={{ backgroundColor: appearance.primaryColor + '15' }}>
-        {appearance.bannerUrl
-          ? (
-            <div className="relative w-full h-full">
-              <Image src={appearance.bannerUrl} fill className="object-cover" alt="" />
-            </div>
-          ) : <span className="opacity-40">{meta.icon}</span>}
-      </div>
-      {/* Header */}
-      <div className="px-4 py-3 flex items-center gap-3 border-b border-gray-100">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold shrink-0 relative overflow-hidden"
-          style={{ backgroundColor: appearance.primaryColor }}>
-          {appearance.logoUrl
-            ? (
-              <div className="relative w-full h-full">
-                <Image src={appearance.logoUrl} fill className="object-cover" alt="" />
-              </div>
-            ) : storeName.charAt(0).toUpperCase()}
-        </div>
-        <div className="min-w-0">
-          <p className="font-bold text-gray-900 text-sm truncate" style={{ fontFamily: appearance.fontFamily }}>{storeName}</p>
-          <p className="text-[10px] text-gray-400 truncate">{appearance.tagline || meta.desc}</p>
-        </div>
-      </div>
-      {/* Sample content */}
-      <div className="p-3 bg-gray-50/50">
-        <div className="grid grid-cols-2 gap-2">
-          {[1,2].map(i => (
-            <div key={i} className="bg-white rounded-xl overflow-hidden border border-gray-100 p-2">
-              <div className="aspect-square rounded-lg mb-2 flex items-center justify-center text-lg"
-                style={{ backgroundColor: appearance.accentColor + '10' }}>
-                {meta.icon}
-              </div>
-              <div className="h-2 bg-gray-100 rounded-full w-3/4 mb-1" />
-              <div className="h-2 bg-gray-100 rounded-full w-1/2" />
-            </div>
-          ))}
-        </div>
-        <button className="w-full mt-3 py-2 rounded-xl text-white text-[10px] font-bold transition-all shadow-sm"
-          style={{ backgroundColor: appearance.primaryColor }}>
-          View Menu
-        </button>
-      </div>
-    </div>
-  )
-}
+
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
@@ -268,7 +215,7 @@ export function SettingsClient({
 
   const TABS = [
     { key: 'store',        label: 'Store',        icon: <Globe size={14} /> },
-    { key: 'appearance',   label: 'Appearance',   icon: <Palette size={14} /> },
+
     { key: 'ops',          label: 'Operations',   icon: <Clock size={14} /> },
     { key: 'logistics',    label: 'Logistics',    icon: <Truck size={14} /> },
     { key: 'payments',     label: 'Payments',     icon: <CreditCard size={14} /> },
@@ -331,8 +278,8 @@ export function SettingsClient({
           
           {/* STORE TAB */}
           {tab === 'store' && (
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <div className="xl:col-span-2 space-y-6">
+            <div className="space-y-6 max-w-4xl">
+
                 <Section title="Store Identity" desc="How customer identifies your brand and finds your link.">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Field label="Store Name *">
@@ -401,77 +348,10 @@ export function SettingsClient({
                     </Field>
                   </div>
                 </Section>
-              </div>
-
-              {/* Preview */}
-              <div className="hidden xl:block">
-                <div className="sticky top-6">
-                   <p className="text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest">Storefront Preview</p>
-                   <StorePreview appearance={appearance} storeName={storeName || 'Your Store'} storeType={storeType} />
-                </div>
-              </div>
             </div>
           )}
 
-          {/* APPEARANCE TAB */}
-          {tab === 'appearance' && (
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <div className="xl:col-span-2 space-y-6">
-                <Section title="Visual Branding" desc="Upload your logo and banners to define your store's personality.">
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <Field label="Logo URL"><Input value={appearance.logoUrl} onChange={e => setApp('logoUrl', e.target.value)} className="rounded-xl h-11" placeholder="https://..." /></Field>
-                      <Field label="Favicon URL"><Input value={appearance.favicon} onChange={e => setApp('favicon', e.target.value)} className="rounded-xl h-11" placeholder="https://..." /></Field>
-                      <Field label="Desktop Banner"><Input value={appearance.bannerUrl} onChange={e => setApp('bannerUrl', e.target.value)} className="rounded-xl h-11" placeholder="https://..." /></Field>
-                      <Field label="Mobile Banner"><Input value={appearance.bannerMobileUrl} onChange={e => setApp('bannerMobileUrl', e.target.value)} className="rounded-xl h-11" placeholder="https://..." /></Field>
-                   </div>
-                </Section>
 
-                <Section title="Colors" desc="Select your primary and accent colors for buttons and highlights.">
-                  <div className="space-y-6">
-                    <Field label="Primary Theme Color">
-                      <ColorPicker value={appearance.primaryColor} onChange={v => setApp('primaryColor', v)} />
-                    </Field>
-                    <Field label="Accent Color">
-                      <ColorPicker value={appearance.accentColor} onChange={v => setApp('accentColor', v)} />
-                    </Field>
-                  </div>
-                </Section>
-
-                <Section title="Layout Styles">
-                   <Field label="Product Grid Layout">
-                      <div className="flex gap-2 p-1 bg-gray-50 rounded-2xl">
-                        {(['grid','masonry','list'] as const).map(l => (
-                          <button key={l} onClick={() => setApp('layout', l)}
-                             className={cn("flex-1 py-3 rounded-xl text-sm font-bold capitalize transition-all",
-                             appearance.layout === l ? "bg-white shadow-sm text-gray-900" : "text-gray-400 hover:text-gray-600")}>
-                             {l}
-                          </button>
-                        ))}
-                      </div>
-                   </Field>
-                   <Field label="Corner Roundness">
-                      <div className="flex gap-2 p-1 bg-gray-50 rounded-2xl">
-                        {(['sharp','rounded','pill'] as const).map(r => (
-                          <button key={r} onClick={() => setApp('borderRadius', r)}
-                             className={cn("flex-1 py-3 rounded-xl text-sm font-bold capitalize transition-all",
-                             appearance.borderRadius === r ? "bg-white shadow-sm text-gray-900" : "text-gray-400 hover:text-gray-600")}>
-                             {r}
-                          </button>
-                        ))}
-                      </div>
-                   </Field>
-                </Section>
-              </div>
-
-              {/* Preview */}
-              <div className="hidden xl:block">
-                <div className="sticky top-6">
-                   <p className="text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest">Storefront Preview</p>
-                   <StorePreview appearance={appearance} storeName={storeName} storeType={storeType} />
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* OPERATIONS TAB */}
           {tab === 'ops' && (

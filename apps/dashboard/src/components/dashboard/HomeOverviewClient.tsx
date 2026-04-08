@@ -4,10 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns'
 import { 
-  TrendingUp, TrendingDown, ShoppingBag, Users, 
-  ArrowUpRight, AlertCircle, Package, Activity,
-  Download, ChevronDown, CheckCircle2, Store,
-  DollarSign, Percent, Loader2, ArrowRight, Zap, Clock, Receipt, Truck
+  TrendingUp, TrendingDown, ShoppingBag, 
+  ArrowUpRight, Activity, ChevronDown, 
+  DollarSign, ArrowRight, Truck
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -23,9 +22,7 @@ const CartesianGrid = dynamic(() => import('recharts').then(mod => mod.Cartesian
 const Tooltip = dynamic(() => import('recharts').then(mod => mod.Tooltip), { ssr: false })
 const ResponsiveContainer = dynamic(() => import('recharts').then(mod => mod.ResponsiveContainer), { ssr: false })
 const Legend = dynamic(() => import('recharts').then(mod => mod.Legend), { ssr: false })
-const PieChart = dynamic(() => import('recharts').then(mod => mod.PieChart), { ssr: false })
-const Pie = dynamic(() => import('recharts').then(mod => mod.Pie), { ssr: false })
-const Cell = dynamic(() => import('recharts').then(mod => mod.Cell), { ssr: false })
+
 
 // --- Constants ---
 const DATE_PRESETS = [
@@ -83,7 +80,7 @@ export function HomeOverviewClient({ merchantId, dateRange, data }: {
   const [showPresets, setShowPresets] = useState(false)
   
   const summary = data?.summary ?? {}
-  const dailyStats = data?.daily_stats ?? []
+  const dailyStats = data?.trends ?? data?.daily_stats ?? []
   const topProducts = data?.top_products ?? []
   const recentOrders = data?.recent_orders ?? []
   const alerts = data?.alerts ?? {}
@@ -289,76 +286,7 @@ export function HomeOverviewClient({ merchantId, dateRange, data }: {
         {/* Sidebar Column: Recent Orders & Alerts */}
         <div className="space-y-6">
           
-          {/* Cost Breakdown Donut */}
-          <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-6">Cost Breakdown</h3>
-            
-            {summary.revenue > 0 ? (
-              <div className="flex flex-col items-center">
-                <div className="h-[180px] w-full relative">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={[
-                          { name: 'COGS', value: Number(summary.cogs) },
-                          { name: 'Expenses', value: Number(summary.expenses) },
-                          { name: 'Net Profit', value: Math.max(Number(summary.net_pnl), 0) },
-                        ]}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        <Cell fill="#F59E0B" />
-                        <Cell fill="#EF4444" />
-                        <Cell fill="#10B981" />
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-2xl font-bold">
-                      {summary.revenue > 0 ? Math.round((summary.net_pnl / summary.revenue) * 100) : 0}%
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-medium">MARGIN</span>
-                  </div>
-                </div>
 
-                <div className="w-full mt-6 space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                      <span className="text-slate-300">COGS</span>
-                    </div>
-                    <span className="font-bold">{rm(summary.cogs)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                      <span className="text-slate-300">Expenses</span>
-                    </div>
-                    <span className="font-bold">{rm(summary.expenses)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                      <span className="text-slate-300">Net Profit</span>
-                    </div>
-                    <span className="font-bold">{rm(summary.net_pnl)}</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="h-[240px] flex flex-col items-center justify-center text-center p-4">
-                <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-4 text-slate-600">
-                  <Package size={24} />
-                </div>
-                <p className="text-slate-400 text-sm font-medium">No revenue this period</p>
-                <p className="text-slate-600 text-xs mt-1">Donut chart will appear when sales are recorded</p>
-              </div>
-            )}
-          </div>
 
           {/* Purchase Activity */}
           <div className="bg-white rounded-2xl border border-gray-100 p-5">

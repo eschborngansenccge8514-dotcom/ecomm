@@ -2,7 +2,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 // import type { CoreMessage } from 'ai'
 type CoreMessage = any
 
-function getSupabase() {
+export function getSupabase() {
   return createClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -13,8 +13,9 @@ function getSupabase() {
 export async function loadMessages(
   sessionId: string,
   limit = 20,
-  supabase: SupabaseClient
+  supabaseInjected?: SupabaseClient
 ): Promise<CoreMessage[]> {
+  const supabase = supabaseInjected || getSupabase()
   const { data, error } = await supabase
     .from('agent_messages')
     .select('role, content')
@@ -97,8 +98,9 @@ export async function saveMessages(
   sessionId: string,
   merchantId: string,
   messages: CoreMessage[],
-  supabase: SupabaseClient
+  supabaseInjected?: SupabaseClient
 ): Promise<void> {
+  const supabase = supabaseInjected || getSupabase()
   const { error } = await supabase.from('agent_messages').insert(
     messages.map((m, index) => {
       // Check if we need to serialize the whole message (has metadata)

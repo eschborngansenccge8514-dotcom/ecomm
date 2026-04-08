@@ -15,6 +15,7 @@ export interface WhatsAppMerchantInput {
   userId: string
   merchantName: string
   sessionId: string
+  instanceName?: string
 }
 
 /**
@@ -27,7 +28,8 @@ export async function handleMerchantWhatsApp({
   merchantId,
   userId,
   merchantName,
-  sessionId
+  sessionId,
+  instanceName
 }: WhatsAppMerchantInput) {
 
   // 1. Load history
@@ -51,7 +53,7 @@ export async function handleMerchantWhatsApp({
     model: google('gemini-2.5-flash-lite'), // Use latest stable
     system: buildSystemPrompt(merchantName) + `\n\n## WhatsApp Context\nMerchant is texting from: ${senderPhone}. Respond concisely for mobile viewing.` + "\n\nIMPORTANT: You MUST always provide a helpful, professional text response. Never return an empty message.",
     messages: processedHistory,
-    tools: buildTools(merchantId, sessionId) as any,
+    tools: buildTools(merchantId, sessionId, instanceName) as any,
     maxSteps: 7,
   } as any)
 

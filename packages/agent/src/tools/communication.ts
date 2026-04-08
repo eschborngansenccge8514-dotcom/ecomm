@@ -12,13 +12,15 @@ import { sendEmail, FROM_ADDRESSES } from '@repo/email'
 // Tool 1: Send a general email — medium risk (logging only, no blocking)
 export const sendEmailTool = (merchantId: string, sessionId: string) =>
   tool({
-    description: 'Send an email to any recipient. Use this for manual outreach, follow-ups, or custom notifications.',
+    description: 'Send a one-to-one email to a specific recipient. Use this for manual outreach, follow-ups, or custom notifications. For bulk promotional emails to segments, use send_marketing_campaign instead.',
     parameters: z.object({
       to:        z.string().email().optional().describe('Recipient email address'),
-      recipient: z.string().email().optional().describe('Alias for "to"'),
+      recipient: z.string().email().optional().describe('Alias for "to" (use if you only have one email)'),
       subject:   z.string().min(1).describe('Email subject line'),
       body:      z.string().min(1).describe('The plain text or HTML content of the email'),
       from_name: z.string().optional().describe('Optional sender name (defaults to business name)')
+    }).refine(data => data.to || data.recipient, {
+      message: 'Missing recipient email (to or recipient)'
     }),
     execute: (input: any) =>
       executeWithGuard(

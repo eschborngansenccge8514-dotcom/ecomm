@@ -1,13 +1,15 @@
-import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native'
+import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, ImageBackground } from 'react-native'
 import { router } from 'expo-router'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useState } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import Toast from 'react-native-toast-message'
+import { BlurView } from 'expo-blur'
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated'
+import { Ionicons } from '@expo/vector-icons'
 
 const schema = z.object({
   fullName:        z.string().min(2, 'Name must be at least 2 characters'),
@@ -23,7 +25,6 @@ type FormData = z.infer<typeof schema>
 
 export default function RegisterScreen() {
   const { signUpWithEmail, isLoading } = useAuthStore()
-  const [role, setRole] = useState<'customer' | 'merchant'>('customer')
 
   const { control, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -37,8 +38,8 @@ export default function RegisterScreen() {
 
   const onSubmit = async (data: FormData) => {
     try {
-      await signUpWithEmail(data.email, data.password, data.fullName, role)
-      Toast.show({ type: 'success', text1: 'Check your email to confirm your account.' })
+      await signUpWithEmail(data.email, data.password, data.fullName, 'customer')
+      Toast.show({ type: 'success', text1: 'Success!', text2: 'Check your email to confirm your account.' })
       router.push('/(auth)/login')
     } catch (err: any) {
       Toast.show({ type: 'error', text1: 'Registration failed', text2: err.message })
@@ -46,56 +47,75 @@ export default function RegisterScreen() {
   }
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-white" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView className="flex-1 px-6 pt-16" showsVerticalScrollIndicator={false}>
-        <TouchableOpacity onPress={() => router.back()} className="mb-8 p-2 -ml-2">
-          <Text className="text-primary-600 text-base font-semibold">← Back</Text>
-        </TouchableOpacity>
-
-        <Text className="text-3xl font-bold text-gray-900 mb-2">Create account</Text>
-        <Text className="text-gray-500 mb-8 text-base">Join as a customer or merchant</Text>
-
-        <View className="flex-row mb-10 gap-3">
-          {(['customer', 'merchant'] as const).map(r => (
-            <TouchableOpacity
-              key={r}
-              onPress={() => setRole(r)}
-              className={`flex-1 py-4 rounded-2xl border-2 items-center justify-center
-                ${role === r ? 'border-primary-500 bg-primary-50' : 'border-gray-200 bg-white'}`}
-            >
-              <Text className={`font-bold capitalize text-base
-                ${role === r ? 'text-primary-700' : 'text-gray-500'}`}>
-                {r === 'merchant' ? '🏠 Merchant' : '🛍️ Customer'}
-              </Text>
+    <ImageBackground 
+      source={{ uri: 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2000' }}
+      className="flex-1"
+    >
+      <KeyboardAvoidingView 
+        className="flex-1" 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView 
+          className="flex-1" 
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View entering={FadeInUp.delay(200).duration(800)}>
+            <TouchableOpacity onPress={() => router.back()} className="mb-6 w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30">
+              <Ionicons name="arrow-back" size={20} color="white" />
             </TouchableOpacity>
-          ))}
-        </View>
+          </Animated.View>
 
-        <Controller control={control} name="fullName"
-          render={({ field: { onChange, value } }) => (
-            <Input label="Full Name" placeholder="Ahmad bin Ali" value={value} onChangeText={onChange} error={errors.fullName?.message} />
-          )}
-        />
-        <Controller control={control} name="email"
-          render={({ field: { onChange, value } }) => (
-            <Input label="Email" placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" value={value} onChangeText={onChange} error={errors.email?.message} />
-          )}
-        />
-        <Controller control={control} name="password"
-          render={({ field: { onChange, value } }) => (
-            <Input label="Password" placeholder="Min 8 characters" secureTextEntry value={value} onChangeText={onChange} error={errors.password?.message} />
-          )}
-        />
-        <Controller control={control} name="confirmPassword"
-          render={({ field: { onChange, value } }) => (
-            <Input label="Confirm Password" placeholder="Repeat password" secureTextEntry value={value} onChangeText={onChange} error={errors.confirmPassword?.message} />
-          )}
-        />
+          <BlurView intensity={60} tint="light" className="rounded-[40px] overflow-hidden border border-white/40 shadow-2xl p-8 mb-12">
+            <Animated.View entering={FadeInDown.delay(300).duration(800)}>
+              <Text className="text-4xl font-bold text-gray-900 mb-2 font-heading tracking-tight">Join Us</Text>
+              <Text className="text-gray-600 mb-8 text-lg font-medium leading-tight">Create your account to start shopping local</Text>
+            </Animated.View>
 
-        <Button onPress={handleSubmit(onSubmit)} loading={isLoading} className="mt-6 mb-12">
-          Create Account
-        </Button>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <Animated.View entering={FadeInDown.delay(400).duration(800)}>
+              <Controller control={control} name="fullName"
+                render={({ field: { onChange, value } }) => (
+                  <Input label="Full Name" placeholder="Ahmad bin Ali" value={value} onChangeText={onChange} error={errors.fullName?.message} />
+                )}
+              />
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(500).duration(800)}>
+              <Controller control={control} name="email"
+                render={({ field: { onChange, value } }) => (
+                  <Input label="Email" placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" value={value} onChangeText={onChange} error={errors.email?.message} />
+                )}
+              />
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(600).duration(800)}>
+              <Controller control={control} name="password"
+                render={({ field: { onChange, value } }) => (
+                  <Input label="Password" placeholder="Min 8 characters" secureTextEntry value={value} onChangeText={onChange} error={errors.password?.message} />
+                )}
+              />
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(700).duration(800)}>
+              <Controller control={control} name="confirmPassword"
+                render={({ field: { onChange, value } }) => (
+                  <Input label="Confirm Password" placeholder="Repeat password" secureTextEntry value={value} onChangeText={onChange} error={errors.confirmPassword?.message} />
+                )}
+              />
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(800).duration(800)}>
+              <Button onPress={handleSubmit(onSubmit)} loading={isLoading} className="mt-4">
+                Create Account
+              </Button>
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(900).duration(800)} className="flex-row justify-center mt-8">
+              <Text className="text-gray-600 font-medium">Already have an account? </Text><TouchableOpacity onPress={() => router.push('/(auth)/login')}><Text className="text-primary-600 font-bold">Sign In</Text></TouchableOpacity>
+            </Animated.View>
+          </BlurView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ImageBackground>
   )
 }

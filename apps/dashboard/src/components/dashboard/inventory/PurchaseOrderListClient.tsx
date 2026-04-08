@@ -9,7 +9,8 @@ import {
   Search,
   ChevronRight,
   Clock,
-  ShoppingCart
+  ShoppingCart,
+  AlertTriangle
 } from 'lucide-react'
 import {
   Table,
@@ -132,7 +133,8 @@ export function PurchaseOrderListClient({
             <TableRow className="hover:bg-transparent border-gray-50">
               <TableHead className="pl-6 font-bold text-gray-400 uppercase text-[10px] tracking-widest">PO Number</TableHead>
               <TableHead className="font-bold text-gray-400 uppercase text-[10px] tracking-widest">Supplier</TableHead>
-              <TableHead className="font-bold text-gray-400 uppercase text-[10px] tracking-widest">Date</TableHead>
+              <TableHead className="font-bold text-gray-400 uppercase text-[10px] tracking-widest">Ordered</TableHead>
+              <TableHead className="font-bold text-gray-400 uppercase text-[10px] tracking-widest">Expected</TableHead>
               <TableHead className="text-right font-bold text-gray-400 uppercase text-[10px] tracking-widest">Total (RM)</TableHead>
               <TableHead className="font-bold text-gray-400 uppercase text-[10px] tracking-widest">Receiving</TableHead>
               <TableHead className="font-bold text-gray-400 uppercase text-[10px] tracking-widest">Status</TableHead>
@@ -144,10 +146,15 @@ export function PurchaseOrderListClient({
             {filtered.length > 0 ? filtered.map((po) => {
               const totalOrdered = po.purchase_order_items?.reduce((s: number, i: any) => s + i.quantity_ordered, 0) ?? 0
               const totalReceived = po.purchase_order_items?.reduce((s: number, i: any) => s + i.quantity_received, 0) ?? 0
+              const isActive = ['sent', 'partially_received'].includes(po.status)
+              const isOverdue = isActive && po.expected_date && new Date(po.expected_date) < new Date()
               return (
                 <TableRow
                   key={po.id}
-                  className="cursor-pointer hover:bg-gray-50 group border-gray-50"
+                  className={cn(
+                    "cursor-pointer hover:bg-gray-50 group border-gray-50",
+                    isOverdue && "bg-red-50/40 hover:bg-red-50/60"
+                  )}
                   onClick={() => router.push(`/inventory/purchase-orders/${po.id}`)}
                 >
                   <TableCell className="pl-6">
@@ -160,11 +167,28 @@ export function PurchaseOrderListClient({
                   <TableCell>
                     <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
                       <Clock size={11} className="text-gray-300" />
-                      {new Date(po.order_date).toLocaleDateString()}
+                      {po.order_date ? new Date(po.order_date).toLocaleDateString() : '—'}
                     </div>
                   </TableCell>
+                  <TableCell>
+                    {po.expected_date ? (
+                      <div className={cn(
+                        "flex items-center gap-1.5 text-xs font-medium",
+                        isOverdue ? "text-red-600" : "text-gray-500"
+                      )}>
+                        {isOverdue
+                          ? <AlertTriangle size={11} className="text-red-500 shrink-0" />
+                          : <Clock size={11} className="text-gray-300 shrink-0" />
+                        }
+                        {new Date(po.expected_date).toLocaleDateString()}
+                        {isOverdue && <span className="ml-1 text-[10px] font-black uppercase tracking-wider text-red-500">Overdue</span>}
+                      </div>
+                    ) : (
+                      <span className="text-gray-300 text-xs">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right font-bold text-gray-900">
-                    {po.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {(po.total ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell>
                     <ReceivingProgress ordered={totalOrdered} received={totalReceived} />
@@ -192,7 +216,7 @@ export function PurchaseOrderListClient({
               )
             }) : (
               <TableRow>
-                <TableCell colSpan={8} className="h-48 text-center text-gray-400">
+                <TableCell colSpan={9} className="h-48 text-center text-gray-400">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <ShoppingCart size={32} className="text-gray-100" />
                     <p>No purchase orders found.</p>

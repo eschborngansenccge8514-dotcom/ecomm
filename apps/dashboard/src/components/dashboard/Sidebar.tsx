@@ -3,15 +3,15 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { 
-  LayoutDashboard, 
-  ShoppingBag, 
+import {
+  LayoutDashboard,
+  ShoppingBag,
   Receipt,
   Package,
   Users,
   Truck,
-  Settings, 
-  LogOut, 
+  Settings,
+  LogOut,
   Store,
   Star,
   AlertCircle,
@@ -29,7 +29,10 @@ import {
   MessageSquare,
   ShoppingCart,
   Wallet,
-  Share2
+  Share2,
+  UserCheck,
+  Clock,
+  BadgeDollarSign
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -54,6 +57,7 @@ const NAV_GROUPS = [
     group: 'Sales',
     items: [
       { href: '/orders', label: 'Orders', icon: ShoppingBag },
+      { href: '/fulfilment', label: 'Fulfilment', icon: Box },
       { href: '/customers', label: 'Customers', icon: Users },
       { href: '/loyalty', label: 'Loyalty', icon: Star },
       { href: '/payment-exceptions', label: 'Payment Errors', icon: AlertCircle },
@@ -73,6 +77,14 @@ const NAV_GROUPS = [
       { href: '/expenses', label: 'Expenses', icon: Receipt },
       { href: '/einvoice', label: 'E-Invoicing', icon: FileCheck },
       { href: '/reports', label: 'Reports', icon: FileText },
+    ]
+  },
+  {
+    group: 'HR',
+    items: [
+      { href: '/hr/employees', label: 'Employees', icon: UserCheck },
+      { href: '/hr/attendance', label: 'Attendance', icon: Clock },
+      { href: '/hr/payroll', label: 'Payroll', icon: BadgeDollarSign },
     ]
   },
   {

@@ -295,13 +295,28 @@ function KpiCard({
 
 /* ── Payments Table ── */
 function PaymentsTable({ payments, router }: { payments: any[], router: any }) {
+  const totalPaid = payments.reduce((s, p) => s + (p.total_amount || 0), 0)
+
   return (
-    <div className="p-6">
+    <div className="p-6 space-y-4">
+      {payments.length > 0 && (
+        <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-emerald-50 border border-emerald-100">
+          <div className="flex items-center gap-2">
+            <CreditCard size={15} className="text-emerald-600" />
+            <span className="text-xs font-black uppercase tracking-wider text-emerald-700">
+              {payments.length} payment{payments.length !== 1 ? 's' : ''} recorded
+            </span>
+          </div>
+          <span className="text-base font-black text-emerald-800">
+            RM {totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        </div>
+      )}
       <div className="rounded-xl border border-gray-100 overflow-hidden">
         <table className="w-full text-left">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              {['Date', 'PO Number', 'Supplier', 'Amount', 'Method'].map(h => (
+              {['Date', 'PO Number', 'Supplier', 'Amount', 'Method', 'Notes'].map(h => (
                 <th key={h} className={cn(
                   "px-4 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400",
                   h === 'Amount' || h === 'Method' ? "text-right" : ""
@@ -312,7 +327,7 @@ function PaymentsTable({ payments, router }: { payments: any[], router: any }) {
           <tbody className="divide-y divide-gray-50">
             {payments.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-16 text-center text-sm text-gray-400">
+                <td colSpan={6} className="px-4 py-16 text-center text-sm text-gray-400">
                   <CreditCard size={28} className="mx-auto mb-2 text-gray-200" />
                   No payments recorded yet.
                 </td>
@@ -340,6 +355,9 @@ function PaymentsTable({ payments, router }: { payments: any[], router: any }) {
                     <span className="px-2 py-1 bg-gray-100 rounded-lg text-[10px] font-bold uppercase tracking-widest text-gray-500">
                       {p.payment_method}
                     </span>
+                  </td>
+                  <td className="px-4 py-3.5 text-xs text-gray-400 max-w-[180px] truncate">
+                    {p.notes || <span className="italic">—</span>}
                   </td>
                 </tr>
               ))

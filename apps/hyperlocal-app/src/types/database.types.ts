@@ -728,6 +728,41 @@ export type Database = {
           },
         ]
       }
+      product_custom_attributes: {
+        Row: {
+          id: string
+          product_id: string
+          merchant_id: string
+          key: string
+          value: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          merchant_id: string
+          key: string
+          value?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          merchant_id?: string
+          key?: string
+          value?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_custom_attributes_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_variants: {
         Row: {
           created_at: string

@@ -1,17 +1,17 @@
-"use client"
+'use client'
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { createClient } from "@supabase/supabase-js"
-import { Bell, AlertTriangle, AlertCircle, Info, X } from "lucide-react"
+import { Bell, BellRing, AlertTriangle, AlertCircle, Info, X, CheckCircle2, ArrowRight, Check } from "lucide-react"
 
 export default function AlertsPanel({ merchantId }: { merchantId: string }) {
   const [alerts, setAlerts] = useState<any[]>([])
   const [isOpen, setIsOpen] = useState(false)
 
-  const supabase = createClient(
+  const supabase = useMemo(() => createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  ), [])
 
   useEffect(() => {
     // 1. Initial fetch
@@ -55,6 +55,12 @@ export default function AlertsPanel({ merchantId }: { merchantId: string }) {
     setAlerts((prev) => prev.filter((a) => a.id !== id))
   }
 
+  const clearAll = async () => {
+    const ids = alerts.map((a) => a.id)
+    setAlerts([])
+    await supabase.from("agent_alerts").update({ is_read: true }).in("id", ids)
+  }
+
   const getSeverityStyles = (severity: string) => {
     switch (severity) {
       case "critical":
@@ -84,7 +90,7 @@ export default function AlertsPanel({ merchantId }: { merchantId: string }) {
         <div className="absolute right-0 mt-2 w-96 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 overflow-hidden ring-1 ring-black ring-opacity-5">
           <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-              <AlertSquare className="w-4 h-4 text-emerald-600" />
+              <BellRing className="w-4 h-4 text-emerald-600" />
               Proactive Insights {alerts.length > 0 && `(${alerts.length})`}
             </h3>
             <button
@@ -99,7 +105,7 @@ export default function AlertsPanel({ merchantId }: { merchantId: string }) {
             {alerts.length === 0 ? (
               <div className="p-12 text-center text-gray-500 flex flex-col items-center gap-3">
                 <div className="p-4 bg-gray-50 rounded-full">
-                  <CheckCircle className="w-8 h-8 text-emerald-500" />
+                  <CheckCircle2 className="w-8 h-8 text-emerald-500" />
                 </div>
                 <p className="text-sm font-medium">Business is clear — no new alerts.</p>
               </div>
@@ -150,7 +156,7 @@ export default function AlertsPanel({ merchantId }: { merchantId: string }) {
           {alerts.length > 0 && (
              <div className="p-3 bg-gray-50/50 border-t border-gray-100 text-center">
                 <button 
-                  onClick={() => setAlerts([])} // local clear
+                  onClick={clearAll}
                   className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
                 >
                    Clear all notifications
@@ -163,82 +169,3 @@ export default function AlertsPanel({ merchantId }: { merchantId: string }) {
   )
 }
 
-function AlertSquare(props: any) {
-  return (
-    <svg 
-      {...props}
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-    >
-      <rect width="18" height="18" x="3" y="3" rx="2" />
-      <path d="m12 8 4 4-4 4" />
-      <path d="M8 12h8" />
-    </svg>
-  )
-}
-
-function CheckCircle(props: any) {
-  return (
-    <svg 
-      {...props}
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-    >
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-      <polyline points="22 4 12 14.01 9 11.01" />
-    </svg>
-  )
-}
-
-function ArrowRight(props: any) {
-  return (
-    <svg 
-      {...props}
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-    >
-      <path d="M5 12h14" />
-      <path d="m12 5 7 7-7 7" />
-    </svg>
-  )
-}
-
-function Check(props: any) {
-  return (
-    <svg 
-      {...props}
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-    >
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  )
-}

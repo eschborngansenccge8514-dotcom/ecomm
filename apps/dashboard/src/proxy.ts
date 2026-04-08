@@ -36,7 +36,7 @@ export async function proxy(request: NextRequest) {
   const isApplyPage = request.nextUrl.pathname.startsWith('/apply')
   const isPublicFile = request.nextUrl.pathname.includes('.') || request.nextUrl.pathname.startsWith('/_next')
 
-  if (!user && !isAuthPage && !isPublicFile) {
+  if (!user && !isAuthPage && !isPublicFile && !request.nextUrl.pathname.startsWith('/pos')) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 

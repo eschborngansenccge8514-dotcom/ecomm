@@ -2,6 +2,7 @@ import { getEmailKpis, getEmailLogs } from './_data/queries';
 import { EmailLogTable } from './email-log-table';
 import { Button } from '@/components/ui/button';
 import { Settings } from 'lucide-react';
+import { getAuthContext } from '@/lib/utils.server';
 
 export const metadata = { title: 'Email Logs' };
 
@@ -9,7 +10,10 @@ export const metadata = { title: 'Email Logs' };
 export const dynamic = 'force-dynamic';
 
 export default async function EmailDashboardPage() {
-  const [kpis, logs] = await Promise.all([getEmailKpis(), getEmailLogs()]);
+  const { user } = await getAuthContext();
+  const merchantId = user.id;
+
+  const [kpis, logs] = await Promise.all([getEmailKpis(merchantId), getEmailLogs(merchantId)]);
 
   const deliveryRate =
     kpis.total > 0 ? ((kpis.delivered / kpis.total) * 100).toFixed(1) : '—';

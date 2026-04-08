@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { 
   Package, Search, Clock, CheckCircle2, 
   ChevronRight, Printer, QrCode, Truck,
@@ -26,6 +26,7 @@ interface FulfilmentClientProps {
 export function FulfilmentClient({ initialFulfilments }: FulfilmentClientProps) {
   const router = useRouter()
   const [fulfilments, setFulfilments] = useState(initialFulfilments)
+  useEffect(() => { setFulfilments(initialFulfilments) }, [initialFulfilments])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [scanningFor, setScanningFor] = useState<string | null>(null) // fulfilmentId
@@ -35,7 +36,7 @@ export function FulfilmentClient({ initialFulfilments }: FulfilmentClientProps) 
     return fulfilments.filter(f => {
       const matchSearch = f.fulfilment_number.toLowerCase().includes(search.toLowerCase()) || 
                           f.order?.order_number?.toLowerCase().includes(search.toLowerCase()) ||
-                          f.order?.customer?.full_name?.toLowerCase().includes(search.toLowerCase())
+                          f.order?.buyer_name?.toLowerCase().includes(search.toLowerCase())
       
       const matchStatus = statusFilter === 'all' || f.status === statusFilter
       return matchSearch && matchStatus
@@ -43,13 +44,15 @@ export function FulfilmentClient({ initialFulfilments }: FulfilmentClientProps) 
   }, [fulfilments, search, statusFilter])
 
   const handleUpdateStatus = async (id: string, status: string) => {
+    // Optimistic update
+    setFulfilments(prev => prev.map(f => f.id === id ? { ...f, status } : f))
     try {
       await updateFulfilmentStatus(id, status)
       toast.success(`Status updated to ${status}`)
       router.refresh()
-      // Optimistic update
-      setFulfilments(prev => prev.map(f => f.id === id ? { ...f, status } : f))
     } catch (err: any) {
+      // Revert on failure
+      setFulfilments(initialFulfilments)
       toast.error(err.message)
     }
   }
@@ -85,27 +88,35 @@ export function FulfilmentClient({ initialFulfilments }: FulfilmentClientProps) 
 
   const stats = {
     pending: fulfilments.filter(f => f.status === 'pending').length,
-    picking: fulfilments.filter(f => f.status === 'picking').length,
+    picking: fulfilments.filter(f => f.status === 'picking' || f.status === 'picked').length,
+    packing: fulfilments.filter(f => f.status === 'packing').length,
     packed: fulfilments.filter(f => f.status === 'packed').length,
   }
 
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
           <div className="w-10 h-10 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 mb-4">
             <Clock size={20} />
           </div>
           <p className="text-2xl font-black text-gray-900">{stats.pending}</p>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">Pending Approval</p>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">Pending</p>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
           <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 mb-4">
             <Package size={20} />
           </div>
           <p className="text-2xl font-black text-gray-900">{stats.picking}</p>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">In Progress (Picking)</p>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">Picking</p>
+        </div>
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+          <div className="w-10 h-10 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600 mb-4">
+            <AlertCircle size={20} />
+          </div>
+          <p className="text-2xl font-black text-gray-900">{stats.packing}</p>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">Packing</p>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
           <div className="w-10 h-10 bg-green-50 rounded-2xl flex items-center justify-center text-green-600 mb-4">
@@ -163,9 +174,12 @@ export function FulfilmentClient({ initialFulfilments }: FulfilmentClientProps) 
                 <div className="text-right">
                   <span className={cn(
                     "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                    f.status === 'pending' ? "bg-amber-100 text-amber-700" :
-                    f.status === 'picking' ? "bg-blue-100 text-blue-700" :
-                    f.status === 'packed' ? "bg-green-100 text-green-700" :
+                    f.status === 'pending'  ? "bg-amber-100  text-amber-700"  :
+                    f.status === 'picking'  ? "bg-blue-100   text-blue-700"   :
+                    f.status === 'picked'   ? "bg-indigo-100 text-indigo-700" :
+                    f.status === 'packing'  ? "bg-purple-100 text-purple-700" :
+                    f.status === 'packed'   ? "bg-green-100  text-green-700"  :
+                    f.status === 'shipped'  ? "bg-cyan-100   text-cyan-700"   :
                     "bg-gray-100 text-gray-500"
                   )}>
                     {f.status}
@@ -178,7 +192,7 @@ export function FulfilmentClient({ initialFulfilments }: FulfilmentClientProps) 
 
               <div className="space-y-4">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="font-bold text-gray-900">{f.order?.customer?.full_name}</span>
+                  <span className="font-bold text-gray-900">{f.order?.buyer_name}</span>
                   <span className="text-gray-400 text-xs">{f.fulfilment_items.length} items</span>
                 </div>
 

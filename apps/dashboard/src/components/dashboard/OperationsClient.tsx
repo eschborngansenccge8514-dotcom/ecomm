@@ -206,9 +206,13 @@ export function OperationsClient({ merchantId, dateRange, stockLevels, fulfillme
                     <tr key={s.product_id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
                       <td className="py-4">
                         <div className="flex items-center gap-3">
-                          <div className="relative w-10 h-10 rounded-xl overflow-hidden shrink-0">
+                        <div className="relative w-10 h-10 rounded-xl overflow-hidden shrink-0 bg-gray-50 flex items-center justify-center">
+                          {s.image_url ? (
                             <Image src={s.image_url} fill className="object-cover" alt="" />
-                          </div>
+                          ) : (
+                            <Package size={16} className="text-gray-400" />
+                          )}
+                        </div>
                           <div className="min-w-0">
                             <p className="font-bold text-gray-900 truncate max-w-[180px]">{s.product_name}</p>
                             <p className="text-xs text-gray-400 font-mono mt-0.5">{s.sku || 'No SKU'}</p>
