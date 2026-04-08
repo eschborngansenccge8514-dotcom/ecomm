@@ -1,7 +1,7 @@
 import { getAuthContext } from '@/lib/utils.server'
 import { redirect }     from 'next/navigation'
-import dynamic from 'next/dynamic'
-const SettingsClient = dynamic(() => import('@/components/dashboard/SettingsClient').then(mod => mod.SettingsClient))
+
+import { SettingsClient } from '@/components/dashboard/SettingsClient'
 
 export default async function SettingsPage() {
   const { supabase, user, merchant, isAdmin } = await getAuthContext()
