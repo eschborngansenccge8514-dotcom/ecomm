@@ -1,5 +1,6 @@
 import { getMerchant }   from '@/lib/utils.server'
-import { ReportsClient } from '@/components/dashboard/ReportsClient'
+import dynamic from 'next/dynamic'
+const ReportsClient = dynamic(() => import('@/components/dashboard/ReportsClient').then(mod => mod.ReportsClient), { ssr: false })
 import { subDays, format } from 'date-fns'
 
 function toDate(s: string | undefined, fallback: Date) {

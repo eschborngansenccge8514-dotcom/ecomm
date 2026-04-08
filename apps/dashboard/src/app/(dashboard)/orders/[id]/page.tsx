@@ -1,6 +1,7 @@
 import { getAuthContext } from '@/lib/utils.server'
 import { notFound, redirect } from 'next/navigation'
-import { OrderDetailClient } from '@/components/dashboard/OrderDetailClient'
+import dynamic from 'next/dynamic'
+const OrderDetailClient = dynamic(() => import('@/components/dashboard/OrderDetailClient').then(mod => mod.OrderDetailClient), { ssr: false })
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
