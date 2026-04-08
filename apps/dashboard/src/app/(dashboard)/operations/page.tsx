@@ -1,6 +1,6 @@
 import { getMerchant } from '@/lib/utils.server'
 import dynamic from 'next/dynamic'
-const OperationsClient = dynamic(() => import('@/components/dashboard/OperationsClient').then(mod => mod.OperationsClient), { ssr: false })
+const OperationsClient = dynamic(() => import('@/components/dashboard/OperationsClient').then(mod => mod.OperationsClient))
 import { subDays, format }     from 'date-fns'
 
 function toDate(s: string | undefined, fallback: Date) {
