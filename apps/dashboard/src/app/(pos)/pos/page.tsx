@@ -9,6 +9,8 @@ import { ProductGrid } from '@/components/pos/ProductGrid'
 import { CartPanel } from '@/components/pos/CartPanel'
 import { SearchBar } from '@/components/pos/SearchBar'
 import { ActionHeader } from '@/components/pos/ActionHeader'
+import { StartSessionModal } from '@/components/pos/StartSessionModal'
+
 import { toast } from 'react-hot-toast'
 import { useShallow } from 'zustand/react/shallow'
 import { usePosOffline } from '@/stores/pos-offline'
@@ -19,13 +21,16 @@ export default function PosPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [category, setCategory] = useState('All')
+  const [isStartSessionOpen, setIsStartSessionOpen] = useState(false)
   const [sessionInfo, setSessionInfo] = useState<{
     outletId?: string,
     sessionId?: string,
     outletName?: string,
     userName?: string,
-    merchantName?: string
+    merchantName?: string,
+    sessionRequired?: boolean
   }>({})
+
   
   const { setSession, setTaxRate, addItem } = usePosCart(
     useShallow((s) => ({
@@ -47,23 +52,31 @@ export default function PosPage() {
         }
 
         // Try to get fresh session info
-        const info = await getOrInitializeSession()
-        setSession(info.outletId, info.sessionId)
-        setTaxRate(info.taxRate)
+        const info = await getOrInitializeSession(false)
+        
         setSessionInfo({
           outletId: info.outletId,
           sessionId: info.sessionId,
           outletName: info.outletName,
           userName: info.userName,
-          merchantName: info.merchantName
+          merchantName: info.merchantName,
+          sessionRequired: info.sessionRequired
         })
-        
-        // Try to get fresh products
-        const data = await fetchPosProducts(info.outletId)
-        setProducts(data)
 
-        // Update cache for next offline use
-        setCachedData(data, info)
+        if (info.sessionRequired) {
+          setIsStartSessionOpen(true)
+        } else if (info.sessionId) {
+          setSession(info.outletId, info.sessionId)
+          setTaxRate(info.taxRate)
+          
+          // Try to get fresh products
+          const data = await fetchPosProducts(info.outletId)
+          setProducts(data)
+
+          // Update cache for next offline use
+          setCachedData(data, info)
+        }
+
       } catch (err: any) {
         if (err?.message !== 'OFFLINE_MODE') {
           console.error('POS Init Error:', err)
@@ -120,6 +133,7 @@ export default function PosPage() {
         outletName={sessionInfo.outletName}
         userName={sessionInfo.userName}
         merchantName={sessionInfo.merchantName}
+        onStartSession={() => setIsStartSessionOpen(true)}
       />
       
       <div className="flex-1 flex overflow-hidden">
@@ -161,6 +175,16 @@ export default function PosPage() {
           <CartPanel />
         </div>
       </div>
+      <StartSessionModal 
+        isOpen={isStartSessionOpen} 
+        outletId={sessionInfo.outletId || ''} 
+        onSuccess={(sid) => {
+          setIsStartSessionOpen(false);
+          window.location.reload(); 
+        }}
+        onClose={() => setIsStartSessionOpen(false)}
+      />
     </div>
+
   )
 }

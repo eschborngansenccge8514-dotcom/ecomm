@@ -12,7 +12,8 @@ import {
   Printer,
   ChevronDown,
   User,
-  Lock
+  Lock,
+  Play
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -33,9 +34,10 @@ interface ActionHeaderProps {
   outletName?: string
   userName?: string
   merchantName?: string
+  onStartSession?: () => void
 }
 
-export function ActionHeader({ outletId, sessionId, outletName, userName, merchantName }: ActionHeaderProps) {
+export function ActionHeader({ outletId, sessionId, outletName, userName, merchantName, onStartSession }: ActionHeaderProps) {
   const router = useRouter()
   const [isPrinterOpen, setIsPrinterOpen] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
@@ -223,14 +225,23 @@ export function ActionHeader({ outletId, sessionId, outletName, userName, mercha
                )}
             </button>
             <div className="h-px bg-slate-100 my-2" />
-            <button 
-              onClick={() => { if (sessionId) { setIsCloseSessionOpen(true); setIsMenuOpen(false); } }}
-              disabled={!sessionId}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-sm font-semibold text-red-600 transition-colors disabled:opacity-50"
-            >
-              <Lock size={18} />
-              End Session (Close POS)
-            </button>
+            {sessionId ? (
+              <button 
+                onClick={() => { setIsCloseSessionOpen(true); setIsMenuOpen(false); }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-sm font-semibold text-red-600 transition-colors"
+              >
+                <Lock size={18} />
+                End Session (Close POS)
+              </button>
+            ) : (
+              <button 
+                onClick={() => { onStartSession?.(); setIsMenuOpen(false); }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-emerald-50 text-sm font-semibold text-emerald-600 transition-colors"
+              >
+                <Play size={18} />
+                Start Session
+              </button>
+            )}
           </div>
         </div>
       )}

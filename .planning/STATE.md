@@ -22,5 +22,11 @@ The project has just been initialized in the GSD workflow. A comprehensive codeb
 - Complex local tax compliance requirements (LHDN).
 - Next.js 16/React 19 bleeding-edge stability.
 
+## Quick Tasks Completed
+
+| Task | Description | Status |
+| :--- | :--- | :--- |
+| **Start Session in POS** | Added manual Start Session button to POS header menu when no active session exists. | DONE |
+
 ---
 *Last updated: 2026-04-09*
