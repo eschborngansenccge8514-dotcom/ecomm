@@ -22,16 +22,6 @@ interface SupportSettingsClientProps {
   initialConfig: any
 }
 
-const DAYS = [
-  { id: 'mon', label: 'Monday' },
-  { id: 'tue', label: 'Tuesday' },
-  { id: 'wed', label: 'Wednesday' },
-  { id: 'thu', label: 'Thursday' },
-  { id: 'fri', label: 'Friday' },
-  { id: 'sat', label: 'Saturday' },
-  { id: 'sun', label: 'Sunday' },
-]
-
 export function SupportSettingsClient({ userId, initialConfig }: SupportSettingsClientProps) {
   const [loading, setLoading] = useState(false)
   const [config, setConfig] = useState({
@@ -39,10 +29,6 @@ export function SupportSettingsClient({ userId, initialConfig }: SupportSettings
     ai_enabled: initialConfig?.ai_enabled ?? true,
     escalation_email: initialConfig?.escalation_email || '',
     knowledge_base_text: initialConfig?.knowledge_base_text || '',
-    business_hours: initialConfig?.business_hours || DAYS.reduce((acc, day) => ({ 
-      ...acc, 
-      [day.id]: { open: '09:00', close: '18:00', closed: false } 
-    }), {})
   })
 
   const supabase = createClient()
@@ -68,18 +54,7 @@ export function SupportSettingsClient({ userId, initialConfig }: SupportSettings
     }
   }
 
-  const updateBusinessHour = (day: string, field: string, value: any) => {
-    setConfig({
-      ...config,
-      business_hours: {
-        ...config.business_hours,
-        [day]: {
-          ...config.business_hours[day],
-          [field]: value
-        }
-      }
-    })
-  }
+
 
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7 pb-10">
@@ -127,48 +102,6 @@ export function SupportSettingsClient({ userId, initialConfig }: SupportSettings
               />
               <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">A notification will be sent here when a customer requests human help.</p>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="transition-all hover:shadow-md">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold">Business Hours</CardTitle>
-            <CardDescription>
-              Set your operating hours. Outside these hours, the AI will prioritize escalation email collection.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {DAYS.map((day) => (
-              <div key={day.id} className="flex items-center gap-4 py-2 border-b last:border-0 border-slate-100">
-                <div className="w-24 text-sm font-bold text-slate-700">{day.label}</div>
-                <div className="flex-1 flex items-center gap-2">
-                  <Input 
-                    type="time" 
-                    className="w-24 h-8 rounded-lg text-xs" 
-                    value={config.business_hours[day.id]?.open}
-                    disabled={config.business_hours[day.id]?.closed}
-                    onChange={(e) => updateBusinessHour(day.id, 'open', e.target.value)}
-                  />
-                  <span className="text-slate-400 text-xs">-</span>
-                  <Input 
-                    type="time" 
-                    className="w-24 h-8 rounded-lg text-xs" 
-                    value={config.business_hours[day.id]?.close}
-                    disabled={config.business_hours[day.id]?.closed}
-                    onChange={(e) => updateBusinessHour(day.id, 'close', e.target.value)}
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch 
-                    checked={!config.business_hours[day.id]?.closed}
-                    onCheckedChange={(checked) => updateBusinessHour(day.id, 'closed', !checked)}
-                  />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 min-w-[40px]">
-                    {config.business_hours[day.id]?.closed ? 'Off' : 'On'}
-                  </span>
-                </div>
-              </div>
-            ))}
           </CardContent>
           <CardFooter className="flex justify-end pt-4 border-t">
             <Button onClick={handleSave} disabled={loading} className="w-full sm:w-auto rounded-xl">

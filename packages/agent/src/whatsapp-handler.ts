@@ -50,7 +50,7 @@ export async function handleMerchantWhatsApp({
   }
 
   const response = await generateText({
-    model: google('gemini-2.5-flash-lite'), // Use latest stable
+    model: google('gemini-3.1-flash-lite-preview'), // Use latest stable
     system: buildSystemPrompt(merchantName) + `\n\n## WhatsApp Context\nMerchant is texting from: ${senderPhone}. Respond concisely for mobile viewing.` + "\n\nIMPORTANT: You MUST always provide a helpful, professional text response. Never return an empty message.",
     messages: processedHistory,
     tools: buildTools(merchantId, sessionId, instanceName) as any,

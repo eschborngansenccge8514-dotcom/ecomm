@@ -193,8 +193,8 @@ export function GoodsReceiptDetailClient({ receipt }: { receipt: any }) {
                 <div>
                   <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest leading-none mb-1">Related PO</p>
                   <p className="font-bold text-blue-600 group-hover:underline">{receipt.purchase_orders?.po_number}</p>
-                  {receipt.purchase_orders?.suppliers?.name && (
-                    <p className="text-xs text-gray-400 font-medium mt-0.5">{receipt.purchase_orders.suppliers.name}</p>
+                  {receipt.purchase_orders?.supplier.name && (
+                    <p className="text-xs text-gray-400 font-medium mt-0.5">{receipt.purchase_orders.supplier.name}</p>
                   )}
                 </div>
               </div>

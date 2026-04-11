@@ -114,11 +114,50 @@ function buildLhdnJson(merchant: any, config: any, buyer: any, items: any[], ord
       classificationCode = '004';
   }
 
-  const subtotal = items.reduce((s: number, i: any) => s + (Number(i.unitPrice) * Number(i.quantity)), 0);
-  const total = Number(totalAmount) || subtotal;
-  const tax = Math.max(0, total - subtotal);
-  const hasTax = tax > 0.01;
-  const taxPercent = hasTax ? Math.round((tax / subtotal) * 100) : 0;
+  // Builder for Tax Line
+  const taxLine = (taxableAmount: number, rate = 0, category = "06") => {
+    const taxAmt = roundMYR((taxableAmount * rate) / 100);
+    return {
+      "TaxAmount": [{ "_": roundMYR(taxAmt).toFixed(2), "currencyID": "MYR" }],
+      "TaxSubtotal": [{
+        "TaxableAmount": [{ "_": roundMYR(taxableAmount).toFixed(2), "currencyID": "MYR" }],
+        "TaxAmount": [{ "_": roundMYR(taxAmt).toFixed(2), "currencyID": "MYR" }],
+        "TaxCategory": [{
+          "ID": [{ "_": category }],
+          "Percent": [{ "_": rate.toFixed(2) }],
+          ...(rate === 0 ? { "TaxExemptionReason": [{ "_": "Not Subject to SST" }] } : {}),
+          "TaxScheme": [{ "ID": [{ "_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6" }] }]
+        }]
+      }]
+    };
+  };
+
+  const ublLines = items.map((item: any, i: number) => {
+    const qty = Number(item.quantity) || 1;
+    const price = Number(item.unitPrice) || 0;
+    const lineTotal = roundMYR(qty * price);
+    const rate = Number(item.taxRate || 0);
+    const category = item.taxType || (rate > 0 ? "01" : "06");
+
+    return {
+      "ID": [{"_": String(i + 1)}],
+      "InvoicedQuantity": [{"_": qty.toFixed(2), "unitCode": "C62"}],
+      "LineExtensionAmount": [{"_": lineTotal.toFixed(2), "currencyID": "MYR"}],
+      "ItemPriceExtension": [{
+        "Amount": [{"_": lineTotal.toFixed(2), "currencyID": "MYR"}]
+      }],
+      "Item": [{
+        "CommodityClassification": [{"ItemClassificationCode": [{"_": item.classificationCode || classificationCode, "listID": "CLASS"}]}],
+        "Description": [{"_": item.description}]
+      }],
+      "Price": [{"PriceAmount": [{"_": price.toFixed(2), "currencyID": "MYR"}]}],
+      "TaxTotal": [taxLine(lineTotal, rate, category)]
+    };
+  });
+
+  const totalLineExtension = roundMYR(ublLines.reduce((s: number, l: any) => s + parseFloat(l.LineExtensionAmount[0]._), 0));
+  const totalTaxAmount = roundMYR(ublLines.reduce((s: number, l: any) => s + parseFloat(l.TaxTotal[0].TaxAmount[0]._), 0));
+  const payableAmount = roundMYR(totalLineExtension + totalTaxAmount);
 
   return {
     "Invoice": [
@@ -190,59 +229,27 @@ function buildLhdnJson(merchant: any, config: any, buyer: any, items: any[], ord
             }]
           }]
         }],
-        "TaxTotal": [{
-          "TaxAmount": [{"_": roundMYR(tax), "currencyID": "MYR"}],
-          "TaxSubtotal": [{
-            "TaxableAmount": [{"_": roundMYR(subtotal), "currencyID": "MYR"}],
-            "TaxAmount": [{"_": roundMYR(tax), "currencyID": "MYR"}],
-            "TaxCategory": [{
-              "ID": [{"_": hasTax ? "01" : "06"}],
-              "Percent": [{"_": taxPercent}],
-              "TaxScheme": [{"ID": [{"_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6"}]}],
-              ...(hasTax ? {} : { "TaxExemptionReason": [{"_": "Not Subject to SST"}] })
-            }]
+      "TaxTotal": [{
+        "TaxAmount": [{"_": totalTaxAmount.toFixed(2), "currencyID": "MYR"}],
+        "TaxSubtotal": [{
+          "TaxableAmount": [{"_": totalLineExtension.toFixed(2), "currencyID": "MYR"}],
+          "TaxAmount": [{"_": totalTaxAmount.toFixed(2), "currencyID": "MYR"}],
+          "TaxCategory": [{
+            "ID": [{"_": "01"}],
+            "Percent": [{"_": "0.00"}],
+            "TaxScheme": [{"ID": [{"_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6"}]}]
           }]
-        }],
-        "LegalMonetaryTotal": [{
-          "LineExtensionAmount": [{"_": roundMYR(subtotal), "currencyID": "MYR"}],
-          "TaxExclusiveAmount": [{"_": roundMYR(subtotal), "currencyID": "MYR"}],
-          "TaxInclusiveAmount": [{"_": roundMYR(total), "currencyID": "MYR"}],
-          "AllowanceTotalAmount": [{"_": 0, "currencyID": "MYR"}],
-          "PayableAmount": [{"_": roundMYR(total), "currencyID": "MYR"}]
-        }],
-        "InvoiceLine": items.map((item: any, i: number) => {
-          const itemTotal = Number(item.unitPrice) * Number(item.quantity);
-          const itemTax = hasTax ? (itemTotal / subtotal) * tax : 0;
-          
-          return {
-            "ID": [{"_": String(i + 1)}],
-            "InvoicedQuantity": [{"_": Number(item.quantity), "unitCode": "C62"}],
-            "LineExtensionAmount": [{"_": roundMYR(itemTotal), "currencyID": "MYR"}],
-            "ItemPriceExtension": [{
-              "Amount": [{"_": roundMYR(itemTotal), "currencyID": "MYR"}]
-            }],
-            "Item": [{
-              "CommodityClassification": [{"ItemClassificationCode": [{"_": classificationCode, "listID": "CLASS"}]}],
-              "Description": [{"_": item.description}]
-            }],
-            "Price": [{"PriceAmount": [{"_": roundMYR(item.unitPrice), "currencyID": "MYR"}]}],
-            "TaxTotal": [{
-              "TaxAmount": [{"_": roundMYR(itemTax), "currencyID": "MYR"}],
-              "TaxSubtotal": [{
-                "TaxableAmount": [{"_": roundMYR(itemTotal), "currencyID": "MYR"}],
-                "TaxAmount": [{"_": roundMYR(itemTax), "currencyID": "MYR"}],
-                "TaxCategory": [{
-                  "ID": [{"_": hasTax ? "01" : "06"}],
-                  "Percent": [{"_": taxPercent}],
-                  "TaxScheme": [{"ID": [{"_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6"}]}],
-                  ...(hasTax ? {} : { "TaxExemptionReason": [{"_": "Not Subject to SST"}] })
-                }]
-              }]
-            }]
-          };
-        })
-      }
-    ]
+        }]
+      }],
+      "LegalMonetaryTotal": [{
+        "LineExtensionAmount": [{"_": totalLineExtension.toFixed(2), "currencyID": "MYR"}],
+        "TaxExclusiveAmount": [{"_": totalLineExtension.toFixed(2), "currencyID": "MYR"}],
+        "TaxInclusiveAmount": [{"_": payableAmount.toFixed(2), "currencyID": "MYR"}],
+        "AllowanceTotalAmount": [{"_": "0.00", "currencyID": "MYR"}],
+        "PayableAmount": [{"_": payableAmount.toFixed(2), "currencyID": "MYR"}]
+      }],
+      "InvoiceLine": ublLines
+    }]
   };
 }
 
@@ -321,7 +328,9 @@ einvoice.post('/submit', async (c) => {
         description: item.product_name,
         quantity: item.qty,
         unitPrice: item.unit_price_rm,
-        totalPrice: item.line_total_rm
+        totalPrice: item.line_total_rm,
+        taxRate: item.tax_rate,
+        taxType: item.lhdn_tax_type
       }))
 
       const adminCustomer = body.customer || {}

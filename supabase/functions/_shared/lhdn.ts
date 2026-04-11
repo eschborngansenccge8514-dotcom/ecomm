@@ -106,19 +106,24 @@ export function buildUblJson(config: any, merchant: any, orders: any[], invoiceN
   const sellerIdType = config.registration_no_type || "BRN"; 
 
   // Builder for Tax Line
-  const taxLine = (taxableAmount: string) => ({
-    "TaxAmount": [{ "_": "0.00", "currencyID": "MYR" }],
-    "TaxSubtotal": [{
-      "TaxableAmount": [{ "_": taxableAmount, "currencyID": "MYR" }],
-      "TaxAmount": [{ "_": "0.00", "currencyID": "MYR" }],
-      "TaxCategory": [{
-        "ID": [{ "_": "06" }],
-        "Percent": [{ "_": "0.00" }],
-        "TaxExemptionReason": [{ "_": "Not Subject to SST" }],
-        "TaxScheme": [{ "ID": [{ "_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6" }] }]
+  const taxLine = (taxableAmount: string, rate = 0, category = "06") => {
+    const taxAmt = roundMYR_str((parseFloat(taxableAmount) * rate) / 100);
+    const taxExemptionReason = rate === 0 ? "Not Subject to SST" : null;
+    
+    return {
+      "TaxAmount": [{ "_": taxAmt, "currencyID": "MYR" }],
+      "TaxSubtotal": [{
+        "TaxableAmount": [{ "_": taxableAmount, "currencyID": "MYR" }],
+        "TaxAmount": [{ "_": taxAmt, "currencyID": "MYR" }],
+        "TaxCategory": [{
+          "ID": [{ "_": category }],
+          "Percent": [{ "_": rate.toFixed(2) }],
+          ...(taxExemptionReason ? { "TaxExemptionReason": [{ "_": taxExemptionReason }] } : {}),
+          "TaxScheme": [{ "ID": [{ "_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6" }] }]
+        }]
       }]
-    }]
-  });
+    };
+  };
 
   // Items building (mode specific)
   let ublLines = [];
@@ -129,7 +134,7 @@ export function buildUblJson(config: any, merchant: any, orders: any[], invoiceN
         "ID": [{ "_": String(index + 1) }],
         "InvoicedQuantity": [{ "_": "1.00", "unitCode": "C62" }],
         "LineExtensionAmount": [{ "_": lineTotal, "currencyID": "MYR" }],
-        "TaxTotal": [taxLine(lineTotal)],
+        "TaxTotal": [taxLine(lineTotal, 0, "06")],
         "Item": [{
           "CommodityClassification": [{ "ItemClassificationCode": [{ "_": "004", "listID": "CLASS" }] }],
           "Description": [{ "_": `Receipt ${o.order_number}` }]
@@ -141,26 +146,30 @@ export function buildUblJson(config: any, merchant: any, orders: any[], invoiceN
   } else {
     // Individual mode (one order, multiple line items)
     const order = orders[0];
-    const items = order.order_items || [];
+    const items = order.order_items || order.pos_transaction_items || [];
     ublLines = items.map((item: any, index: number) => {
-      const lineTotal = roundMYR_str(item.line_total || item.total || 0);
+      const lineTotal = roundMYR_str(item.line_total || item.total || item.line_total_rm || 0);
+      const rate = parseFloat(item.tax_rate || 0);
+      const taxCode = item.lhdn_tax_type || (rate > 0 ? "02" : "06");
+
       return {
         "ID": [{ "_": String(index + 1) }],
-        "InvoicedQuantity": [{ "_": roundMYR_str(item.quantity || 1.00), "unitCode": "C62" }],
+        "InvoicedQuantity": [{ "_": roundMYR_str(item.quantity || item.qty || 1.00), "unitCode": "C62" }],
         "LineExtensionAmount": [{ "_": lineTotal, "currencyID": "MYR" }],
-        "TaxTotal": [taxLine(lineTotal)],
+        "TaxTotal": [taxLine(lineTotal, rate, taxCode)],
         "Item": [{
-          "CommodityClassification": [{ "ItemClassificationCode": [{ "_": (customerOverride?.classification_code || "004"), "listID": "CLASS" }] }],
+          "CommodityClassification": [{ "ItemClassificationCode": [{ "_": (item.classification_code || "004"), "listID": "CLASS" }] }],
           "Description": [{ "_": item.product_name || item.name || "Item" }]
         }],
-        "Price": [{ "PriceAmount": [{ "_": roundMYR_str(item.unit_price || item.price || 0), "currencyID": "MYR" }] }],
+        "Price": [{ "PriceAmount": [{ "_": roundMYR_str(item.unit_price || item.price || item.unit_price_rm || 0), "currencyID": "MYR" }] }],
         "ItemPriceExtension": [{ "Amount": [{ "_": lineTotal, "currencyID": "MYR" }] }]
       };
     });
   }
 
   const totalLineExtension = roundMYR_str(ublLines.reduce((s: number, l: any) => s + parseFloat(l.LineExtensionAmount[0]._), 0));
-  const payableAmount = totalLineExtension;
+  const totalTaxAmount = roundMYR_str(ublLines.reduce((s: number, l: any) => s + parseFloat(l.TaxTotal[0].TaxAmount[0]._), 0));
+  const payableAmount = roundMYR_str(parseFloat(totalLineExtension) + parseFloat(totalTaxAmount));
 
   // Buyer Info
   const isB2C = (!customerOverride?.tin || customerOverride.tin === "EI00000000010");
@@ -223,14 +232,13 @@ export function buildUblJson(config: any, merchant: any, orders: any[], invoiceN
         }]
       }],
       "TaxTotal": [{
-        "TaxAmount": [{ "_": "0.00", "currencyID": "MYR" }],
+        "TaxAmount": [{ "_": totalTaxAmount, "currencyID": "MYR" }],
         "TaxSubtotal": [{
           "TaxableAmount": [{ "_": totalLineExtension, "currencyID": "MYR" }],
-          "TaxAmount": [{ "_": "0.00", "currencyID": "MYR" }],
+          "TaxAmount": [{ "_": totalTaxAmount, "currencyID": "MYR" }],
           "TaxCategory": [{
-            "ID": [{ "_": "06" }],
+            "ID": [{ "_": "01" }], -- In Malaysia, 01 is often used for consolidated or simplified tax total if items are mixed
             "Percent": [{ "_": "0.00" }],
-            "TaxExemptionReason": [{ "_": "Not Subject to SST" }],
             "TaxScheme": [{ "ID": [{ "_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6" }] }]
           }]
         }]
@@ -238,7 +246,7 @@ export function buildUblJson(config: any, merchant: any, orders: any[], invoiceN
       "LegalMonetaryTotal": [{
         "LineExtensionAmount": [{ "_": totalLineExtension, "currencyID": "MYR" }],
         "TaxExclusiveAmount": [{ "_": totalLineExtension, "currencyID": "MYR" }],
-        "TaxInclusiveAmount": [{ "_": totalLineExtension, "currencyID": "MYR" }],
+        "TaxInclusiveAmount": [{ "_": payableAmount, "currencyID": "MYR" }],
         "AllowanceTotalAmount": [{ "_": "0.00", "currencyID": "MYR" }],
         "PayableAmount": [{ "_": payableAmount, "currencyID": "MYR" }]
       }],

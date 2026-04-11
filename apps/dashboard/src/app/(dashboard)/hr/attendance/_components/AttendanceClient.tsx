@@ -46,10 +46,12 @@ export function AttendanceClient({
   const [selectedEmployee, setSelectedEmployee] = useState<string>("");
   const [breakMinutes, setBreakMinutes] = useState("60");
   const [now, setNow] = useState(new Date());
+  const [mounted, setMounted] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   // Live clock
   useEffect(() => {
+    setMounted(true);
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
@@ -104,10 +106,10 @@ export function AttendanceClient({
         {/* Live clock */}
         <div className="text-center mb-6">
           <p className="text-5xl font-black text-gray-900 tracking-tight font-mono">
-            {now.toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+            {mounted ? now.toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "--:--:--"}
           </p>
           <p className="text-gray-400 text-sm mt-1">
-            {now.toLocaleDateString("en-MY", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+            {mounted ? now.toLocaleDateString("en-MY", { weekday: "long", year: "numeric", month: "long", day: "numeric" }) : "Loading clock..."}
           </p>
         </div>
 
@@ -133,7 +135,7 @@ export function AttendanceClient({
             <div className="bg-emerald-50 rounded-xl p-4 text-sm">
               <p className="text-emerald-700 font-semibold">
                 Punched in at {formatTime(String(selectedOpen.punch_in))} ·{" "}
-                {formatDuration(String(selectedOpen.punch_in), null, 0)} elapsed
+                {mounted ? formatDuration(String(selectedOpen.punch_in), null, 0) : "—"} elapsed
               </p>
               <div className="mt-3 flex items-center gap-3">
                 <label className="text-emerald-700 text-xs font-medium whitespace-nowrap">Break (min)</label>

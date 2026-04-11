@@ -46,10 +46,11 @@ export const expenses = pgTable("expenses", {
   aiConfidenceScore:    numeric("ai_confidence_score", { precision: 4, scale: 3 }),
   aiNotes:              text("ai_notes"),
   notes:                text("notes"),
+  paymentAccountId:     uuid("payment_account_id"),
   createdAt:            timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt:            timestamp("updated_at", { withTimezone: true }).defaultNow(),
 }, (t) => ({
-  merchantIdx: index("idx_expenses_merchant").on(t.merchantId),
-  dateIdx:     index("idx_expenses_date").on(t.receiptDate),
-  categoryIdx: index("idx_expenses_category").on(t.category),
+  idxExpensesMerchant: index("idx_expenses_merchant").on(t.merchantId),
+  idxExpensesDate: index("idx_expenses_date").on(t.receiptDate),
+  idxExpensesCategory: index("idx_expenses_category").on(t.category),
 }));

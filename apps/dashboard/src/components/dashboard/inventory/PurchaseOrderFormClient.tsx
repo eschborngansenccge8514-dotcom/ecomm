@@ -17,7 +17,12 @@ import {
   AlertCircle,
   Building2,
   FileText,
-  XCircle
+  XCircle,
+  FileSearch,
+  Mail,
+  Phone,
+  Upload,
+  Loader2
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,9 +36,11 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { searchProducts } from '@/lib/inventory-actions'
-import { createPurchaseOrder, updatePurchaseOrderFull } from '@/lib/purchase-order-actions'
+import { createPurchaseOrder, updatePurchaseOrderFull, analyseQuotation } from '@/lib/purchase-order-actions'
 import { toast } from 'react-hot-toast'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
+import { SupplierAddModal } from './SupplierAddModal'
 
 interface LineItem {
   product_id: string
@@ -89,6 +96,7 @@ export function PurchaseOrderFormClient({
   initialData?: any
 }) {
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
   const [supplierId, setSupplierId] = useState<string>(initialData?.supplier_id || '')
   const [expectedDate, setExpectedDate] = useState<string>(
     initialData?.expected_date
@@ -100,22 +108,29 @@ export function PurchaseOrderFormClient({
     initialData?.purchase_order_items?.map((i: any) => ({
       product_id: i.product_id,
       variant_id: i.variant_id,
-      name: i.products?.name + (i.variant_id ? ` (Variant)` : ''),
+      name: (i.products?.name || '') + (i.variant_id ? ` (Variant)` : ''),
       sku: i.products?.sku || '',
       quantity_ordered: i.quantity_ordered,
       unit_cost: i.unit_cost
     })) || []
   )
+  const [localSuppliers, setLocalSuppliers] = useState<any[]>(suppliers)
   const [productSearch, setProductSearch] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [searchFocused, setSearchFocused] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [isAnalysing, setIsAnalysing] = useState(false)
+  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false)
+  const [linkingIndex, setLinkingIndex] = useState<number | null>(null)
   const searchRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const supabase = createClient()
 
   const isEdit = !!initialData
 
   // Close dropdown on outside click
   useEffect(() => {
+    setMounted(true)
     function handler(e: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setSearchFocused(false)
@@ -136,24 +151,42 @@ export function PurchaseOrderFormClient({
   }
 
   const addItem = (product: any, variant: any = null) => {
-    const existing = items.find(
-      i => i.product_id === product.id && i.variant_id === (variant?.id ?? null)
-    )
-    if (existing) {
-      toast.error('Already added')
-      return
-    }
-    setItems(prev => [
-      ...prev,
-      {
-        product_id: product.id,
-        variant_id: variant?.id ?? null,
-        name: product.name + (variant ? ` — ${variant.name}` : ''),
-        sku: variant?.sku || product.sku || '',
-        quantity_ordered: 1,
-        unit_cost: product.costPrice || 0
+    if (linkingIndex !== null) {
+      // Resolve unmapped item
+      setItems(prev => {
+        const next = [...prev]
+        const currentItem = next[linkingIndex]
+        next[linkingIndex] = {
+          ...currentItem,
+          product_id: product.id,
+          variant_id: variant?.id ?? null,
+          name: product.name + (variant ? ` — ${variant.name}` : ''),
+          sku: variant?.sku || product.sku || '',
+          unit_cost: product.costPrice || currentItem.unit_cost
+        }
+        return next
+      })
+      setLinkingIndex(null)
+    } else {
+      const existing = items.find(
+        i => i.product_id === product.id && i.variant_id === (variant?.id ?? null)
+      )
+      if (existing) {
+        toast.error('Already added')
+        return
       }
-    ])
+      setItems(prev => [
+        ...prev,
+        {
+          product_id: product.id,
+          variant_id: variant?.id ?? null,
+          name: product.name + (variant ? ` — ${variant.name}` : ''),
+          sku: variant?.sku || product.sku || '',
+          quantity_ordered: 1,
+          unit_cost: product.costPrice || 0
+        }
+      ])
+    }
     setProductSearch('')
     setSearchResults([])
     setSearchFocused(false)
@@ -183,6 +216,10 @@ export function PurchaseOrderFormClient({
     }
     if (items.length === 0) {
       toast.error('Please add at least one item')
+      return
+    }
+    if (items.some(i => !i.product_id)) {
+      toast.error('All items must be linked to a product before saving')
       return
     }
 
@@ -216,6 +253,71 @@ export function PurchaseOrderFormClient({
       }
     })
   }
+  
+  const handleUploadQuotation = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsAnalysing(true)
+    const toastId = toast.loading('Uploading and analysing quotation...')
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("Please log in first")
+
+      const fileName = `${user.id}/${Date.now()}-${file.name}`
+      const { data, error: uploadError } = await supabase.storage
+        .from('receipts')
+        .upload(fileName, file)
+
+      if (uploadError) throw uploadError
+
+      const result = await analyseQuotation(data.path, file.type)
+      const { extraction } = result
+
+      // Update form with extracted data
+      if (extraction.supplierId) {
+        if (extraction.supplier) {
+          setLocalSuppliers(prev => {
+             const exists = prev.find(s => s.id === extraction.supplierId)
+             if (!exists) return [...prev, extraction.supplier]
+             return prev
+          })
+        }
+        setSupplierId(extraction.supplierId)
+      }
+      
+      if (extraction.notes) {
+        setNotes(prev => prev ? `${prev}\n\nAI Notes: ${extraction.notes}` : `AI Notes: ${extraction.notes}`)
+      }
+
+      if (extraction.items && extraction.items.length > 0) {
+        // Merge items or replace? Usually better to append for quotations
+        // For now, let's append but check for duplicates
+        setItems(prev => {
+          const newItems = [...prev]
+          extraction.items.forEach((item: any) => {
+             const exists = newItems.find(i => i.product_id === item.product_id && i.variant_id === item.variant_id && item.product_id !== '')
+             if (!exists) {
+               newItems.push(item)
+             }
+          })
+          return newItems
+        })
+      }
+
+      toast.success('Quotation analysed and form pre-filled!', { id: toastId })
+      
+      // Refresh to get any newly created suppliers/products in the props
+      router.refresh()
+    } catch (err: any) {
+      console.error(err)
+      toast.error(`Error: ${err.message}`, { id: toastId })
+    } finally {
+      setIsAnalysing(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   const showDropdown = searchFocused && (searchResults.length > 0 || productSearch.length >= 2)
 
@@ -237,9 +339,30 @@ export function PurchaseOrderFormClient({
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            className="hidden" 
+            accept="image/*,application/pdf" 
+            onChange={handleUploadQuotation}
+          />
+          <Button 
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isAnalysing || isPending}
+            className="rounded-xl px-4 border-gray-200 font-bold text-sm h-10 transition-all gap-2 hover:bg-gray-50 bg-white shadow-sm"
+          >
+            {isAnalysing ? (
+              <Loader2 size={16} className="animate-spin text-blue-500" />
+            ) : (
+              <FileSearch size={16} className="text-gray-500" />
+            )}
+            {isAnalysing ? 'Analysing...' : 'Upload Quotation'}
+          </Button>
+
           <Button
             onClick={handleSave}
-            disabled={isPending}
+            disabled={isPending || isAnalysing}
             className="rounded-xl px-6 bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100 font-bold text-sm h-10 transition-all"
           >
             <Check size={16} className="mr-2" />
@@ -259,10 +382,18 @@ export function PurchaseOrderFormClient({
           </CardHeader>
           <CardContent className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Left Side: Supplier */}
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">Supplier / Vendor</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">Supplier / Vendor</Label>
+                    <button 
+                      type="button"
+                      onClick={() => setIsSupplierModalOpen(true)}
+                      className="text-[10px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 hover:underline transition-all"
+                    >
+                      <Plus size={10} /> Add New
+                    </button>
+                  </div>
                   <Select
                     onValueChange={(val: string | null) => setSupplierId(val || '')}
                     value={supplierId}
@@ -277,7 +408,7 @@ export function PurchaseOrderFormClient({
                       </div>
                     </SelectTrigger>
                     <SelectContent className="rounded-xl border-gray-100 shadow-xl">
-                      {suppliers.map(s => (
+                      {localSuppliers.map(s => (
                         <SelectItem key={s.id} value={s.id} className="font-medium rounded-lg cursor-pointer">
                           <span className="font-bold text-gray-900">{s.name}</span>
                           <span className="text-gray-400 ml-2 text-xs">{s.code}</span>
@@ -289,6 +420,50 @@ export function PurchaseOrderFormClient({
                     <p className="text-[10px] text-amber-500 font-bold flex items-center gap-1 mt-1">
                       <AlertCircle size={10} /> Supplier is required to save
                     </p>
+                  )}
+
+                  {/* Selected Supplier Details */}
+                  {supplierId && (
+                    <div className="mt-4 p-4 rounded-xl border border-blue-50 bg-blue-50/20 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                      {(() => {
+                        const s = localSuppliers.find(x => x.id === supplierId);
+                        if (!s) return null;
+                        return (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center">
+                                <Building2 size={12} className="text-blue-600" />
+                              </div>
+                              <span className="text-sm font-bold text-gray-900">{s.name}</span>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                              {s.email && (
+                                <div className="flex items-center gap-2 text-[11px] text-gray-500 font-medium">
+                                  <Mail size={12} className="text-gray-400" />
+                                  <span className="truncate">{s.email}</span>
+                                </div>
+                              )}
+                              {s.phone && (
+                                <div className="flex items-center gap-2 text-[11px] text-gray-500 font-medium">
+                                  <Phone size={12} className="text-gray-400" />
+                                  <span>{s.phone}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {s.address && (
+                              <div className="flex items-start gap-2 text-[10px] text-gray-400 font-medium border-t border-blue-50/50 pt-2">
+                                <Building2 size={12} className="text-gray-300 mt-0.5" />
+                                <span className="leading-relaxed">
+                                  {typeof s.address === 'string' ? s.address : JSON.stringify(s.address)}
+                                </span>
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()}
+                    </div>
                   )}
                 </div>
 
@@ -312,7 +487,7 @@ export function PurchaseOrderFormClient({
                   </Label>
                   <div className="flex items-center gap-3 px-4 h-11 rounded-xl border border-gray-100 shadow-sm bg-gray-50 text-gray-500 text-sm font-semibold cursor-not-allowed">
                     <CalendarDays size={16} className="text-gray-400" />
-                    <span>{new Date().toLocaleDateString()}</span>
+                    <span>{mounted ? new Date().toLocaleDateString() : '—'}</span>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -436,13 +611,31 @@ export function PurchaseOrderFormClient({
                       >
                         {/* Product Info */}
                         <div className="min-w-0 pr-4">
-                          <p className="font-bold text-gray-900 text-xs sm:text-sm uppercase italic tracking-tighter truncate leading-tight">
+                  <p className="font-bold text-gray-900 text-xs sm:text-sm uppercase italic tracking-tighter truncate leading-tight">
                             {item.name}
                           </p>
                           {item.sku && (
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5 truncate">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5 truncate flex items-center gap-2">
                               {item.sku}
                             </p>
+                          )}
+                          {!item.product_id && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setProductSearch(item.name.replace('[FAILED] ', ''))
+                                  setSearchFocused(true)
+                                  setLinkingIndex(i)
+                                }}
+                                className="text-[9px] font-black uppercase tracking-wider px-2 py-1 bg-blue-50 text-blue-600 rounded-lg border border-blue-100 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                              >
+                                Link to Existing SKU
+                              </button>
+                              <p className="text-[10px] text-amber-600 font-bold uppercase tracking-widest italic bg-amber-50 px-1.5 py-1 rounded border border-amber-100">
+                                Unmapped - Please link to product
+                              </p>
+                            </div>
                           )}
                         </div>
 
@@ -517,6 +710,15 @@ export function PurchaseOrderFormClient({
             )}
           </CardContent>
         </Card>
+
+        <SupplierAddModal 
+          isOpen={isSupplierModalOpen}
+          onClose={() => setIsSupplierModalOpen(false)}
+          onSuccess={(newSupplier) => {
+            setLocalSuppliers(prev => [...prev, newSupplier])
+            setSupplierId(newSupplier.id)
+          }}
+        />
       </div>
     </div>
   )

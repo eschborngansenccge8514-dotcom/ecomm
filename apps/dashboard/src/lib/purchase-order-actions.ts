@@ -1,6 +1,7 @@
 'use server'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { extractQuotationData } from "@project1/agent"
 
 async function getMerchantId(supabase: any) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -22,7 +23,7 @@ export async function getPurchaseOrders(filters?: { status?: string, dateFrom?: 
 
   let query = supabase
     .from('purchase_orders')
-    .select('*, suppliers(name), purchase_order_items(id, quantity_ordered, quantity_received)')
+    .select('*, supplier:suppliers(name), purchase_order_items(id, quantity_ordered, quantity_received)')
     .eq('merchant_id', merchantId)
     .order('created_at', { ascending: false })
 
@@ -41,7 +42,7 @@ export async function getPurchaseOrder(id: string) {
 
   const { data, error } = await supabase
     .from('purchase_orders')
-    .select('*, suppliers(*), merchants(*), purchase_order_items(*, products(name)), goods_receipts(*, goods_receipt_items(*, products(name))), expenses(id, total_amount, payment_method, created_at, notes)')
+    .select('*, supplier:suppliers(*), purchase_order_items(*, products(name, sku, cost_price), product_variants(name, sku, cost_price)), goods_receipts(*), expenses(*)')
     .eq('id', id)
     .eq('merchant_id', merchantId)
     .single()
@@ -136,12 +137,12 @@ export async function sendPurchaseOrder(id: string, method: 'email' | 'whatsapp'
   // 1. Fetch PO with supplier info
   const po = await getPurchaseOrder(id)
   
-  if (method === 'email' && !po.suppliers?.email) {
-    throw new Error(`Supplier "${po.suppliers?.name}" does not have an email address configured.`)
+  if (method === 'email' && !po.supplier?.email) {
+    throw new Error(`Supplier "${po.supplier?.name}" does not have an email address configured.`)
   }
   
-  if (method === 'whatsapp' && !po.suppliers?.phone) {
-    throw new Error(`Supplier "${po.suppliers?.name}" does not have a phone number configured.`)
+  if (method === 'whatsapp' && !po.supplier?.phone) {
+    throw new Error(`Supplier "${po.supplier?.name}" does not have a phone number configured.`)
   }
 
   // 2. Update status
@@ -172,9 +173,9 @@ export async function sendPurchaseOrder(id: string, method: 'email' | 'whatsapp'
       }
 
       // Format phone: strip '+' and spaces for Evolution API
-      const phone = po.suppliers.phone.replace(/\D/g, '')
+      const phone = po.supplier.phone.replace(/\D/g, '')
 
-      const textMessage = `*Purchase Order ${po.po_number || ''}*\n\nHello ${po.suppliers.name},\n\nWe have issued a new purchase order for RM ${po.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}.\n\nPlease find the attached Purchase Order document.\n\nPlease acknowledge receipt.\n\nThank you.`
+      const textMessage = `*Purchase Order ${po.po_number || ''}*\n\nHello ${po.supplier.name},\n\nWe have issued a new purchase order for RM ${po.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}.\n\nPlease find the attached Purchase Order document.\n\nPlease acknowledge receipt.\n\nThank you.`
 
       if (base64Pdf) {
         // Send Media (PDF) via Evolution API
@@ -299,6 +300,30 @@ export async function receiveGoods(poId: string, items: Array<{ po_item_id: stri
     .update({ status: allReceived ? 'received' : 'partially_received', updated_at: new Date().toISOString() })
     .eq('id', poId)
 
+  // --- ACCOUNTING INTEGRATION: GOODS RECEIPT ---
+  try {
+    const { postProcurementReceipt } = await import('@project1/accounting')
+    const po = await getPurchaseOrder(poId)
+    const receiptTotal = items.reduce((sum, item) => {
+      const poItem = poItemMap[item.po_item_id]
+      return sum + (Number(poItem?.unit_cost || 0) * item.quantity)
+    }, 0)
+
+    if (receiptTotal > 0) {
+      await postProcurementReceipt({
+        merchantId,
+        poId,
+        poNumber: po.po_number,
+        supplier: po.supplier?.name || 'Supplier',
+        total: receiptTotal,
+        date: new Date()
+      })
+    }
+  } catch (accError) {
+    console.error('Procurement Accounting Sync Failed (Receipt):', accError)
+  }
+  // ---------------------------------------------
+
   revalidatePath('/inventory/purchase-orders')
   revalidatePath('/products')
   return receipt
@@ -309,7 +334,7 @@ export async function createDraftPOFromSuggestions(suggestions: any[]) {
   const merchantId = await getMerchantId(supabase)
 
   // Group by supplier
-  const supplierGroups = suggestions.reduce((acc, sug) => {
+  const supplierGroups = suggestions.reduce((acc: any, sug: any) => {
     if (!sug.preferred_supplier_id) return acc
     if (!acc[sug.preferred_supplier_id]) acc[sug.preferred_supplier_id] = []
     acc[sug.preferred_supplier_id].push(sug)
@@ -342,7 +367,7 @@ export async function getGoodsReceipts() {
 
   const { data, error } = await supabase
     .from('goods_receipts')
-    .select('*, purchase_orders(po_number, suppliers(name))')
+    .select('*, purchase_orders(po_number, supplier:suppliers(name))')
     .eq('merchant_id', merchantId)
     .order('received_at', { ascending: false })
 
@@ -442,7 +467,7 @@ export async function getGoodsReceipt(id: string) {
 
   const { data, error } = await supabase
     .from('goods_receipts')
-    .select('*, purchase_orders(po_number, total, subtotal, suppliers(name)), goods_receipt_items(*, products(name), purchase_order_items(unit_cost, quantity_ordered, quantity_received))')
+    .select('*, purchase_orders(po_number, total, subtotal, supplier:suppliers(name)), goods_receipt_items(*, products(name), purchase_order_items(unit_cost, quantity_ordered, quantity_received))')
     .eq('id', id)
     .eq('merchant_id', merchantId)
     .single()
@@ -467,7 +492,7 @@ export async function recordPurchasePayment(params: {
   // 1. Get PO current state
   const { data: po, error: poError } = await supabase
     .from('purchase_orders')
-    .select('*, suppliers(name)')
+    .select('*, supplier:suppliers(name)')
     .eq('id', params.poId)
     .single()
   
@@ -500,7 +525,7 @@ export async function recordPurchasePayment(params: {
     .insert({
       merchant_id: merchantId,
       purchase_order_id: params.poId,
-      vendor_name: po.suppliers?.name || 'Supplier',
+      vendor_name: (Array.isArray(po.supplier) ? po.supplier[0]?.name : po.supplier?.name) || 'Supplier',
       total_amount: params.amount,
       payment_method: params.method,
       notes: `Payment for PO ${po.po_number}. ${params.notes || ''}`,
@@ -513,6 +538,22 @@ export async function recordPurchasePayment(params: {
 
   if (expenseError) throw expenseError
 
+  // --- ACCOUNTING INTEGRATION: PAYMENT ---
+  try {
+    const { postProcurementPayment } = await import('@project1/accounting')
+    await postProcurementPayment({
+      merchantId,
+      poId: params.poId,
+      poNumber: po.po_number,
+      amount: Number(params.amount),
+      date: new Date(),
+      paymentMethod: params.method
+    })
+  } catch (accError) {
+    console.error('Procurement Accounting Sync Failed (Payment):', accError)
+  }
+  // ---------------------------------------
+
   revalidatePath('/inventory/purchasing')
   revalidatePath(`/inventory/purchase-orders/${params.poId}`)
   return { success: true }
@@ -524,11 +565,165 @@ export async function getPurchasePayments() {
 
   const { data, error } = await supabase
     .from('expenses')
-    .select('*, purchase_orders(po_number, suppliers(name))')
+    .select('*, purchase_orders(po_number, supplier:suppliers(name))')
     .eq('merchant_id', merchantId)
     .not('purchase_order_id', 'is', null)
     .order('created_at', { ascending: false })
 
   if (error) throw error
   return data
+}
+
+export async function analyseQuotation(storagePath: string, mimeType: any) {
+  const supabase = await createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+
+  const { data: merchant } = await supabase
+    .from('merchants')
+    .select('*')
+    .eq('owner_id', user.id)
+    .single()
+    
+  if (!merchant) throw new Error("Merchant not found")
+
+  // 1. Download file from Storage
+  const { data: fileData, error: downloadError } = await supabase.storage
+    .from("receipts")
+    .download(storagePath);
+
+  if (downloadError || !fileData) {
+    console.error("Download error:", downloadError);
+    throw new Error("Failed to download quotation from storage");
+  }
+
+  // 2. Extract data via AI
+  const buffer = await fileData.arrayBuffer();
+  
+  const businessContext = `
+    Store Name: ${merchant.store_name}
+    Store Type: ${merchant.store_type || 'General Merchant'}
+    Description: ${merchant.description || 'N/A'}
+  `.trim();
+
+  const extraction = await extractQuotationData(buffer, mimeType as any, businessContext);
+
+  // 3. Try mapping items to products or create them
+  const mappedItems = []
+  const createdProductsMap = new Map<string, string>() // description -> id
+
+  for (const item of extraction.items) {
+    // Improved search: break into keywords and find products that match most keywords
+    const keywords = item.description.split(/\s+/).filter(k => k.length > 2)
+    const orQuery = keywords.map(k => `name.ilike.%${k}%,sku.ilike.%${k}%`).join(',')
+    
+    const { data: products } = await supabase
+      .from('products')
+      .select('id, name, sku, cost_price, product_variants(id, name, sku)')
+      .eq('merchant_id', merchant.id)
+      .or(orQuery || `name.ilike.%${item.description}%`)
+      .limit(1)
+
+    if (products && products.length > 0) {
+      const p = products[0]
+      mappedItems.push({
+        product_id: p.id,
+        variant_id: p.product_variants?.[0]?.id || null,
+        name: p.name + (p.product_variants?.[0] ? ` — ${p.product_variants[0].name}` : ''),
+        sku: p.product_variants?.[0]?.sku || p.sku || '',
+        quantity_ordered: item.quantity,
+        unit_cost: item.unitPrice
+      })
+    } else {
+      // Not found — check if we already created it in this loop
+      let productId = createdProductsMap.get(item.description)
+      
+      if (!productId) {
+        // Create new product
+        const { data: newProduct, error: createError } = await supabase
+          .from('products')
+          .insert({
+            merchant_id: merchant.id,
+            name: item.description,
+            sku: `AUTO-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+            cost_price: item.unitPrice || 0,
+            price: (item.unitPrice || 0) * 1.5, // Default 50% markup
+            status: 'active',
+            track_inventory: true,
+            stock_quantity: 0
+          })
+          .select('id')
+          .single()
+
+        if (!createError && newProduct) {
+          productId = newProduct.id
+          if (productId) {
+            createdProductsMap.set(item.description, productId)
+          }
+        }
+      }
+
+      mappedItems.push({
+        product_id: productId || '',
+        variant_id: null,
+        name: productId ? item.description : `[FAILED] ${item.description}`,
+        sku: '',
+        quantity_ordered: item.quantity,
+        unit_cost: item.unitPrice,
+        unmapped: !productId
+      })
+    }
+  }
+
+  // 4. Try mapping supplier or create it
+  let supplierId = ''
+  let supplierObj = null
+
+  if (extraction.vendorName) {
+    const { data: suppliers } = await supabase
+      .from('suppliers')
+      .select('*')
+      .eq('merchant_id', merchant.id)
+      .ilike('name', extraction.vendorName.trim()) 
+      .limit(1)
+    
+    if (suppliers && suppliers.length > 0) {
+      supplierId = suppliers[0].id
+      supplierObj = suppliers[0]
+    } else {
+      // Create new supplier
+      const { data: newSupplier, error: supplierError } = await supabase
+        .from('suppliers')
+        .insert({
+          merchant_id: merchant.id,
+          name: extraction.vendorName.trim(),
+          code: `VND-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+          email: extraction.vendorEmail || null,
+          phone: extraction.vendorPhone || null,
+          address: extraction.vendorAddress || null,
+          is_active: true
+        })
+        .select('*')
+        .single()
+      
+      if (supplierError) {
+        console.error('Error auto-creating supplier:', supplierError)
+      }
+      
+      if (!supplierError && newSupplier) {
+        supplierId = newSupplier.id
+        supplierObj = newSupplier
+      }
+    }
+  }
+
+  return {
+    extraction: {
+      ...extraction,
+      supplierId,
+      supplier: supplierObj,
+      items: mappedItems
+    }
+  }
 }

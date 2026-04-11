@@ -468,36 +468,33 @@ export default function StoreScreen() {
         refreshing={loadingProducts}
       />
 
-      {/* FAB cluster: cart + chat */}
-      <View style={{ position: 'absolute', bottom: 32, right: 24, alignItems: 'center', gap: 12, zIndex: 50 }}>
-        {/* Chat FAB */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => router.push({
-            pathname: '/(customer)/support',
-            params: { merchantId: merchant.owner_id, storeName: merchant.store_name }
-          })}
-          style={[styles.chatFAB, styles.shadowHeavy, { position: 'relative', bottom: 0, right: 0 }]}
-          className="bg-white w-12 h-12 rounded-full items-center justify-center border border-gray-200"
-        >
-          <Ionicons name="chatbox-ellipses" size={22} color="#2563eb" />
-        </TouchableOpacity>
+      {/* Chat FAB — bottom right */}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => router.push({
+          pathname: '/(customer)/support',
+          params: { merchantId: merchant.owner_id, storeName: merchant.store_name }
+        })}
+        style={[styles.chatFAB, styles.shadowHeavy]}
+        className="bg-white w-12 h-12 rounded-full items-center justify-center border border-gray-200"
+      >
+        <Ionicons name="chatbox-ellipses" size={22} color="#2563eb" />
+      </TouchableOpacity>
 
-        {/* Cart FAB */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => setCartVisible(true)}
-          style={[styles.shadowHeavy, { position: 'relative' }]}
-          className="bg-primary-600 w-14 h-14 rounded-full items-center justify-center border-4 border-white"
-        >
-          <Ionicons name="bag" size={24} color="#fff" />
-          {storeCartCount > 0 && (
-            <View className="absolute -top-1 -right-1 bg-red-500 rounded-full min-w-[20px] h-5 items-center justify-center px-1">
-              <Text className="text-white text-[10px] font-bold">{storeCartCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
+      {/* Cart button — top right */}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => setCartVisible(true)}
+        style={[styles.shadowHeavy, { position: 'absolute', top: insets.top + 5, right: 16, zIndex: 50 }]}
+        className="bg-primary-600 w-12 h-12 rounded-full items-center justify-center border-4 border-white"
+      >
+        <Ionicons name="bag" size={22} color="#fff" />
+        {storeCartCount > 0 && (
+          <View className="absolute -top-1 -right-1 bg-red-500 rounded-full min-w-[20px] h-5 items-center justify-center px-1">
+            <Text className="text-white text-[10px] font-bold">{storeCartCount}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
 
       <CartPanel
         visible={cartVisible}

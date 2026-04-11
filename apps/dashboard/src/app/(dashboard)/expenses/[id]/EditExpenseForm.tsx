@@ -30,7 +30,7 @@ const TAX_TYPES = [
   { value: 'capital_allowance', label: 'Capital Allowance', pct: 100 },
 ]
 
-export function EditExpenseForm({ expense }: { expense: any }) {
+export function EditExpenseForm({ expense, accounts }: { expense: any, accounts: any[] }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState({
@@ -40,11 +40,30 @@ export function EditExpenseForm({ expense }: { expense: any }) {
     category: expense.category,
     taxDeductible: expense.tax_deductible,
     taxDeductiblePct: expense.tax_deductible_pct,
-    notes: expense.notes || ''
+    notes: expense.notes || '',
+    paymentAccountId: expense.payment_account_id || ''
   })
 
+  // Only show Asset accounts that are bank/cash related (11xx)
+  const bankAccounts = accounts.filter(a => a.type === 'ASSET' && a.code.startsWith('11'))
+
   const updateField = (field: string, value: any) => {
-    setData(prev => ({ ...prev, [field]: value }))
+    setData(prev => {
+      const next = { ...prev, [field]: value };
+      if (field === 'category') {
+        if (value === 'meals_entertainment') {
+          next.taxDeductible = 'partial';
+          next.taxDeductiblePct = 50;
+        } else if (value === 'equipment_hardware') {
+          next.taxDeductible = 'capital_allowance';
+          next.taxDeductiblePct = 100;
+        } else {
+          next.taxDeductible = 'full';
+          next.taxDeductiblePct = 100;
+        }
+      }
+      return next;
+    })
   }
 
   const handleUpdate = async (e: React.FormEvent) => {
@@ -58,7 +77,8 @@ export function EditExpenseForm({ expense }: { expense: any }) {
         category: data.category,
         tax_deductible: data.taxDeductible,
         tax_deductible_pct: data.taxDeductiblePct,
-        notes: data.notes
+        notes: data.notes,
+        payment_account_id: data.paymentAccountId
       })
       toast.success('Record updated')
       router.refresh()
@@ -115,12 +135,20 @@ export function EditExpenseForm({ expense }: { expense: any }) {
               </SelectTrigger>
               <SelectContent className="rounded-xl">
                 <SelectItem value="utilities">💡 Utilities</SelectItem>
-                <SelectItem value="meals_entertainment">🍽️ Meals/Entertainment</SelectItem>
-                <SelectItem value="rent_premises">🏢 Rent</SelectItem>
-                <SelectItem value="marketing_advertising">📣 Marketing</SelectItem>
                 <SelectItem value="office_supplies">📓 Office Supplies</SelectItem>
-                <SelectItem value="software_subscriptions">💻 Software</SelectItem>
+                <SelectItem value="rent_premises">🏢 Rent Premises</SelectItem>
+                <SelectItem value="marketing_advertising">📣 Marketing & Adv.</SelectItem>
+                <SelectItem value="professional_services">⚖️ Professional Services</SelectItem>
+                <SelectItem value="software_subscriptions">💻 Software & Subs</SelectItem>
+                <SelectItem value="insurance">🛡️ Insurance</SelectItem>
+                <SelectItem value="repairs_maintenance">🔧 Repairs & Maint.</SelectItem>
+                <SelectItem value="postage_courier">📮 Postage & Courier</SelectItem>
+                <SelectItem value="bank_charges">🏦 Bank Charges</SelectItem>
+                <SelectItem value="staff_hr">👥 Staff & HR</SelectItem>
+                <SelectItem value="raw_materials_inventory">🏭 Raw Materials</SelectItem>
                 <SelectItem value="transportation_vehicle">🚗 Transportation</SelectItem>
+                <SelectItem value="meals_entertainment">🍽️ Meals/Entertainment</SelectItem>
+                <SelectItem value="equipment_hardware">🖥️ Equipment & Hardware</SelectItem>
                 <SelectItem value="other">📦 Other</SelectItem>
               </SelectContent>
             </Select>
@@ -138,21 +166,19 @@ export function EditExpenseForm({ expense }: { expense: any }) {
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="text-xs font-bold text-gray-400">Tax Type</Label>
+            <Label className="text-xs font-bold text-gray-400">Paid From</Label>
             <Select 
-              value={data.taxDeductible} 
-              onValueChange={(v) => {
-                const type = TAX_TYPES.find(t => t.value === v)
-                updateField('taxDeductible', v)
-                updateField('taxDeductiblePct', type?.pct || 100)
-              }}
+              value={data.paymentAccountId} 
+              onValueChange={(v) => updateField('paymentAccountId', v)}
             >
               <SelectTrigger className="h-12 rounded-2xl border-gray-100">
-                <SelectValue />
+                <SelectValue placeholder="Select Source...">
+                  {data.paymentAccountId ? bankAccounts.find(acc => acc.id === data.paymentAccountId)?.name : "Select Source..."}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="rounded-xl">
-                {TAX_TYPES.map(t => (
-                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                {bankAccounts.map(acc => (
+                    <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -161,11 +187,15 @@ export function EditExpenseForm({ expense }: { expense: any }) {
 
        <div className="p-6 bg-emerald-50/50 rounded-[32px] border border-emerald-100/50 flex items-center justify-between">
           <div className="flex items-center gap-3">
-             <div className="w-10 h-10 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 animate-pulse">
+             <div className="w-10 h-10 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
                 <Calculator size={20} />
              </div>
              <div className="flex flex-col">
-                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Deductible</span>
+                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">
+                  {data.taxDeductible === 'partial' ? '50% Deductible (S39)' : 
+                   data.taxDeductible === 'capital_allowance' ? 'Capital Allowance' : 
+                   '100% Deductible (S33)'}
+                </span>
                 <span className="text-2xl font-black text-gray-900 tracking-tight">RM {deductibleAmt.toFixed(2)}</span>
              </div>
           </div>

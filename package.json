@@ -15,11 +15,13 @@
     "@ai-sdk/google": "^3.0.51",
     "@ai-sdk/react": "^3.0.147",
     "ai": "^6.0.0",
+    "dotenv": "^17.4.1",
+    "postgres": "^3.4.4",
     "react-native-sse": "^1.2.1",
     "scheduler": "0.26.0"
   },
   "packageManager": "pnpm@9.15.0",
   "engines": {
-    "node": "20.x"
+    "node": ">=20"
   }
 }

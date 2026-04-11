@@ -1,0 +1,10 @@
+{
+  "name": "@project1/accounting",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "dependencies": {
+    "@project1/db": "workspace:*",
+    "drizzle-orm": "^0.30.0"
+  }
+}

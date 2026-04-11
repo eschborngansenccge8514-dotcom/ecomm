@@ -32,7 +32,7 @@ export function PurchaseListClient({
 
   const filtered = initialPurchases.filter(p => {
     const poNumber = p.purchase_orders?.po_number ?? ''
-    const supplierName = p.purchase_orders?.suppliers?.name ?? ''
+    const supplierName = Array.isArray(p.purchase_orders?.supplier) ? p.purchase_orders.supplier[0]?.name : p.purchase_orders?.supplier?.name ?? ''
     const notes = p.notes ?? ''
     return (
       poNumber.toLowerCase().includes(query.toLowerCase()) ||
@@ -95,7 +95,7 @@ export function PurchaseListClient({
                     </span>
                   </TableCell>
                   <TableCell className="font-medium text-gray-700">
-                    {p.purchase_orders?.suppliers?.name ?? '—'}
+                    {Array.isArray(p.purchase_orders?.supplier) ? p.purchase_orders.supplier[0]?.name : p.purchase_orders?.supplier?.name ?? '—'}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">

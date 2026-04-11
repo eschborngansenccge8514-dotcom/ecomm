@@ -76,7 +76,10 @@ export function PurchaseOrderListClient({
   const filtered = initialOrders.filter(o => {
     const matchesQuery =
       o.po_number.toLowerCase().includes(query.toLowerCase()) ||
-      (o.suppliers?.name ?? '').toLowerCase().includes(query.toLowerCase())
+      (() => {
+        const s = Array.isArray(o.supplier) ? o.supplier[0] : o.supplier;
+        return (s?.name ?? '').toLowerCase().includes(query.toLowerCase());
+      })()
     const matchesFilter = filter === 'all' || o.status === filter
     return matchesQuery && matchesFilter
   })
@@ -163,7 +166,13 @@ export function PurchaseOrderListClient({
                       {po.po_number}
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium text-gray-700">{po.suppliers?.name}</TableCell>
+                  <TableCell className="font-medium text-gray-700">
+                    {(() => {
+                      const s = po.supplier;
+                      if (Array.isArray(s)) return s[0]?.name;
+                      return s?.name || po.supplier_name;
+                    })()}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
                       <Clock size={11} className="text-gray-300" />

@@ -49,15 +49,16 @@ export default function CheckoutPage() {
   
   const [method, setMethod] = useState<PaymentMethod>(defaultPaymentMethod || 'cash')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isCompleted, setIsCompleted] = useState(false)
   const [numpadValue, setNumpadValue] = useState<string>(totals.total.toFixed(2))
 
   const cashReceived = parseFloat(numpadValue) || 0
 
   useEffect(() => {
-    if (mounted && items.length === 0) {
+    if (mounted && items.length === 0 && !isSubmitting && !isCompleted) {
       router.replace('/pos')
     }
-  }, [mounted, items.length, router])
+  }, [mounted, items.length, router, isSubmitting, isCompleted])
 
   if (!mounted || items.length === 0) {
     return (
@@ -109,17 +110,19 @@ export default function CheckoutPage() {
       }
       
       toast.success('Transaction Completed!')
+      setIsCompleted(true)
       clearCart()
       router.replace(`/pos/receipt/${res.txnId}`)
     } catch (err: any) {
       if (err.message === 'OFFLINE' || (typeof navigator !== 'undefined' && !navigator.onLine) || err.message?.includes('fetch')) {
-        addPending(payload)
+        const offId = addPending(payload)
         toast.success('Offline Mode: Sale saved locally. Will sync later.', {
           icon: '📶',
           duration: 5000
         })
+        setIsCompleted(true)
         clearCart()
-        router.replace('/pos')
+        router.replace(`/pos/receipt/${offId}`)
       } else {
         toast.error(`Error: ${err.message}`)
         console.error(err)

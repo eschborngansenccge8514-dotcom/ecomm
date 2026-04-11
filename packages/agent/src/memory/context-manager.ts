@@ -53,7 +53,7 @@ export async function buildContextMessages(
   const recentHalf = history.slice(mid)
 
   const { text: compressionSummary } = await generateText({
-    model: google('gemini-2.5-flash-lite'),
+    model: google('gemini-3.1-flash-lite-preview'),
     prompt: `Summarise this conversation history as a compact context block.
 Focus on: decisions made, key facts established, actions completed, anything pending.
 Maximum 200 words. Write in third person ("The merchant asked...", "The agent confirmed...").

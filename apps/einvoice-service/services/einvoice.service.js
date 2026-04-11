@@ -104,10 +104,44 @@ async function issueInvoice(merchantUid, invoiceData, type = '01') {
     status:         'submitted',
   });
 
+  // Malaysia Tax Compliance: Trigger accounting post for the new invoice
+  // This ensures Accounts Receivable (1200) and Revenue (4000) are updated automatically.
+  await triggerAccountingPost('invoice.issued', {
+    ...invoiceRecord,
+    subtotal: invoiceData.subtotal,
+    tax:      invoiceData.tax || 0,
+    total:    invoiceData.total || (invoiceData.subtotal + (invoiceData.tax || 0))
+  });
+
   return { 
     ...invoiceRecord, 
     qrCodeUrl: lhdnResponse.longId ? `${config.URLS[config.ENV].API}/documents/${lhdnResponse.uuid}/details` : null 
   };
+}
+
+/**
+ * Internal helper to trigger the accounting engine auto-poster.
+ */
+async function triggerAccountingPost(type, record) {
+  // We use the Supabase Edge Function as the entry point for cross-service accounting posts
+  const endpoint = process.env.SUPABASE_URL + '/functions/v1/accounting-auto-post';
+  const apiKey   = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!endpoint || !apiKey) return;
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({ type, record })
+    });
+    if (!res.ok) console.warn(`[Accounting Linkage] RPC failed: ${res.status} ${res.statusText}`);
+  } catch (err) {
+    console.warn(`[Accounting Linkage] Trigger failed: ${err.message}`);
+  }
 }
 
 /**

@@ -5,91 +5,175 @@ import { PosProduct, PosTransactionPayload } from '@project1/domain'
 
 const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
 
-export async function getOrInitializeSession() {
+export async function getOrInitializeSession(autoCreate = true) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  // 1. Get user profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name')
-    .eq('id', user.id)
-    .single()
+  try {
+    // 1. Get user profile
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .maybeSingle()
 
-  const userName = profile?.full_name || user.email?.split('@')[0] || 'Cashier'
+    const userName = profile?.full_name || user.email?.split('@')[0] || 'Cashier'
 
-  // 2. Get merchant
-  const { data: merchant } = await supabase
-    .from('merchants')
-    .select('id, store_name, store_config')
-    .eq('owner_id', user.id)
-    .single()
-  
-  if (!merchant) throw new Error('Merchant not found')
-  const merchantId = merchant.id
-  const merchantName = merchant.store_name
-  const taxRate = Number(merchant.store_config?.taxRate ?? 8)
+    // 2. Get merchant
+    const { data: merchant, error: mErr } = await supabase
+      .from('merchants')
+      .select('id, store_name, store_config')
+      .eq('owner_id', user.id)
+      .maybeSingle()
+    
+    if (mErr) throw mErr
+    if (!merchant) throw new Error('Merchant not found')
+    
+    const merchantId = merchant.id
+    const merchantName = merchant.store_name
+    const taxRate = Number(merchant.store_config?.taxRate ?? 8)
 
-  // 3. Get or Create primary outlet
-  let outletId: string
-  let outletName: string
-  const { data: outlet } = await supabase
-    .from('pos_outlets')
-    .select('id, name')
-    .eq('merchant_id', merchantId)
-    .limit(1)
-    .single()
-  
-  if (outlet) {
-    outletId = outlet.id
-    outletName = outlet.name
-  } else {
-    const { data: newOutlet, error } = await supabase
+    // 3. Get or Create primary outlet
+    let outletId: string
+    let outletName: string
+    const { data: outlet, error: oErr } = await supabase
       .from('pos_outlets')
-      .insert({
-        merchant_id: merchantId,
-        name: 'Main Outlet',
-        is_active: true
-      })
       .select('id, name')
-      .single()
-    if (error) throw error
-    outletId = newOutlet.id
-    outletName = newOutlet.name
-  }
+      .eq('merchant_id', merchantId)
+      .limit(1)
+      .maybeSingle()
+    
+    if (oErr) throw oErr
+    
+    if (outlet) {
+      outletId = outlet.id
+      outletName = outlet.name
+    } else {
+      const { data: newOutlet, error } = await supabase
+        .from('pos_outlets')
+        .insert({
+          merchant_id: merchantId,
+          name: 'Main Outlet',
+          is_active: true
+        })
+        .select('id, name')
+        .single()
+      if (error) {
+        console.error('Outlet Creation Error:', error)
+        throw error
+      }
+      outletId = newOutlet.id
+      outletName = newOutlet.name
+    }
 
-  // 4. Get or Create active session
-  let sessionId: string
-  const { data: session } = await supabase
-    .from('pos_sessions')
-    .select('id')
-    .eq('outlet_id', outletId)
-    .eq('status', 'open')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single()
-  
-  if (session) {
-    sessionId = session.id
-  } else {
+    // 4. Get active session
+    const { data: session, error: sErr } = await supabase
+      .from('pos_sessions')
+      .select('id, opening_cash_rm')
+      .eq('outlet_id', outletId)
+      .eq('status', 'open')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    
+    if (sErr) throw sErr
+    
+    if (session) {
+      return { 
+        outletId, 
+        sessionId: session.id, 
+        outletName, 
+        userName, 
+        merchantName, 
+        taxRate, 
+        sessionRequired: false,
+        openingCash: Number(session.opening_cash_rm) || 0
+      }
+    }
+
+    // No active session found
+    if (autoCreate) {
+      const { data: newSession, error } = await supabase
+        .from('pos_sessions')
+        .insert({
+          merchant_id: merchantId,
+          outlet_id: outletId,
+          cashier_id: user.id,
+          opening_cash_rm: 0,
+          status: 'open'
+        })
+        .select('id')
+        .single()
+      if (error) {
+        console.error('Session Creation Error:', error)
+        throw error
+      }
+      return { 
+        outletId, 
+        sessionId: newSession.id, 
+        outletName, 
+        userName, 
+        merchantName, 
+        taxRate, 
+        sessionRequired: false,
+        openingCash: 0 
+      }
+    }
+
+    return { 
+      outletId, 
+      sessionId: undefined, 
+      outletName, 
+      userName, 
+      merchantName, 
+      taxRate, 
+      sessionRequired: true 
+    }
+  } catch (err) {
+    console.error('POS Init Action Error:', err)
+    throw err
+  }
+}
+
+export async function openPosSession(outletId: string, openingCash: number) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  try {
+    const { data: merchant, error: mErr } = await supabase
+      .from('merchants')
+      .select('id')
+      .eq('owner_id', user.id)
+      .maybeSingle()
+    
+    if (mErr) throw mErr
+    if (!merchant) throw new Error('Merchant not found')
+
     const { data: newSession, error } = await supabase
       .from('pos_sessions')
       .insert({
-        merchant_id: merchantId,
+        merchant_id: merchant.id,
         outlet_id: outletId,
         cashier_id: user.id,
-        opening_cash_rm: 0,
+        opening_cash_rm: openingCash,
         status: 'open'
       })
       .select('id')
       .single()
-    if (error) throw error
-    sessionId = newSession.id
-  }
 
-  return { outletId, sessionId, outletName, userName, merchantName, taxRate }
+    if (error) {
+      console.error('Open Session Insert Error:', error)
+      throw error
+    }
+    return { success: true, sessionId: newSession.id }
+  } catch (err) {
+    console.error('Open Session Action Error:', err)
+    throw err
+  }
 }
+
 
 export async function submitTransaction(payload: PosTransactionPayload) {
   const supabase = await createClient()
@@ -169,6 +253,42 @@ export async function submitTransaction(payload: PosTransactionPayload) {
 
   if (itemsError) throw itemsError
 
+  /* --- DISABLING REAL-TIME POSTING FOR PHASE 2 (BATCHING) ---
+  try {
+    const { postPOSSale } = await import('@project1/accounting')
+    
+    // Calculate total COGS if possible
+    let totalCogs = 0
+    const productIds = Array.from(new Set(payload.items.map(i => i.productId)))
+    
+    const { data: products } = await supabase
+      .from('products')
+      .select('id, cost_price')
+      .in('id', productIds)
+
+    if (products) {
+      const costMap = new Map(products.map(p => [p.id, Number(p.cost_price) || 0]))
+      totalCogs = payload.items.reduce((sum, item) => {
+        return sum + (costMap.get(item.productId) || 0) * item.qty
+      }, 0)
+    }
+
+    await postPOSSale({
+      merchantId: merchantId,
+      totalAmount: payload.totals.total,
+      subtotal: payload.totals.subtotal,
+      sstAmount: payload.totals.tax,
+      cogsAmount: totalCogs,
+      createdAt: new Date(),
+      txnRef: receiptNumber,
+      paymentMethod: payload.paymentMethod as any,
+    })
+  } catch (accError) {
+    console.error('Accounting Sync Failed (Non-Fatal):', accError)
+  }
+  */
+  // -----------------------------------------------------------
+
   // Hydrate full transaction for instant UI render
   let fullTxn = null
   try {
@@ -192,22 +312,153 @@ export async function submitTransaction(payload: PosTransactionPayload) {
   return { success: true, txnId: txn.id, receiptNumber, fullTxn }
 }
 
-export async function closePosSession(sessionId: string, closingCash: number) {
+export async function closePosSession(sessionId: string, closingCash: number, notes?: string) {
   const supabase = await createClient()
   if (!uuidRegex.test(sessionId)) throw new Error('Invalid session ID')
 
-  const { error } = await supabase
+  const summary = await getSessionSummary(sessionId)
+  
+  const discrepancy = closingCash - summary.expectedCash
+  
+  const { data: sessionData, error: fetchErr } = await supabase
     .from('pos_sessions')
-    .update({ 
-      status: 'closed', 
-      closed_at: new Date().toISOString(),
-      actual_cash_counted_rm: closingCash
-    })
+    .select('merchant_id')
     .eq('id', sessionId)
+    .single()
+  
+  if (fetchErr) throw fetchErr
 
-  if (error) throw error
+  // Post to Accounting Batch
+  try {
+     const { postPOSSessionBatch } = await import('@project1/accounting')
+     await postPOSSessionBatch({
+        merchantId: sessionData.merchant_id, // Fixed casing
+        sessionId: sessionId,
+        sessionNo: sessionId.slice(0, 8).toUpperCase(),
+        totalSubtotal: summary.totalSubtotal,
+        totalTax: summary.totalTax,
+        totalTotal: summary.totalSales,
+        totalCogs: summary.totalCogs,
+        cashTotal: summary.cashSales,
+        cardTotal: summary.cardSales,
+        ewalletTotal: summary.ewalletSales,
+        date: new Date()
+     })
+  } catch (accErr) {
+     console.error('Session Batch Posting Failed:', accErr)
+     // In Phase 2, we might want to block or log this
+  }
+
+  try {
+    const { error } = await supabase
+      .from('pos_sessions')
+      .update({ 
+        status: 'closed', 
+        closed_at: new Date().toISOString(),
+        actual_cash_counted_rm: closingCash || 0,
+        expected_cash_rm: summary.expectedCash || 0,
+        total_sales_rm: summary.totalSales || 0,
+        discrepancy_rm: discrepancy || 0,
+        reconciliation_notes: notes || '',
+        posted_to_journal: true
+      })
+      .eq('id', sessionId)
+      
+    if (error) {
+      console.error('POS Session Update Failed:', error)
+      throw new Error(`Database Error [${error.code}]: ${error.message || 'Unknown error'}`)
+    }
+  } catch (err) {
+    console.error('Close POS Session Error:', err)
+    throw err
+  }
+
   return { success: true }
 }
+
+
+export async function getSessionSummary(sessionId: string) {
+  const supabase = await createClient()
+  if (!uuidRegex.test(sessionId)) throw new Error('Invalid session ID')
+
+  try {
+    // 1. Get session info
+    const { data: session, error: sessionError } = await supabase
+      .from('pos_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .maybeSingle()
+    
+    if (sessionError) throw sessionError
+    if (!session) throw new Error('Session not found')
+
+    // 2. Get all transactions for this session
+    const { data: transactions, error: txnError } = await supabase
+      .from('pos_transactions')
+      .select('total_rm, subtotal_rm, tax_rm, payment_method, pos_transaction_items(product_id, qty)')
+      .eq('session_id', sessionId)
+    
+    if (txnError) throw txnError
+
+    // 3. Get products to calculate COGS
+    const allProdIds = Array.from(new Set(
+      transactions?.flatMap(t => t.pos_transaction_items.map((i: any) => i.product_id)) || []
+    ))
+    
+    const { data: products } = await supabase
+      .from('products')
+      .select('id, cost_price, categories(name)')
+      .in('id', allProdIds)
+    
+    const costMap = new Map(products?.map(p => [p.id, Number(p.cost_price) || 0]) || [])
+    const catMap = new Map(products?.map(p => [p.id, (Array.isArray(p.categories) ? p.categories[0]?.name : (p.categories as any)?.name) || 'Uncategorized']) || [])
+
+    const summary = {
+      openingCash: Number(session.opening_cash_rm) || 0,
+      cashSales: 0,
+      cardSales: 0,
+      ewalletSales: 0,
+      totalSales: 0,
+      totalSubtotal: 0,
+      totalTax: 0,
+      totalCogs: 0,
+      transactionCount: transactions?.length || 0,
+      expectedCash: 0,
+      salesByCategory: {} as Record<string, number>
+    }
+
+    transactions?.forEach(txn => {
+      const amount = Number(txn.total_rm) || 0
+      const subtotal = Number(txn.subtotal_rm) || 0
+      const tax = Number(txn.tax_rm) || 0
+      
+      summary.totalSales += amount
+      summary.totalSubtotal += subtotal
+      summary.totalTax += tax
+      
+      if (txn.payment_method === 'cash') summary.cashSales += amount
+      else if (txn.payment_method === 'card') summary.cardSales += amount
+      else if (txn.payment_method === 'ewallet') summary.ewalletSales += amount
+
+      // Deep stats per item
+      txn.pos_transaction_items?.forEach((item: any) => {
+        const cost = costMap.get(item.product_id) || 0
+        const cat = catMap.get(item.product_id) || 'Uncategorized'
+        
+        summary.totalCogs += (cost * item.qty)
+        summary.salesByCategory[cat] = (summary.salesByCategory[cat] || 0) + (amount * (subtotal / amount || 1)) // approximate
+      })
+    })
+
+    summary.expectedCash = summary.openingCash + summary.cashSales
+
+    return summary
+  } catch (err) {
+    console.error('Get Session Summary Error:', err)
+    throw err
+  }
+}
+
 
 export async function fetchPosHistory(outletId: string) {
   const supabase = await createClient()
@@ -372,3 +623,107 @@ export async function fetchPosProducts(outletId: string) {
   
   return products
 }
+
+export async function verifyPosPin(pin: string): Promise<{ success: boolean; message?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('pos_pin')
+    .eq('id', user.id)
+    .single()
+
+  if (error || !profile) {
+    throw new Error('Could not retrieve security profile')
+  }
+
+  if (!profile.pos_pin) {
+    return { success: false, message: 'NO_PIN_SET' }
+  }
+
+  if (profile.pos_pin === pin) {
+    return { success: true }
+  }
+
+  return { success: false, message: 'INVALID_PIN' }
+}
+
+export async function updatePosPin(pin: string): Promise<{ success: boolean }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  // Validation: 4-digit PIN
+  if (!/^\d{4}$/.test(pin)) {
+    throw new Error('PIN must be exactly 4 digits.')
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ pos_pin: pin })
+    .eq('id', user.id)
+
+  if (error) throw error
+
+  return { success: true }
+}
+
+export async function updateUserProfile(data: { full_name?: string; avatar_url?: string }): Promise<{ success: boolean }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { error } = await supabase
+    .from('profiles')
+    .update(data)
+    .eq('id', user.id)
+
+  if (error) throw error
+  return { success: true }
+}
+
+export async function updateMerchantSettings(data: { 
+  store_name?: string; 
+  tagline?: string;
+  phone?: string;
+  whatsapp?: string;
+  tax_rate?: number;
+  address?: string;
+}): Promise<{ success: boolean }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  // Get merchant
+  const { data: merchant } = await supabase
+    .from('merchants')
+    .select('id, store_config')
+    .eq('owner_id', user.id)
+    .single()
+
+  if (!merchant) throw new Error('Merchant not found')
+
+  const updates: any = {}
+  if (data.store_name) updates.store_name = data.store_name
+  
+  // Update store_config for tax and other flexible fields
+  const newConfig = { ...merchant.store_config }
+  if (data.tagline) newConfig.tagline = data.tagline
+  if (data.phone) newConfig.phone = data.phone
+  if (data.whatsapp) newConfig.whatsapp = data.whatsapp
+  if (data.tax_rate !== undefined) newConfig.taxRate = data.tax_rate
+  if (data.address) newConfig.address = data.address
+  
+  updates.store_config = newConfig
+
+  const { error } = await supabase
+    .from('merchants')
+    .update(updates)
+    .eq('id', merchant.id)
+
+  if (error) throw error
+  return { success: true }
+}
+

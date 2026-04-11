@@ -1,8 +1,6 @@
 {
-  "gsd": {
-    "version": "1.0.0",
-    "profile": "balanced",
-    "auto_commit": true,
-    "parallel_execution": true
-  }
+  "version": "1.0.0",
+  "profile": "balanced",
+  "auto_commit": true,
+  "parallel_execution": true
 }

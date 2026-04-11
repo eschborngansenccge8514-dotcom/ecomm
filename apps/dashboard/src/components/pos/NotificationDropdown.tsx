@@ -13,6 +13,11 @@ interface NotificationDropdownProps {
 export function NotificationDropdown({ isOpen, onClose }: NotificationDropdownProps) {
   const [alerts, setAlerts] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (isOpen) {
@@ -51,11 +56,11 @@ export function NotificationDropdown({ isOpen, onClose }: NotificationDropdownPr
         <div className="p-2 space-y-1">
           {/* Status Alert */}
           <div className={`p-3 border rounded-xl flex items-start gap-3 mb-2 ${
-            (typeof navigator !== 'undefined' && navigator.onLine) 
+            (mounted && navigator.onLine) 
               ? 'bg-emerald-50 border-emerald-100' 
               : 'bg-rose-50 border-rose-100'
           }`}>
-            {(typeof navigator !== 'undefined' && navigator.onLine) ? (
+            {(mounted && navigator.onLine) ? (
               <>
                 <CheckCircle2 className="text-emerald-500 shrink-0" size={18} />
                 <div>

@@ -1,315 +1,200 @@
-import React from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import styles from './landing.module.css';
-import { 
-  ArrowRight, 
-  Monitor, 
-  ShoppingBag, 
-  Package, 
-  Zap, 
-  Check,
-  BarChart3,
-  Globe2,
-  Shield,
-  Smartphone,
-  Cpu,
-  LineChart,
-  Boxes,
-  Users
-} from 'lucide-react';
+// apps/dashboard/src/app/(public)/landing/page.tsx
+import Script from 'next/script';
+import { HeroSection } from '@/components/sections/hero-section';
+import { FeaturesSection } from '@/components/sections/features-section';
+import { Navbar } from '@/components/layout/navbar';
+import { Footer } from '@/components/layout/footer';
+import { CookieBanner } from '@/components/cookie-banner';
+import { organizationSchema, softwareApplicationSchema, faqSchema } from '@/lib/landing/structured-data';
+import { FAQS } from '@/lib/landing/constants';
 
-export default function LandingPage() {
-  const pillars = [
-    {
-      title: 'Global Storefronts',
-      description: 'Create hyper-optimized, beautiful digital storefronts that convert visitors into loyal customers.',
-      icon: <Monitor size={28} strokeWidth={1.5} />,
-      tag: 'Build'
-    },
-    {
-      title: 'Omnichannel Sales',
-      description: 'One synchronized platform to sell across web, mobile, social, and physical retail locations.',
-      icon: <ShoppingBag size={28} strokeWidth={1.5} />,
-      tag: 'Sell'
-    },
-    {
-      title: 'Intelligent Operations',
-      description: 'Centralize inventory routing, automated fulfillment, and real-time staff management.',
-      icon: <Package size={28} strokeWidth={1.5} />,
-      tag: 'Manage'
-    },
-    {
-      title: 'Infinite Scale',
-      description: 'Enterprise-grade infrastructure designed to seamlessly handle massive traffic spikes.',
-      icon: <Zap size={28} strokeWidth={1.5} />,
-      tag: 'Grow'
-    }
-  ];
+// Below-fold sections deferred for performance
+import { PricingSection } from '@/components/sections/pricing-section';
+import { FAQSection } from '@/components/sections/faq-section';
 
-  const comprehensiveFeatures = [
-    { name: 'Native Cloud POS', icon: <Monitor size={18} /> },
-    { name: 'Multi-warehouse Sync', icon: <Boxes size={18} /> },
-    { name: 'Real-time Analytics', icon: <LineChart size={18} /> },
-    { name: 'Global Payments', icon: <Globe2 size={18} /> },
-    { name: 'Fraud Protection', icon: <Shield size={18} /> },
-    { name: 'Mobile Management', icon: <Smartphone size={18} /> },
-    { name: 'AI Recommendations', icon: <Cpu size={18} /> },
-    { name: 'CRM & Loyalty', icon: <Users size={18} /> }
-  ];
+export const metadata = {
+  title: 'Hyperlocal — Merchant OS for Malaysian Businesses',
+  description: 'All-in-one merchant operating system for Malaysian SMEs. POS, online store, Shopee/Lazada sync, built-in accounting, MyInvois e-invoice, and AI agents — one platform.',
+};
 
-  const logos = [
-    'ACME CORP', 'NOVA TECH', 'LUMINA', 'QUANTUM', 'VERTEX', 'NEXUS'
-  ];
-
+export default function HomePage() {
   return (
-    <div className={styles.landingContainer}>
-      <header className={styles.glassNav}>
-        <div className={styles.navContainer}>
-          <Link href="/landing" className={styles.logoWrapper}>
-            <div className={styles.logoBox}>M</div>
-            <span className={styles.logoText}>MerchantOS</span>
-          </Link>
-          <div className={styles.navLinks}>
-            <Link href="#" className={styles.navLink}>Platform</Link>
-            <Link href="#" className={styles.navLink}>Solutions</Link>
-            <Link href="#" className={styles.navLink}>Developers</Link>
-            <Link href="#" className={styles.navLink}>Pricing</Link>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link href="/login" className="text-sm font-semibold text-zinc-300 hover:text-white px-4 transition-colors">Log in</Link>
-            <Link href="/register" className={styles.primaryCTA}>Start free trial</Link>
-          </div>
-        </div>
-      </header>
-
-      <main className={styles.content}>
-        {/* HERO */}
-        <section className={styles.heroSection}>
-          <div className={styles.heroContent}>
-            <h1 className={styles.heroTitle}>The operating system for modern commerce</h1>
-            <p className={styles.heroSubtitle}>
-              Millions of the world's most successful brands trust MerchantOS to sell, ship, and process payments globally. Experience unparalleled speed and control.
-            </p>
-            <div className={styles.ctaGroup}>
-              <Link href="/register" className={styles.primaryCTA}>Start free trial</Link>
-              <Link href="#" className={styles.secondaryCTA}>Explore platform <ArrowRight size={18} /></Link>
-            </div>
-          </div>
-          <div className={styles.heroMockupWrapper}>
-            <Image 
-              src="/dashboard-mockup.png" 
-              alt="Dashboard Preview" 
-              width={1000} 
-              height={700} 
-              className={styles.mockupImage}
-              priority
-            />
-          </div>
-        </section>
-
-        {/* LOGOS */}
-        <section className={styles.trustSection}>
-          <div className={styles.logoStrip}>
-            {logos.map((logo, i) => (
-              <span key={i} className={styles.trustLogo}>{logo}</span>
-            ))}
-          </div>
-        </section>
-
-        {/* PILLARS */}
-        <section className={styles.pillarsSection}>
-          <div className={styles.sectionHeader}>
-            <span className={styles.sectionTag}>Platform Core</span>
-            <h2 className={styles.sectionTitle}>Built for every stage of your business</h2>
-          </div>
-          <div className={styles.pillarsGrid}>
-            {pillars.map((pillar, idx) => (
-              <div key={idx} className={styles.pillarCard}>
-                <div className={styles.pillarIcon}>{pillar.icon}</div>
-                <h3 className={styles.pillarTitle}>{pillar.title}</h3>
-                <p className={styles.pillarDesc}>{pillar.description}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* SPLIT FEATURES */}
-        <section className={styles.splitFeaturesWrapper}>
-          <div className={styles.splitFeature}>
-            <div className={styles.splitImageWrapper}>
-              <div className="bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl shadow-2xl w-full max-w-md relative z-10">
-                <div className="absolute inset-0 bg-gradient-to-br from-[#00e599]/10 to-transparent rounded-2xl pointer-events-none"></div>
-                <div className="flex justify-between items-center mb-6 relative z-10">
-                  <h4 className="font-bold text-white text-lg">Live Inventory</h4>
-                  <span className="text-[#00e599] bg-[#00e599]/10 px-3 py-1 rounded-full text-xs font-bold ring-1 ring-[#00e599]/30">Synced</span>
-                </div>
-                <div className="space-y-5 relative z-10">
-                  {[1,2,3].map(i => (
-                    <div key={i} className="flex gap-4 items-center border-b border-white/5 pb-5 last:border-0 last:pb-0">
-                      <div className="w-12 h-12 bg-white/5 rounded-xl border border-white/10"></div>
-                      <div className="flex-1">
-                        <div className="h-2.5 w-24 bg-white/20 rounded mb-2"></div>
-                        <div className="h-2 w-16 bg-white/10 rounded"></div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold text-white">240 unit</div>
-                        <div className="text-xs text-zinc-500 mt-1">Updated just now</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div>
-              <span className={styles.sectionTag}>Command Center</span>
-              <h3 className={styles.splitTitle}>Control your entire inventory in real-time</h3>
-              <p className={styles.splitDesc}>
-                Whether you have one store or a hundred, our global inventory engine keeps your stock levels perfectly in sync across every sales channel.
+    <>
+      <Script
+        id="schema-organization"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+      />
+      <Script
+        id="schema-software"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationSchema) }}
+      />
+      <Script
+        id="schema-faq"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema(FAQS as any)) }}
+      />
+      
+      <div className="flex flex-col min-h-screen bg-white selection:bg-[#01696f]/30 selection:text-[#01696f]">
+        <Navbar />
+        
+        <main className="flex-grow">
+          <HeroSection />
+          
+          {/* Social Proof Bar placeholder */}
+          <div className="bg-gray-50 border-y border-gray-100 py-12 overflow-hidden">
+            <div className="mx-auto max-w-7xl px-4">
+              <p className="text-center text-xs font-bold text-gray-400 uppercase tracking-widest mb-8">
+                Trusted by 5,000+ Malaysian Merchants
               </p>
-              <ul className="space-y-4 mb-8 text-zinc-300">
-                {['Multi-location synchronous tracking', 'Automated ML-driven stock alerts', 'One-click supplier PO generation'].map((item, i) => (
-                  <li key={i} className="flex gap-3 items-center font-medium">
-                    <div className="bg-[#00e599]/20 p-1 rounded-full">
-                      <Check size={16} className="text-[#00e599]" />
-                    </div>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/register" className={styles.primaryCTA}>Explore Inventory</Link>
+              <div className="flex flex-wrap justify-center items-center gap-x-12 gap-y-8 opacity-40 grayscale transition-all hover:grayscale-0 hover:opacity-100">
+                 {['Shopee', 'Lazada', 'TikTok Shop', 'Maybank', 'Billplz', 'MyInvois'].map(logo => (
+                   <span key={logo} className="text-xl font-black text-gray-800 tracking-tighter">{logo}</span>
+                 ))}
+              </div>
             </div>
           </div>
 
-          <div className={styles.splitFeature}>
-            <div className={styles.splitImageWrapper}>
-              <div className="bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl shadow-2xl w-full max-w-md relative z-10">
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent rounded-2xl pointer-events-none"></div>
-                <div className="flex justify-between items-start mb-8 relative z-10">
-                  <div>
-                    <div className="text-zinc-400 text-sm font-medium mb-1">Total Revenue</div>
-                    <h4 className="font-bold text-4xl text-white tracking-tight">$84,200.00</h4>
+          <FeaturesSection />
+
+          {/* Problem Section */}
+          <section className="bg-gray-900 py-24 text-white">
+            <div className="mx-auto max-w-4xl px-4 text-center">
+              <h2 className="text-3xl font-bold mb-8">Running a business shouldn't feel like this.</h2>
+              <div className="grid md:grid-cols-3 gap-8">
+                {[
+                  { title: 'Fragmented Tools', desc: 'Syncing data between 5 different apps every day.' },
+                  { title: 'Manual Work', desc: 'Wasting hours on accounting and inventory counting.' },
+                  { title: 'Hidden Costs', desc: 'Paying for multiple subscriptions that don\'t talk to each other.' }
+                ].map(item => (
+                  <div key={item.title} className="p-6 rounded-2xl bg-white/5 border border-white/10">
+                    <div className="text-red-400 mb-4 text-2xl group-hover:scale-110 transition">✕</div>
+                    <h3 className="font-bold mb-2">{item.title}</h3>
+                    <p className="text-sm text-gray-400">{item.desc}</p>
                   </div>
-                  <div className="bg-indigo-500/20 p-3 rounded-xl border border-indigo-500/30">
-                    <BarChart3 size={24} className="text-indigo-400" />
-                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* AI Agent Section */}
+          <section className="py-24 bg-white">
+            <div className="mx-auto max-w-6xl px-4">
+              <div className="flex flex-col md:flex-row items-center gap-16">
+                <div className="flex-1">
+                  <span className="text-[#01696f] font-bold tracking-widest uppercase text-xs">AI-Powered Workforce</span>
+                  <h2 className="text-4xl font-extrabold mt-4 mb-6 leading-tight">Your business, run by AI Agents.</h2>
+                  <p className="text-lg text-gray-600 mb-8 leading-relaxed">
+                    Hyperlocal doesn't just give you tools; it gives you a workforce. Our AI agents handle customer service, 
+                    inventory reordering, and financial reporting around the clock.
+                  </p>
+                  <ul className="space-y-4">
+                    {['Customer Service Agent handles 90% of queries', 'Inventory Agent auto-generates POs based on sales velocity', 'Accounting Agent auto-posts SST journal entries'].map(text => (
+                      <li key={text} className="flex gap-3 items-start">
+                        <span className="bg-[#01696f]/10 text-[#01696f] p-1 rounded-full text-xs">✓</span>
+                        <span className="text-gray-700 font-medium">{text}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <div className="h-40 bg-white/5 rounded-xl border border-white/10 flex items-end gap-3 p-5 relative z-10">
-                  {[40, 70, 45, 90, 65, 80, 50].map((h, i) => (
-                    <div key={i} className="relative flex-1 group">
-                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-white text-black text-xs font-bold py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">${h}k</div>
-                      <div className="w-full bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-t-sm transition-all duration-500 hover:opacity-80" style={{ height: `${h}%` }}></div>
-                    </div>
-                  ))}
+                <div className="flex-1 bg-gray-50 rounded-3xl p-8 border border-gray-100 shadow-xl relative overflow-hidden group">
+                   <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition">
+                     <div className="w-64 h-64 rounded-full bg-[#01696f]"></div>
+                   </div>
+                   <div className="relative z-10 space-y-4">
+                     {[
+                       { agent: 'SupportBot', msg: 'Order #4122 has been shipped via Lalamove.' },
+                       { agent: 'InventoryBot', msg: 'Stock for "Iced Latte" is low. Creating PO for Supplier A.' },
+                       { agent: 'FinanceBot', msg: 'Daily reconciliation complete. SST variance: 0%.' }
+                     ].map(msg => (
+                       <div key={msg.agent} className="p-4 bg-white rounded-xl shadow-sm border border-gray-100 flex gap-4 animate-in fade-in slide-in-from-right duration-500">
+                         <div className="w-10 h-10 rounded-full bg-[#01696f]/10 flex items-center justify-center text-xs font-bold text-[#01696f]">AI</div>
+                         <div>
+                           <div className="text-xs font-bold text-gray-900">{msg.agent}</div>
+                           <div className="text-sm text-gray-500 mt-1">{msg.msg}</div>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
                 </div>
               </div>
             </div>
-            <div>
-              <span className={styles.sectionTag}>Financial Engine</span>
-              <h3 className={styles.splitTitle}>World-class checkout that converts at scale</h3>
-              <p className={styles.splitDesc}>
-                Offer your customers the fastest, most frictionless checkout experience on the planet. Built for massive volume and microsecond latency.
+          </section>
+
+          {/* Metrics Section */}
+          <section className="bg-gray-50 py-24">
+            <div className="mx-auto max-w-7xl px-4 grid grid-cols-2 md:grid-cols-4 gap-8">
+              {[
+                { label: 'Orders Processed', value: '1.2M+' },
+                { label: 'Active Merchants', value: '5,000+' },
+                { label: 'Staff Hours Saved', value: '250k+' },
+                { label: 'SST Compliance', value: '100%' }
+              ].map(stat => (
+                <div key={stat.label} className="text-center">
+                  <div className="text-3xl md:text-5xl font-black text-[#01696f] mb-2">{stat.value}</div>
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <PricingSection />
+          
+          {/* Testimonials Section */}
+          <section className="py-24 bg-white">
+             <div className="mx-auto max-w-4xl px-4 text-center">
+               <h2 className="text-3xl font-bold mb-12">Built for Malaysian business owners.</h2>
+               <div className="grid md:grid-cols-2 gap-8 text-left">
+                 {[
+                   { name: 'Sarah Tan', biz: 'The Coffee Nook, KL', quote: 'Hyperlocal replaced my bookkeeper and my POS. It saves me at least 15 hours a week that I now spend with my family.' },
+                   { name: 'Ahmad Rizwan', biz: 'Rizwan Gadgets, JB', quote: 'The Shopee and Lazada sync is magic. I no longer have to worry about overselling or manual inventory updates.' }
+                 ].map(item => (
+                   <div key={item.name} className="p-8 rounded-3xl bg-gray-50 border border-gray-100 relative">
+                     <span className="absolute top-6 left-8 text-6xl text-[#01696f]/10 font-serif leading-none">"</span>
+                     <p className="relative z-10 text-gray-600 mb-6 italic">{item.quote}</p>
+                     <div className="flex items-center gap-4">
+                       <div className="w-10 h-10 rounded-full bg-[#01696f]/20"></div>
+                       <div>
+                         <div className="text-sm font-bold text-gray-900">{item.name}</div>
+                         <div className="text-xs text-gray-400">{item.biz}</div>
+                       </div>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             </div>
+          </section>
+
+          <FAQSection />
+          
+          {/* Final CTA Section */}
+          <section className="bg-[#01696f] py-24 text-white">
+            <div className="mx-auto max-w-4xl px-4 text-center">
+              <h2 className="text-3xl md:text-5xl font-extrabold mb-6">
+                Ready to automate your business?
+              </h2>
+              <p className="text-xl text-white/80 mb-10 max-w-2xl mx-auto">
+                Join thousands of merchants who have replaced their manual work with the Hyperlocal Merchant OS.
               </p>
-              <ul className="space-y-4 mb-8 text-zinc-300">
-                {['Native 130+ currency support', 'Dynamic localized payment methods', 'One-tap Shop Pay enabled'].map((item, i) => (
-                  <li key={i} className="flex gap-3 items-center font-medium">
-                    <div className="bg-[#00e599]/20 p-1 rounded-full">
-                      <Check size={16} className="text-[#00e599]" />
-                    </div>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/register" className={styles.primaryCTA}>Explore Checkout</Link>
-            </div>
-          </div>
-        </section>
-
-        {/* DENSE GRID */}
-        <section className={styles.denseSection}>
-          <div className={styles.sectionHeader}>
-            <span className={styles.sectionTag}>Ecosystem</span>
-            <h2 className={styles.sectionTitle}>Everything else you need to succeed</h2>
-          </div>
-          <div className={styles.denseGrid}>
-            {comprehensiveFeatures.map((feature, i) => (
-              <div key={i} className={styles.denseItem}>
-                <div className="text-[#00e599] bg-[#00e599]/10 p-2 rounded-lg ring-1 ring-[#00e599]/20">
-                  {feature.icon}
-                </div>
-                {feature.name}
+              <div className="flex flex-wrap justify-center gap-4">
+                <a
+                  href="/register"
+                  className="rounded-full bg-[#a8f0e8] text-[#01696f] px-10 py-5 text-lg font-bold shadow-2xl transition hover:scale-105 active:scale-95"
+                >
+                  Start Your 14-Day Free Trial
+                </a>
               </div>
-            ))}
-          </div>
-        </section>
-
-        {/* BOTTOM CTA */}
-        <section className={styles.bottomCTA}>
-          <h2 className={styles.bottomCTATitle}>Grow your business with MerchantOS</h2>
-          <p className={styles.bottomCTADesc}>
-            Join millions of businesses worldwide. Try MerchantOS free for 14 days, no credit card required.
-          </p>
-          <div className={styles.emailInputWrapper}>
-            <input 
-              type="email" 
-              placeholder="Enter your email address" 
-              className={styles.emailInput}
-            />
-            <button className={`${styles.primaryCTA} py-4 px-8 text-lg`}>Start free trial</button>
-          </div>
-        </section>
-      </main>
-
-      <footer className={styles.footer}>
-        <div className={styles.footerContent}>
-          <div className="max-w-xs">
-            <Link href="/landing" className={`${styles.logoWrapper} mb-6`}>
-              <div className={styles.logoBox}>M</div>
-              <span className={styles.logoText}>MerchantOS</span>
-            </Link>
-            <p className="text-zinc-400 text-sm leading-relaxed mt-4">
-              The only platform you need to build, manage, and scale your commerce business globally.
-            </p>
-          </div>
-          <div className={styles.footerLinks}>
-            <div className={styles.footerCol}>
-              <h4>Company</h4>
-              <ul>
-                <li><Link href="#">About</Link></li>
-                <li><Link href="#">Careers</Link></li>
-                <li><Link href="#">Press</Link></li>
-                <li><Link href="#">Sustainability</Link></li>
-              </ul>
+              <p className="mt-6 text-sm text-white/40">
+                No credit card required · Instant setup · Cancel anytime
+              </p>
             </div>
-            <div className={styles.footerCol}>
-              <h4>Products</h4>
-              <ul>
-                <li><Link href="#">Point of Sale</Link></li>
-                <li><Link href="#">Global Payments</Link></li>
-                <li><Link href="#">B2B Wholesale</Link></li>
-                <li><Link href="#">Checkout</Link></li>
-              </ul>
-            </div>
-            <div className={styles.footerCol}>
-              <h4>Developers</h4>
-              <ul>
-                <li><Link href="#">API Documentation</Link></li>
-                <li><Link href="#">Community Forums</Link></li>
-                <li><Link href="#">App Marketplace</Link></li>
-                <li><Link href="#">Changelog</Link></li>
-              </ul>
-            </div>
-          </div>
-        </div>
-        <div className={styles.footerBottom}>
-          <div className={styles.footerBottomLinks}>
-            <Link href="#">Terms of Service</Link>
-            <Link href="#">Privacy Policy</Link>
-            <Link href="#">Sitemap</Link>
-          </div>
-          <p>© {new Date().getFullYear()} MerchantOS Inc. All rights reserved.</p>
-        </div>
-      </footer>
-    </div>
+          </section>
+        </main>
+        
+        <Footer />
+        <CookieBanner />
+      </div>
+    </>
   );
 }

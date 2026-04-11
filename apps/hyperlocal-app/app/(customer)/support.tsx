@@ -37,7 +37,7 @@ export default function SupportChatScreen() {
   }
 
   // API URL - use local IP for physical devices/emulators to reach the host
-  const API_URL = process.env.EXPO_PUBLIC_DASHBOARD_URL ?? 'http://192.168.1.102:3000'
+  const API_URL = process.env.EXPO_PUBLIC_DASHBOARD_URL ?? 'http://localhost:3000'
 
   const handleSubmit = () => {
     const text = input.trim()

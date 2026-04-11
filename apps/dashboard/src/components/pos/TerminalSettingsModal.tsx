@@ -1,4 +1,4 @@
-import { Settings, X, Monitor, Printer, Layout, CheckCircle2, WifiOff, CreditCard, Wallet, Banknote } from 'lucide-react'
+import { Settings, X, Monitor, Printer, Layout, CheckCircle2, WifiOff, CreditCard, Wallet, Banknote, BarChart3 } from 'lucide-react'
 import { usePosSettings } from '@/stores/pos-settings'
 import { usePosOffline } from '@/stores/pos-offline'
 
@@ -13,6 +13,7 @@ export function TerminalSettingsModal({ isOpen, onClose, outletId, sessionId }: 
   const { 
     terminalName, setTerminalName, 
     autoPrint, setAutoPrint,
+    autoPrintZReport, setAutoPrintZReport,
     defaultPaymentMethod, setDefaultPaymentMethod,
     quickPayAmounts, setQuickPayAmounts
   } = usePosSettings()
@@ -87,23 +88,41 @@ export function TerminalSettingsModal({ isOpen, onClose, outletId, sessionId }: 
               Preferences
             </label>
             <div className="space-y-2">
-              <button 
-                onClick={() => setAutoPrint(!autoPrint)}
-                className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-200 transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${autoPrint ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-200 text-slate-400'}`}>
-                    <Printer size={16} />
+                <button 
+                  onClick={() => setAutoPrint(!autoPrint)}
+                  className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-200 transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${autoPrint ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-200 text-slate-400'}`}>
+                      <Printer size={16} />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-[11px] font-black text-slate-900 uppercase">Auto-Print Receipts</p>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase">After checkout</p>
+                    </div>
                   </div>
-                  <div className="text-left">
-                    <p className="text-[11px] font-black text-slate-900 uppercase">Auto-Print</p>
-                    <p className="text-[8px] font-bold text-slate-400 uppercase">After checkout</p>
+                  <div className={`w-10 h-6 rounded-full relative transition-colors ${autoPrint ? 'bg-slate-900' : 'bg-slate-200'}`}>
+                     <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${autoPrint ? 'left-5' : 'left-1'}`} />
                   </div>
-                </div>
-                <div className={`w-10 h-6 rounded-full relative transition-colors ${autoPrint ? 'bg-slate-900' : 'bg-slate-200'}`}>
-                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${autoPrint ? 'left-5' : 'left-1'}`} />
-                </div>
-              </button>
+                </button>
+
+                <button 
+                  onClick={() => setAutoPrintZReport(!autoPrintZReport)}
+                  className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-200 transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${autoPrintZReport ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-200 text-slate-400'}`}>
+                      <BarChart3 size={16} />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-[11px] font-black text-slate-900 uppercase">Auto-Print Z-Report</p>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase">After session close</p>
+                    </div>
+                  </div>
+                  <div className={`w-10 h-6 rounded-full relative transition-colors ${autoPrintZReport ? 'bg-slate-900' : 'bg-slate-200'}`}>
+                     <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${autoPrintZReport ? 'left-5' : 'left-1'}`} />
+                  </div>
+                </button>
 
               <button 
                 onClick={() => setOfflineMode(!isOfflineMode)}

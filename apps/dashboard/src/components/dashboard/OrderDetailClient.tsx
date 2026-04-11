@@ -277,10 +277,8 @@ function StatusTimeline({ order }: { order: any }) {
     </div>
   )
 }
-import { 
-  printInvoice, 
-  updateOrderStatus 
-} from '@/lib/order-actions'
+import { printInvoice } from '@/lib/order-actions'
+import { updateOrderStatusServer } from '@/app/(dashboard)/orders/actions'
 import { invokeWorker } from '@/lib/worker'
 import { 
   getFulfilments, 
@@ -1269,24 +1267,18 @@ export function OrderDetailClient({ order: initial, merchantId, customerOrderCou
   const applyStatusUpdate = useCallback(async (nextStatus: string) => {
     setIsUpdating(true)
     const supabase = createClient()
-    const now = new Date().toISOString()
-    const updates: any = { status: nextStatus }
-
-    if (nextStatus === 'confirmed') updates.confirmed_at = now
-    if (nextStatus === 'preparing') updates.preparing_at = now
-    if (nextStatus === 'ready_for_pickup') updates.ready_at = now
-    if (nextStatus === 'delivered') updates.delivered_at = now
-    if (nextStatus === 'cancelled') updates.cancelled_at = now
-
-    const { error } = await supabase.from('orders').update(updates).eq('id', order.id)
-    if (error) {
-      toast.error(error.message)
+    
+    try {
+      const updated = await updateOrderStatusServer(order.id, nextStatus)
+      setOrder(updated)
+      toast.success(`Order marked as ${nextStatus.replace(/_/g, ' ')}`)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update order status')
       setIsUpdating(false)
       return
     }
 
-    setOrder((prev: any) => ({ ...prev, ...updates }))
-    toast.success(`Order marked as ${nextStatus.replace(/_/g, ' ')}`)
+    setIsUpdating(false)
 
     // Auto-book Lalamove if confirmed
     if (nextStatus === 'confirmed' && order.delivery_provider === 'lalamove') {

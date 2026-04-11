@@ -8,6 +8,7 @@
     "@project1/domain": "workspace:*",
     "@supabase/supabase-js": "^2.100.1",
     "ai": "3.4.33",
-    "drizzle-orm": "^0.30.0"
+    "drizzle-orm": "^0.30.0",
+    "postgres": "^3.4.4"
   }
 }

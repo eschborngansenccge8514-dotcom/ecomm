@@ -172,7 +172,7 @@ export async function runSupportAgent({
   // 4. Call streamText with lightweight Gemini model
   console.log(`[SupportAgent] calling streamText (${Date.now() - t0}ms)`)
   const result = streamText({
-    model: google('gemini-2.5-flash-lite'),
+    model: google('gemini-3.1-flash-lite-preview'),
     system: buildSupportSystemPrompt(merchantName, knowledge_base_text, customerContext),
     messages,
     tools: buildSupportTools(merchantUuid, ownerId, sessionId, supabase, resolvedCustomerId) as any,

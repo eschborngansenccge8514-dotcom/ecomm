@@ -18,12 +18,24 @@ export function StartSessionModal({ isOpen, outletId, onSuccess, onClose }: Star
 
   const handleStartSession = async () => {
     setIsSubmitting(true)
+    const amount = parseFloat(openingCash) || 0
+    
+    // We close the modal immediately for a 'snappy' feel
+    // and handle the success/error via toasts
     try {
-      const res = await openPosSession(outletId, parseFloat(openingCash) || 0)
-      toast.success('Session Started Successfully!')
-      onSuccess(res.sessionId)
+      toast.promise(
+        openPosSession(outletId, amount).then(res => {
+          onSuccess(res.sessionId)
+          return res
+        }),
+        {
+          loading: 'Opening session...',
+          success: 'Session Started!',
+          error: (err) => `Failed: ${err.message}`
+        }
+      )
+      onClose?.()
     } catch (err: any) {
-      toast.error(`Error: ${err.message}`)
       console.error(err)
     } finally {
       setIsSubmitting(false)

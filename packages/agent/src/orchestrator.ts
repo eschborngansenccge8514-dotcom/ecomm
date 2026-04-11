@@ -60,7 +60,7 @@ export async function runAgent({
   // Step 3: call streamText — synchronous in ai@6, returns StreamTextResult directly
   console.log(`[Agent] calling streamText (${Date.now() - t0}ms)`)
   const result = streamText({
-    model: google('gemini-2.5-flash-lite'),
+    model: google('gemini-3.1-flash-lite-preview'),
     system: buildSystemPrompt(merchantName) + memoryContext,
     messages,
     tools: buildTools(merchantId, sessionId) as any,

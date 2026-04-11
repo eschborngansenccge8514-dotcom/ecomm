@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { generatePayrollRun, finalizePayrollRun, getPayrollItems } from "../../actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,8 +22,9 @@ const MONTHS = [
   "July","August","September","October","November","December",
 ];
 
-const now = new Date();
-const YEARS = [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2];
+// Stable defaults for SSR to avoid hydration mismatch
+const DEFAULT_YEAR = 2026;
+const DEFAULT_MONTH = 4;
 
 function rm(v: unknown) {
   return `RM ${Number(v).toLocaleString("en-MY", { minimumFractionDigits: 2 })}`;
@@ -36,12 +37,24 @@ function StatusBadge({ status }: { status: unknown }) {
 }
 
 export function PayrollClient({ runs: initialRuns }: { runs: PayrollRun[] }) {
+  const [mounted, setMounted] = useState(false);
   const [runs, setRuns] = useState(initialRuns);
-  const [genYear, setGenYear] = useState(String(now.getFullYear()));
-  const [genMonth, setGenMonth] = useState(String(now.getMonth() + 1));
+  const [genYear, setGenYear] = useState(String(DEFAULT_YEAR));
+  const [genMonth, setGenMonth] = useState(String(DEFAULT_MONTH));
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
   const [itemsMap, setItemsMap] = useState<Record<string, PayrollItem[]>>({});
   const [isPending, startTransition] = useTransition();
+
+  const YEARS = mounted 
+    ? [new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2]
+    : [DEFAULT_YEAR, DEFAULT_YEAR - 1, DEFAULT_YEAR - 2];
+
+  useEffect(() => {
+    setMounted(true);
+    const now = new Date();
+    setGenYear(String(now.getFullYear()));
+    setGenMonth(String(now.getMonth() + 1));
+  }, []);
 
   function handleGenerate() {
     startTransition(async () => {

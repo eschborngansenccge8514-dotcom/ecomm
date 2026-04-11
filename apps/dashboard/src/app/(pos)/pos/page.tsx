@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { usePosCart } from '@/stores/pos-cart'
 import { fetchPosProducts, getOrInitializeSession } from '@/lib/pos-actions'
 import { PosProduct } from '@project1/domain'
@@ -14,13 +14,22 @@ import { StartSessionModal } from '@/components/pos/StartSessionModal'
 import { toast } from 'react-hot-toast'
 import { useShallow } from 'zustand/react/shallow'
 import { usePosOffline } from '@/stores/pos-offline'
+import { AccountingGuide } from '@/app/(dashboard)/accounting/_components/AccountingGuide'
+import { POSTour } from '@/components/pos/POSTour'
 
 export default function PosPage() {
   const router = useRouter()
-  const [products, setProducts] = useState<PosProduct[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [category, setCategory] = useState('All')
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  // URL-based state
+  const searchQuery = searchParams.get('q') || ''
+  const category = searchParams.get('c') || 'All'
+
+  const { cachedProducts, cachedSession, setCachedData, isOfflineMode, setSyncing, lastSyncedAt } = usePosOffline()
+  
+  const [products, setProducts] = useState<PosProduct[]>(cachedProducts || [])
+  const [isLoading, setIsLoading] = useState(cachedProducts.length === 0)
   const [isStartSessionOpen, setIsStartSessionOpen] = useState(false)
   const [sessionInfo, setSessionInfo] = useState<{
     outletId?: string,
@@ -29,9 +38,15 @@ export default function PosPage() {
     userName?: string,
     merchantName?: string,
     sessionRequired?: boolean
-  }>({})
+  }>({
+    outletId: cachedSession?.outletId,
+    sessionId: cachedSession?.sessionId,
+    outletName: cachedSession?.outletName,
+    userName: cachedSession?.userName,
+    merchantName: cachedSession?.merchantName
+  })
 
-  
+  // Cart actions
   const { setSession, setTaxRate, addItem } = usePosCart(
     useShallow((s) => ({
       setSession: s.setSession,
@@ -40,77 +55,99 @@ export default function PosPage() {
     }))
   )
 
-  const { cachedProducts, cachedSession, setCachedData, isOfflineMode } = usePosOffline()
-  
-  useEffect(() => {
-    async function init() {
-      const isActuallyOffline = isOfflineMode || (typeof navigator !== 'undefined' && !navigator.onLine)
-
-      try {
-        if (isActuallyOffline) {
-          throw new Error('OFFLINE_MODE')
-        }
-
-        // Try to get fresh session info
-        const info = await getOrInitializeSession(false)
-        
-        setSessionInfo({
-          outletId: info.outletId,
-          sessionId: info.sessionId,
-          outletName: info.outletName,
-          userName: info.userName,
-          merchantName: info.merchantName,
-          sessionRequired: info.sessionRequired
-        })
-
-        if (info.sessionRequired) {
-          setIsStartSessionOpen(true)
-        } else if (info.sessionId) {
-          setSession(info.outletId, info.sessionId)
-          setTaxRate(info.taxRate)
-          
-          // Try to get fresh products
-          const data = await fetchPosProducts(info.outletId)
-          setProducts(data)
-
-          // Update cache for next offline use
-          setCachedData(data, info)
-        }
-
-      } catch (err: any) {
-        if (err?.message !== 'OFFLINE_MODE') {
-          console.error('POS Init Error:', err)
-        }
-        
-        // Avoid stale closures from the first mount by reading the latest state
-        const state = usePosOffline.getState()
-        
-        // Fallback to cache if available
-        if (state.cachedSession && state.cachedProducts.length > 0) {
-          toast.success('Running in Offline Mode (Cached Data)', { icon: '📶' })
-          
-          setSession(state.cachedSession.outletId, state.cachedSession.sessionId)
-          setTaxRate(state.cachedSession.taxRate)
-          setSessionInfo({
-            outletId: state.cachedSession.outletId,
-            sessionId: state.cachedSession.sessionId,
-            outletName: state.cachedSession.outletName,
-            userName: state.cachedSession.userName,
-            merchantName: state.cachedSession.merchantName
-          })
-          setProducts(state.cachedProducts)
-        } else {
-          toast.error('Failed to initialize POS. Please check your connection.')
-        }
-      } finally {
-        setIsLoading(false)
-      }
+  // Filter updates (URL-based)
+  const updateFilters = (key: 'q' | 'c', value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value && value !== 'All') {
+      params.set(key, value)
+    } else {
+      params.delete(key)
     }
-    init()
+    // Use replace to avoid polluting history on every keystroke
+    router.replace(`${pathname}?${params.toString()}`)
+  }
 
-    // Prefetch checkout page to ensure it's available offline
-    router.prefetch('/pos/checkout')
-  }, [setSession, router])
+  const init = useCallback(async () => {
+    const isActuallyOffline = isOfflineMode || (typeof navigator !== 'undefined' && !navigator.onLine)
+    
+    // SWR Threshold: 5 minutes (300,000 ms)
+    const SYNC_THRESHOLD = 5 * 60 * 1000
+    const isStale = !lastSyncedAt || (Date.now() - lastSyncedAt > SYNC_THRESHOLD)
+
+    try {
+      if (isActuallyOffline) {
+        throw new Error('OFFLINE_MODE')
+      }
+
+      // Only show loading if we have NO data
+      if (products.length === 0) {
+        setIsLoading(true)
+      }
+
+      // If not stale and we have products, skip background fetch
+      if (!isStale && products.length > 0) {
+        return
+      }
+
+      setSyncing(true)
+
+      // Try to get fresh session info
+      const info = await getOrInitializeSession(false)
+      
+      setSessionInfo({
+        outletId: info.outletId,
+        sessionId: info.sessionId,
+        outletName: info.outletName,
+        userName: info.userName,
+        merchantName: info.merchantName,
+        sessionRequired: info.sessionRequired
+      })
+
+      if (info.sessionRequired) {
+        setIsStartSessionOpen(true)
+      } else if (info.sessionId) {
+        setSession(info.outletId, info.sessionId)
+        setTaxRate(info.taxRate)
+        
+        // Fetch fresh products
+        const data = await fetchPosProducts(info.outletId)
+        setProducts(data)
+
+        // Update cache
+        setCachedData(data, info as any)
+      }
+
+    } catch (err: any) {
+      if (err?.message !== 'OFFLINE_MODE') {
+        console.error('POS Init Error:', err)
+      }
+      
+      const state = usePosOffline.getState()
+      if (state.cachedSession && state.cachedProducts.length > 0) {
+        if (!isActuallyOffline) toast.error('Sync failed. Using cached data.')
+        
+        setSession(state.cachedSession.outletId, state.cachedSession.sessionId)
+        setTaxRate(state.cachedSession.taxRate)
+        setSessionInfo({
+          outletId: state.cachedSession.outletId,
+          sessionId: state.cachedSession.sessionId,
+          outletName: state.cachedSession.outletName,
+          userName: state.cachedSession.userName,
+          merchantName: state.cachedSession.merchantName
+        })
+        setProducts(state.cachedProducts)
+      } else {
+        toast.error('Failed to initialize POS.')
+      }
+    } finally {
+      setIsLoading(false)
+      setSyncing(false)
+    }
+  }, [isOfflineMode, products.length, lastSyncedAt, setSyncing, setSession, setTaxRate, setCachedData, getOrInitializeSession, fetchPosProducts])
+
+  useEffect(() => {
+    init()
+  }, [init])
 
   const categories = useMemo(() => {
     const cats = new Set(products.map(p => p.category).filter(Boolean))
@@ -140,12 +177,12 @@ export default function PosPage() {
         {/* Left Side: Products */}
         <div className="flex-1 flex flex-col min-w-0 border-r border-slate-200">
           <div className="p-4 bg-white border-b border-slate-200 space-y-4">
-            <SearchBar value={searchQuery} onChange={setSearchQuery} />
+            <SearchBar value={searchQuery} onChange={(v) => updateFilters('q', v)} />
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
               {categories.map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => setCategory(cat)}
+                  onClick={() => updateFilters('c', cat)}
                   className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap
                     ${category === cat 
                       ? 'bg-slate-900 text-white' 
@@ -180,11 +217,12 @@ export default function PosPage() {
         outletId={sessionInfo.outletId || ''} 
         onSuccess={(sid) => {
           setIsStartSessionOpen(false);
-          window.location.reload(); 
+          init();
         }}
         onClose={() => setIsStartSessionOpen(false)}
       />
+      <AccountingGuide context="pos" />
+      <POSTour />
     </div>
-
   )
 }

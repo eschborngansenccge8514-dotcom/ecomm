@@ -8,7 +8,8 @@ const nextConfig: NextConfig = {
     '@project1/agent',
     '@project1/domain',
     '@project1/support-agent',
-    '@project1/db'
+    '@project1/db',
+    '@project1/accounting'
   ],
   images: {
     remotePatterns: [

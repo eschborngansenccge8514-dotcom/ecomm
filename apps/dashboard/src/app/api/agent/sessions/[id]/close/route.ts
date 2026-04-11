@@ -50,7 +50,7 @@ export async function POST(
     .join('\n')
 
   const { text: summary } = await generateText({
-    model: google('gemini-2.5-flash-lite'),
+    model: google('gemini-3.1-flash-lite-preview'),
     prompt: `Summarize this agent-merchant conversation into a concise 1-2 sentence overview of what was discussed and any actions taken.
     
     TRANSCRIPT:

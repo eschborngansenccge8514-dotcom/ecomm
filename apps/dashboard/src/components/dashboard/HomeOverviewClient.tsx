@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { OnboardingChecklist } from './OnboardingChecklist'
 
 // Recharts components must be dynamic for SSR
 const AreaChart = dynamic(() => import('recharts').then(mod => mod.AreaChart), { ssr: false })
@@ -59,7 +60,7 @@ function MetricCard({ title, value, subValue, current, previous, icon: Icon, col
         <div>
           <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">{title}</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
-          {subValue && <p className="text-xs text-gray-400 mt-1">{subValue}</p>}
+          {subValue && <div className="text-xs text-gray-400 mt-1">{subValue}</div>}
         </div>
         <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', colorClass)}>
           <Icon size={20} />
@@ -136,6 +137,11 @@ export function HomeOverviewClient({ merchantId, dateRange, data }: {
         </div>
       </div>
 
+      {/* Onboarding Checklist (Only for new users) */}
+      <div className="mb-6">
+        <OnboardingChecklist />
+      </div>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard 
@@ -143,6 +149,13 @@ export function HomeOverviewClient({ merchantId, dateRange, data }: {
           value={rm(summary.revenue)} 
           current={Number(summary.revenue)}
           previous={Number(summary.prev_revenue)}
+          subValue={
+            <div className="flex items-center gap-2">
+              <span className="text-blue-600">POS: {rm(summary.pos_revenue)}</span>
+              <span className="text-gray-300">•</span>
+              <span className="text-gray-500">Web: {rm(summary.web_revenue)}</span>
+            </div>
+          }
           icon={TrendingUp} 
           colorClass="bg-blue-100 text-blue-600"
           highlight
@@ -168,7 +181,7 @@ export function HomeOverviewClient({ merchantId, dateRange, data }: {
           title="Net P&L" 
           value={rm(summary.net_pnl)} 
           current={Number(summary.net_pnl)}
-          previous={Number(summary.prev_revenue - (summary.prev_cogs ?? 0) - summary.prev_expenses)} // Approx
+          previous={Number(summary.prev_net_pnl ?? 0)}
           icon={Activity} 
           colorClass={summary.net_pnl >= 0 ? "bg-indigo-100 text-indigo-600" : "bg-red-100 text-red-600"}
         />

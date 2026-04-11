@@ -18,13 +18,15 @@ import {
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { HistoryModal } from './HistoryModal'
 import { NotificationDropdown } from './NotificationDropdown'
 import { PrinterModal } from './PrinterModal'
 import { TerminalSettingsModal } from './TerminalSettingsModal'
 import { OfflineSyncModal } from './OfflineSyncModal'
 import { CloseSessionModal } from './CloseSessionModal'
+import { ProfileModal } from './ProfileModal'
+import { AccountSettingsModal } from './AccountSettingsModal'
 import { usePosSettings } from '@/stores/pos-settings'
 import { usePosOffline } from '@/stores/pos-offline'
 
@@ -47,9 +49,33 @@ export function ActionHeader({ outletId, sessionId, outletName, userName, mercha
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isOfflineSyncOpen, setIsOfflineSyncOpen] = useState(false)
   const [isCloseSessionOpen, setIsCloseSessionOpen] = useState(false)
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false)
+  const [profileData, setProfileData] = useState<any>(null)
+  const [merchantData, setMerchantData] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+    
+    // Fetch profile and merchant data for modals
+    async function fetchData() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const [{ data: profile }, { data: merchant }] = await Promise.all([
+          supabase.from('profiles').select('*').eq('id', user.id).single(),
+          supabase.from('merchants').select('*').eq('owner_id', user.id).single()
+        ])
+        setProfileData(profile)
+        setMerchantData(merchant)
+      }
+    }
+    fetchData()
+  }, [])
 
   const { terminalName } = usePosSettings()
-  const { pendingTransactions, isOfflineMode } = usePosOffline()
+  const { pendingTransactions, isOfflineMode, isSyncing } = usePosOffline()
   const pendingCount = pendingTransactions?.length || 0
 
   // Generate initials (e.g. "Adam G" -> "AG")
@@ -59,6 +85,7 @@ export function ActionHeader({ outletId, sessionId, outletName, userName, mercha
     .map(n => n[0])
     .join('')
     .toUpperCase()
+    .slice(0, 2)
     .slice(0, 2)
 
   const handleLogout = async () => {
@@ -87,7 +114,7 @@ export function ActionHeader({ outletId, sessionId, outletName, userName, mercha
           </div>
           <div>
             <h1 className="text-sm font-black text-slate-900 leading-none uppercase tracking-tight">
-              {terminalName || merchantName || 'Terminal 01'}
+              {mounted ? (terminalName || merchantName || 'Terminal 01') : (merchantName || 'Terminal 01')}
             </h1>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
               Outlet: {outletName || 'Main'}
@@ -97,14 +124,19 @@ export function ActionHeader({ outletId, sessionId, outletName, userName, mercha
       </div>
 
       <div className="flex items-center gap-4">
-        {isOfflineMode || (typeof navigator !== 'undefined' && !navigator.onLine) ? (
+        {mounted && (isOfflineMode || !navigator.onLine) ? (
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 text-amber-600 text-[10px] font-black uppercase tracking-widest border border-amber-100">
             <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
             Offline Mode
           </div>
+        ) : isSyncing ? (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest border border-blue-100">
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />
+            Syncing...
+          </div>
         ) : (
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-widest border border-emerald-100">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             Online
           </div>
         )}
@@ -147,14 +179,14 @@ export function ActionHeader({ outletId, sessionId, outletName, userName, mercha
             {isUserMenuOpen && (
               <div className="absolute top-10 right-0 w-48 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 animate-in slide-in-from-top-2 duration-200 z-50">
                 <button 
-                  onClick={() => router.push('/dashboard/profile')}
+                  onClick={() => { setIsProfileOpen(true); setIsUserMenuOpen(false); }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-xs font-bold text-slate-700 transition-colors"
                 >
                   <User size={16} className="text-slate-400" />
                   My Profile
                 </button>
                 <button 
-                  onClick={() => router.push('/dashboard/settings')}
+                  onClick={() => { setIsAccountSettingsOpen(true); setIsUserMenuOpen(false); }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-xs font-bold text-slate-700 transition-colors"
                 >
                   <Settings size={16} className="text-slate-400" />
@@ -177,7 +209,7 @@ export function ActionHeader({ outletId, sessionId, outletName, userName, mercha
             className={`p-2.5 rounded-xl transition-all relative ${isMenuOpen ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100'}`}
           >
             {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
-            {pendingCount > 0 && (
+            {mounted && pendingCount > 0 && (
               <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-white text-[10px] font-black rounded-full border-2 border-white flex items-center justify-center animate-bounce">
                 {pendingCount}
               </span>
@@ -198,6 +230,19 @@ export function ActionHeader({ outletId, sessionId, outletName, userName, mercha
       />
       <OfflineSyncModal isOpen={isOfflineSyncOpen} onClose={() => setIsOfflineSyncOpen(false)} />
       <CloseSessionModal isOpen={isCloseSessionOpen} onClose={() => setIsCloseSessionOpen(false)} sessionId={sessionId || ''} />
+      
+      <ProfileModal 
+        isOpen={isProfileOpen} 
+        onClose={() => setIsProfileOpen(false)} 
+        user={profileData} // Using profileData as proxy for user since it has the same info
+        profile={profileData} 
+      />
+      
+      <AccountSettingsModal 
+        isOpen={isAccountSettingsOpen} 
+        onClose={() => setIsAccountSettingsOpen(false)} 
+        merchant={merchantData}
+      />
 
       {/* Quick Menu Dropdown */}
       {isMenuOpen && (
@@ -218,7 +263,7 @@ export function ActionHeader({ outletId, sessionId, outletName, userName, mercha
                  <Wifi size={18} className="text-slate-400" />
                  Offline Sync
                </div>
-               {pendingCount > 0 && (
+               {mounted && pendingCount > 0 && (
                  <span className="bg-amber-100 text-amber-600 text-[10px] px-2 py-0.5 rounded-full font-black">
                    {pendingCount} PENDING
                  </span>

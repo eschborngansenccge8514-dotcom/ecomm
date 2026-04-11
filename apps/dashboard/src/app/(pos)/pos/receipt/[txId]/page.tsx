@@ -11,15 +11,31 @@ import { format } from 'date-fns'
 
 import { usePosOffline } from '@/stores/pos-offline'
 import { usePosCart } from '@/stores/pos-cart'
+import { usePosSettings } from '@/stores/pos-settings'
 
 export default function ReceiptPage() {
   const params = useParams()
   const txId = params.txId as string
   const [txn, setTxn] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   const [loadingStatus, setLoadingStatus] = useState('Verifying transaction...')
   const { pendingTransactions } = usePosOffline()
   const lastCompletedTxn  = usePosCart(state => state.lastCompletedTxn)
+  const { autoPrint } = usePosSettings()
+
+  useEffect(() => {
+    if (autoPrint && txn && !isLoading && mounted) {
+      const timer = setTimeout(() => {
+        window.print()
+      }, 2000) // Increased delay to 2s to ensure the external QR image is fully fetched
+      return () => clearTimeout(timer)
+    }
+  }, [autoPrint, txn, isLoading, mounted])
 
   useEffect(() => {
     async function load() {
@@ -165,19 +181,26 @@ export default function ReceiptPage() {
   const cashierName = pos_session?.profiles?.full_name || 'Staff'
   
   // Format date to Malaysia Timezone (UTC+8)
-  const createdAt = txn.created_at ? new Date(txn.created_at) : new Date()
-  const mytDate = new Intl.DateTimeFormat('en-MY', {
+  const createdAt = txn.created_at ? new Date(txn.created_at) : (mounted ? new Date() : new Date(0))
+  const mytDate = mounted ? new Intl.DateTimeFormat('en-MY', {
     timeZone: 'Asia/Kuala_Lumpur',
     dateStyle: 'medium',
     timeStyle: 'short',
     hour12: true
-  }).format(createdAt)
+  }).format(createdAt) : '—'
 
   return (
-    <div className="h-full flex flex-col items-center bg-slate-50 overflow-y-auto p-12">
-      <div className="max-w-md w-full space-y-12">
+    <div className="h-full flex flex-col items-center bg-slate-50 overflow-y-auto p-12 print:p-0 print:bg-white">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          body { background: white !important; }
+          @page { margin: 0; size: auto; }
+          .no-print, [role="status"], .react-hot-toast-container { display: none !important; }
+        }
+      `}} />
+      <div className="max-w-md w-full space-y-12 print:space-y-0">
         {/* Success Header */}
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-4 print:hidden">
           <div className="w-20 h-20 rounded-full bg-emerald-500 text-white flex items-center justify-center mx-auto shadow-2xl shadow-emerald-200 animate-in zoom-in-50 duration-500">
             <CheckCircle2 size={40} />
           </div>
@@ -186,7 +209,7 @@ export default function ReceiptPage() {
         </div>
 
         {/* Paper Receipt Mockup */}
-        <div className="bg-white p-8 shadow-2xl shadow-slate-200 rounded-lg relative overflow-hidden border-t-8 border-slate-900 animate-in slide-in-from-bottom-8 duration-700">
+        <div className="bg-white p-8 shadow-2xl shadow-slate-200 rounded-lg relative overflow-hidden border-t-8 border-slate-900 animate-in slide-in-from-bottom-8 duration-700 print:shadow-none print:border-none print:p-4">
           
           {/* Merchant Info (LHDN Compliant) */}
           <div className="text-center space-y-2 mb-8">
@@ -299,9 +322,11 @@ export default function ReceiptPage() {
                <div className="space-y-4 w-full">
                  <div className="w-28 h-28 bg-white border-2 border-slate-900 rounded-3xl p-3 mx-auto flex items-center justify-center shadow-xl shadow-slate-200/50 relative overflow-hidden">
                     <Image 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : ''}/einvoice/request/${txId}`)}`}
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${mounted ? window.location.origin : ''}/einvoice/request/${txId}`)}`}
                       alt="Request e-Invoice QR"
                       fill
+                      priority
+                      unoptimized
                       className="object-contain p-3"
                     />
                  </div>
@@ -322,7 +347,7 @@ export default function ReceiptPage() {
           </div>
           
           {/* Jagged edge pattern at bottom */}
-          <div className="absolute bottom-0 left-0 right-0 h-2 flex">
+          <div className="absolute bottom-0 left-0 right-0 h-2 flex print:hidden">
             {[...Array(20)].map((_, i) => (
               <div key={i} className="flex-1 h-full bg-slate-50 rotate-45 translate-y-1" />
             ))}
@@ -330,7 +355,7 @@ export default function ReceiptPage() {
         </div>
 
         {/* Actions */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 print:hidden">
           <button 
             onClick={() => window.print()}
             className="flex items-center justify-center gap-3 px-6 h-14 bg-white border-2 border-slate-900 text-slate-900 rounded-2xl font-black hover:bg-slate-50 transition-all shadow-sm"

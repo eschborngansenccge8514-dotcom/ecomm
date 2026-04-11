@@ -32,7 +32,9 @@ import {
   Share2,
   UserCheck,
   Clock,
-  BadgeDollarSign
+  BadgeDollarSign,
+  History,
+  ArrowRightLeft
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -75,7 +77,10 @@ const NAV_GROUPS = [
     items: [
       { href: '/wallet', label: 'Wallet', icon: Wallet },
       { href: '/expenses', label: 'Expenses', icon: Receipt },
+      { href: '/accounting', label: 'Accounting', icon: PieChart },
+      { href: '/accounting/reconcile', label: 'Reconciliation', icon: ArrowRightLeft },
       { href: '/einvoice', label: 'E-Invoicing', icon: FileCheck },
+      { href: '/settings/audit', label: 'Audit Trail', icon: History },
       { href: '/reports', label: 'Reports', icon: FileText },
     ]
   },

@@ -179,7 +179,7 @@ export async function handleEmailInput(input: {
   body: string;
 }) {
   const { text } = await generateText({
-    model: google('gemini-2.5-flash-lite'),
+    model: google('gemini-3.1-flash-lite-preview'),
     system: `You are a helpful customer support agent for Hyperlocal.
              Reply professionally and concisely to the customer's email.
              Do not include a subject line. Write only the email body.`,

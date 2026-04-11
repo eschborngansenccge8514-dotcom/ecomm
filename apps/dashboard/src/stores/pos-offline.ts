@@ -30,10 +30,14 @@ interface OfflineState {
   updateStatus: (id: string, status: 'pending' | 'syncing' | 'failed', error?: string) => void
   clearSynced: () => void
   
+  // Sync state
+  isSyncing: boolean
+  setSyncing: (syncing: boolean) => void
+  lastSyncedAt: number | null
+  
   // Cache for offline operation
   cachedProducts: PosProduct[]
   cachedSession: CachedSession | null
-  lastSyncedAt: number | null
   setCachedData: (products: PosProduct[], session: CachedSession) => void
 }
 
@@ -43,17 +47,21 @@ export const usePosOffline = create<OfflineState>()(
       isOfflineMode: false,
       setOfflineMode: (offline) => set({ isOfflineMode: offline }),
       pendingTransactions: [],
-      addPending: (payload) => set((state) => ({
-        pendingTransactions: [
-          ...state.pendingTransactions,
-          {
-            id: `OFF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            payload,
-            timestamp: Date.now(),
-            status: 'pending'
-          }
-        ]
-      })),
+      addPending: (payload) => {
+        const id = `OFF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        set((state) => ({
+          pendingTransactions: [
+            ...state.pendingTransactions,
+            {
+              id,
+              payload,
+              timestamp: Date.now(),
+              status: 'pending'
+            }
+          ]
+        }))
+        return id
+      },
       removePending: (id) => set((state) => ({
         pendingTransactions: state.pendingTransactions.filter((t) => t.id !== id)
       })),
@@ -68,10 +76,13 @@ export const usePosOffline = create<OfflineState>()(
       cachedProducts: [],
       cachedSession: null,
       lastSyncedAt: null,
+      isSyncing: false,
+      setSyncing: (syncing) => set({ isSyncing: syncing }),
       setCachedData: (products, session) => set({
         cachedProducts: products,
         cachedSession: session,
-        lastSyncedAt: Date.now()
+        lastSyncedAt: Date.now(),
+        isSyncing: false
       }),
     }),
     {

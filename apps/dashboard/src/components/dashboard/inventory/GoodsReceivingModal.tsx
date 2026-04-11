@@ -75,7 +75,9 @@ export function GoodsReceivingModal({ po, onClose }: GoodsReceivingModalProps) {
              </div>
              <div>
                <DialogTitle className="text-2xl font-black">Receive Goods</DialogTitle>
-               <p className="text-sm text-slate-400 font-bold uppercase tracking-widest mt-1">PO: {po.po_number} / {po.supplier?.name}</p>
+               <p className="text-sm text-slate-400 font-bold uppercase tracking-widest mt-1">
+                 PO: {po.po_number} / {Array.isArray(po.supplier) ? po.supplier[0]?.name : po.supplier?.name}
+               </p>
              </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full text-slate-400 hover:text-white hover:bg-slate-800">

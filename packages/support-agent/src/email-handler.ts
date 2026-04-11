@@ -116,7 +116,7 @@ export async function handleSupportEmailInput({
     let response: any
     try {
       response = await generateText({
-        model: google('gemini-2.5-flash-lite'),
+        model: google('gemini-3.1-flash-lite-preview'),
         system: systemPrompt + "\n\nIMPORTANT: You MUST always provide a helpful, professional text response. Never return an empty message.",
         messages: processedHistory,
         tools: buildSupportTools(merchantId, ownerId, sessionId, supabase, customerId) as any,

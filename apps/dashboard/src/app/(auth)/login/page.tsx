@@ -7,6 +7,7 @@ import { Input }  from '@/components/ui/input'
 import { Label }  from '@/components/ui/label'
 import toast      from 'react-hot-toast'
 import { Mail, Lock, ArrowRight, Loader2, Store } from 'lucide-react'
+import { Copyright } from '@/components/public/Copyright'
 
 function LoginContent() {
   const router = useRouter()
@@ -98,7 +99,7 @@ function LoginContent() {
         </div>
 
         <div className="relative z-10 text-slate-500 text-sm font-medium">
-          © {new Date().getFullYear()} Go-Buy Marketplace. All rights reserved.
+          <Copyright company="Go-Buy Marketplace" suffix="All rights reserved." />
         </div>
       </div>
 

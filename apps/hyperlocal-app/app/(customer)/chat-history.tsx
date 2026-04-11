@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuthStore } from '@/stores/authStore'
 import { BlurView } from 'expo-blur'
 
-const API_URL = process.env.EXPO_PUBLIC_DASHBOARD_URL ?? 'http://192.168.1.102:3000'
+const API_URL = process.env.EXPO_PUBLIC_DASHBOARD_URL ?? 'http://localhost:3000'
 
 function Badge({ text, color }: { text: string; color: string }) {
   return (

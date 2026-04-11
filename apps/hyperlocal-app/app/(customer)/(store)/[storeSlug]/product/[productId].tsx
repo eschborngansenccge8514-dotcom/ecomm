@@ -3,6 +3,8 @@ import { useLocalSearchParams, router } from 'expo-router'
 import { Image } from 'expo-image'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { productsService } from '@/services/products.service'
 import { useCartStore } from '@/stores/cartStore'
 import { VariantSelector } from '@/components/product/VariantSelector'
@@ -16,9 +18,11 @@ import type { ProductWithMerchant } from '@/services/products.service'
 
 export default function ProductDetailScreen() {
   const { productId } = useLocalSearchParams<{ productId: string }>()
-  const { addItem, merchantId } = useCartStore()
+  const { addItem, merchantId, getItemCount } = useCartStore()
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [quantity, setQuantity] = useState(1)
+  const insets = useSafeAreaInsets()
+  const cartCount = getItemCount()
 
   const { data: product, isLoading, isError } = useQuery({
     queryKey: ['product', productId],
@@ -96,6 +100,27 @@ export default function ProductDetailScreen() {
           style={{ width: '100%', height: 350 }}
           contentFit="cover"
         />
+
+        {/* Back button — top left */}
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={{ position: 'absolute', top: insets.top + 8, left: 16, zIndex: 10, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 }}
+        >
+          <Ionicons name="arrow-back" size={20} color="#0f172a" />
+        </TouchableOpacity>
+
+        {/* Cart button — top right */}
+        <TouchableOpacity
+          onPress={() => router.push('/(customer)/(cart)')}
+          style={{ position: 'absolute', top: insets.top + 8, right: 16, zIndex: 10, width: 40, height: 40, borderRadius: 20, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center', shadowColor: '#2563eb', shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+        >
+          <Ionicons name="bag" size={20} color="#fff" />
+          {cartCount > 0 && (
+            <View style={{ position: 'absolute', top: -4, right: -4, backgroundColor: '#ef4444', borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 }}>
+              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{cartCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
         <View className="px-5 pt-8 pb-32">
           {/* Price & Name */}

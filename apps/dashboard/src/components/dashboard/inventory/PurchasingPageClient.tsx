@@ -346,7 +346,7 @@ function PaymentsTable({ payments, router }: { payments: any[], router: any }) {
                     {p.purchase_orders?.po_number}
                   </td>
                   <td className="px-4 py-3.5 text-sm font-semibold text-gray-800 capitalize">
-                    {p.purchase_orders?.suppliers?.name}
+                    {Array.isArray(p.purchase_orders?.supplier) ? p.purchase_orders.supplier[0]?.name : p.purchase_orders?.supplier?.name}
                   </td>
                   <td className="px-4 py-3.5 text-sm font-black text-gray-900 text-right">
                     RM {p.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}

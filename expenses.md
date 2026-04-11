@@ -179,7 +179,7 @@ export async function extractReceiptData(
   const base64Data = Buffer.from(fileBuffer).toString("base64");
 
   const { object } = await generateObject({
-    model:  google("gemini-2.5-flash-lite"),
+    model:  google("gemini-3.1-flash-lite-preview"),
     schema: ReceiptExtractionSchema,
     messages: [{
       role: "user",

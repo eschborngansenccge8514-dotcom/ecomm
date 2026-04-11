@@ -2,14 +2,30 @@
   "mcpServers": {
     "supabase": {
       "type": "stdio",
-      "command": "npx",
+      "command": "/Users/jj/.nvm/versions/node/v24.13.1/bin/npx",
       "args": [
         "-y",
         "@supabase/mcp-server-supabase",
         "--access-token",
         "sbp_cd13489a449e54ef02501737f99a959704642cbb"
       ],
-      "env": {}
+      "env": {
+        "SUPABASE_URL": "https://dgafjyrittkskxlgswvf.supabase.co",
+        "SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRnYWZqeXJpdHRrc2t4bGdzd3ZmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDY4MTEwOCwiZXhwIjoyMDkwMjU3MTA4fQ.u1uAd_lWedzo60HZqi7WTAWI2f_vkjGSQ5z8AXCvWtk",
+        "PATH": "/Users/jj/.nvm/versions/node/v24.13.1/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+      }
+    },
+    "postgres": {
+      "type": "stdio",
+      "command": "/Users/jj/.nvm/versions/node/v24.13.1/bin/npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://postgres.dgafjyrittkskxlgswvf:iSU3aOFvpUlnZnRG@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
+      ],
+      "env": {
+        "PATH": "/Users/jj/.nvm/versions/node/v24.13.1/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+      }
     }
   }
 }

@@ -19,7 +19,9 @@ import {
   CheckCircle2,
   CreditCard,
   Receipt,
-  MessageSquare
+  MessageSquare,
+  Phone,
+  Building2
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -320,11 +322,11 @@ export function PurchaseOrderDetailClient({ po }: { po: any }) {
     
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(40, 40, 40)
-    doc.text(po.suppliers?.name || 'N/A', 18, 74)
+    doc.text(po.supplier.name || 'N/A', 18, 74)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 100, 100)
-    doc.text(po.suppliers?.email || '', 18, 79)
-    doc.text(po.suppliers?.phone || '', 18, 84)
+    doc.text(po.supplier.email || '', 18, 79)
+    doc.text(po.supplier.phone || '', 18, 84)
 
     // ── Items Table ──
     autoTable(doc, {
@@ -451,7 +453,7 @@ export function PurchaseOrderDetailClient({ po }: { po: any }) {
                 </Badge>
               )}
             </div>
-            <p className="text-sm text-gray-500 mt-1 uppercase font-bold tracking-tighter">Order for {po.suppliers?.name}</p>
+            <p className="text-sm text-gray-500 mt-1 uppercase font-bold tracking-tighter">Order for {po.supplier.name}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -485,40 +487,40 @@ export function PurchaseOrderDetailClient({ po }: { po: any }) {
                       onClick={() => handleSend('email')} 
                       className={cn(
                         "flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors",
-                        po.suppliers?.preferred_contact_method === 'email' ? "bg-blue-50 text-blue-700" : "hover:bg-gray-50"
+                        po.supplier.preferred_contact_method === 'email' ? "bg-blue-50 text-blue-700" : "hover:bg-gray-50"
                       )}
                     >
                       <div className={cn(
                         "w-8 h-8 rounded-full flex items-center justify-center",
-                        po.suppliers?.preferred_contact_method === 'email' ? "bg-blue-100" : "bg-gray-50"
+                        po.supplier.preferred_contact_method === 'email' ? "bg-blue-100" : "bg-gray-50"
                       )}>
                         <Mail size={16} />
                       </div>
                       <div className="flex flex-col">
                         <span className="font-bold text-sm">Email</span>
-                        <span className="text-[10px] opacity-70">{po.suppliers?.email || 'No email set'}</span>
+                        <span className="text-[10px] opacity-70">{po.supplier.email || 'No email set'}</span>
                       </div>
-                      {po.suppliers?.preferred_contact_method === 'email' && <CheckCircle2 size={14} className="ml-auto" />}
+                      {po.supplier.preferred_contact_method === 'email' && <CheckCircle2 size={14} className="ml-auto" />}
                     </DropdownMenuItem>
 
                     <DropdownMenuItem 
                       onClick={() => handleSend('whatsapp')} 
                       className={cn(
                         "flex items-center gap-3 p-3 rounded-xl cursor-pointer mt-1 transition-colors",
-                        po.suppliers?.preferred_contact_method === 'whatsapp' ? "bg-green-50 text-green-700" : "hover:bg-gray-50"
+                        po.supplier.preferred_contact_method === 'whatsapp' ? "bg-green-50 text-green-700" : "hover:bg-gray-50"
                       )}
                     >
                       <div className={cn(
                         "w-8 h-8 rounded-full flex items-center justify-center",
-                        po.suppliers?.preferred_contact_method === 'whatsapp' ? "bg-green-100" : "bg-gray-50"
+                        po.supplier.preferred_contact_method === 'whatsapp' ? "bg-green-100" : "bg-gray-50"
                       )}>
                         <MessageSquare size={16} />
                       </div>
                       <div className="flex flex-col">
                         <span className="font-bold text-sm">WhatsApp</span>
-                        <span className="text-[10px] opacity-70">{po.suppliers?.phone || 'No phone set'}</span>
+                        <span className="text-[10px] opacity-70">{po.supplier.phone || 'No phone set'}</span>
                       </div>
-                      {po.suppliers?.preferred_contact_method === 'whatsapp' && <CheckCircle2 size={14} className="ml-auto" />}
+                      {po.supplier.preferred_contact_method === 'whatsapp' && <CheckCircle2 size={14} className="ml-auto" />}
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                 </DropdownMenuContent>
@@ -760,23 +762,49 @@ export function PurchaseOrderDetailClient({ po }: { po: any }) {
               <Truck size={16} className="text-gray-300" />
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
-              <div>
-                <p className="font-bold text-gray-900 text-lg uppercase italic tracking-tighter leading-none">
-                  {po.suppliers?.name}
-                </p>
-                <p className="text-xs text-gray-400 font-bold mt-2 uppercase tracking-widest leading-none border-l-2 border-blue-500 pl-2">
-                  {po.suppliers?.code}
-                </p>
-              </div>
-              <div className="space-y-3 pt-4">
-                {po.suppliers?.email && (
-                  <div className="flex items-center gap-3 text-sm text-gray-600 font-medium">
-                    <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
-                      <Mail size={14} className="text-blue-400" />
-                    </div>
-                    <span>{po.suppliers.email}</span>
-                  </div>
-                )}
+                  {(() => {
+                    const s = Array.isArray(po.supplier) ? po.supplier[0] : po.supplier;
+                    return (
+                      <>
+                        <div>
+                          <p className="font-bold text-gray-900 text-lg uppercase italic tracking-tighter leading-none">
+                            {s?.name || '—'}
+                          </p>
+                          <p className="text-xs text-gray-400 font-bold mt-2 uppercase tracking-widest leading-none border-l-2 border-blue-500 pl-2">
+                            {s?.code || '—'}
+                          </p>
+                        </div>
+                        <div className="space-y-3 pt-4">
+                          {s?.email && (
+                            <div className="flex items-center gap-3 text-sm text-gray-600 font-medium">
+                              <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
+                                <Mail size={14} className="text-blue-400" />
+                              </div>
+                              <span>{s.email}</span>
+                            </div>
+                          )}
+                          {s?.phone && (
+                            <div className="flex items-center gap-3 text-sm text-gray-600 font-medium border-t border-gray-50 pt-3">
+                              <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
+                                <Phone size={14} className="text-blue-400" />
+                              </div>
+                              <span>{s.phone}</span>
+                            </div>
+                          )}
+                          {s?.address && (
+                            <div className="flex items-center gap-3 text-sm text-gray-600 font-medium border-t border-gray-50 pt-3">
+                              <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
+                                <Building2 size={14} className="text-blue-400" />
+                              </div>
+                              <span className="text-xs leading-relaxed">
+                                {typeof s.address === 'string' ? s.address : JSON.stringify(s.address)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )
+                  })()}
                 <div className="flex items-center gap-3 text-sm text-gray-600 border-t border-gray-50 pt-4 mt-2">
                   <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
                     <Calendar size={14} className="text-orange-400" />
@@ -797,7 +825,6 @@ export function PurchaseOrderDetailClient({ po }: { po: any }) {
                     </div>
                   </div>
                 )}
-              </div>
             </CardContent>
           </Card>
 

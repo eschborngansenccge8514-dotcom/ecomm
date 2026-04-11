@@ -3,6 +3,7 @@
 import { getAuthContext } from "@/lib/utils.server";
 import { extractReceiptData } from "@project1/agent";
 import { revalidatePath } from "next/cache";
+import { postExpense } from "@project1/accounting";
 
 export async function analyseReceipt(storagePath: string, mimeType: any) {
   const { supabase, merchant } = await getAuthContext();
@@ -20,7 +21,14 @@ export async function analyseReceipt(storagePath: string, mimeType: any) {
 
   // 2. Extract data via AI
   const buffer = await fileData.arrayBuffer();
-  const extraction = await extractReceiptData(buffer, mimeType);
+  
+  const businessContext = `
+    Store Name: ${merchant.store_name}
+    Store Type: ${merchant.store_type || 'General Merchant'}
+    Description: ${merchant.description || 'N/A'}
+  `.trim();
+
+  const extraction = await extractReceiptData(buffer, mimeType as any, businessContext);
 
   // 3. Get temporary URL for preview
   const { data: urlData } = await supabase.storage
@@ -67,6 +75,7 @@ export async function saveExpense(input: any) {
       ai_confidence_score:   input.confidenceScore,
       ai_notes:              input.aiNotes,
       notes:                 input.notes,
+      payment_account_id:    input.paymentAccountId,
     })
     .select()
     .single();
@@ -74,6 +83,26 @@ export async function saveExpense(input: any) {
   if (error) {
     console.error("Save expense error:", error);
     throw new Error(error.message);
+  }
+
+  // 4. Auto-post to accounting if confirmed
+  if (data.status === 'confirmed') {
+    try {
+      await postExpense({
+        merchantId: merchant.id,
+        expenseId:  data.id,
+        vendor:      data.vendor_name || 'Unknown Vendor',
+        amount:      Number(data.total_amount),
+        taxAmount:   Number(data.sst_amount || 0),
+        category:    data.category,
+        date:        data.receipt_date ? new Date(data.receipt_date) : new Date(),
+        paymentAccountId: data.payment_account_id,
+      });
+    } catch (e) {
+      console.error("Failed to auto-post expense to accounting:", e);
+      // We don't throw here to avoid failing the whole save, 
+      // but in production you might want a retry queue.
+    }
   }
 
   revalidatePath("/expenses");
@@ -194,13 +223,31 @@ export async function confirmExpense(id: string) {
   const { supabase, merchant } = await getAuthContext();
   if (!merchant) throw new Error("Unauthorized");
 
-  const { error } = await supabase
+  const { data: expense, error } = await supabase
     .from("expenses")
     .update({ status: 'confirmed', updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("merchant_id", merchant.id);
+    .eq("merchant_id", merchant.id)
+    .select()
+    .single();
 
   if (error) throw new Error(error.message);
+
+  // Auto-post to accounting
+  try {
+    await postExpense({
+      merchantId: merchant.id,
+      expenseId:  expense.id,
+      vendor:      expense.vendor_name || 'Unknown Vendor',
+      amount:      Number(expense.total_amount),
+      taxAmount:   Number(expense.sst_amount || 0),
+      category:    expense.category,
+      date:        expense.receipt_date ? new Date(expense.receipt_date) : new Date(),
+      paymentAccountId: expense.payment_account_id,
+    });
+  } catch (e) {
+    console.error("Failed to auto-post expense to accounting:", e);
+  }
 
   revalidatePath("/expenses");
   revalidatePath(`/expenses/${id}`);

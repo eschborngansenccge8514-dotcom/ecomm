@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   const { messages, cartContext } = await req.json()
 
   const result = await streamText({
-    model: google('gemini-1.5-pro-latest'),
+    model: google('gemini-3.1-flash-lite-preview'),
     messages,
     system: `You are MerchantMind POS Assistant. 
     You help the cashier manage the current sale.

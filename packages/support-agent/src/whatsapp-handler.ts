@@ -68,7 +68,7 @@ export async function handleWhatsAppMessage({
   }
 
   const response = await generateText({
-    model: google('gemini-2.5-flash-lite'), // Use latest stable
+    model: google('gemini-3.1-flash-lite-preview'), // Use latest stable
     system: systemPrompt + "\n\nIMPORTANT: You MUST always provide a helpful, professional text response. Never return an empty message.",
     messages: processedHistory,
     tools: buildSupportTools(merchantId, ownerId, sessionId, supabase, customerId) as any,

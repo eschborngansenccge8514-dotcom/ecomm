@@ -1,5 +1,6 @@
 import { getAuthContext } from "@/lib/utils.server";
 import { getExpenseById } from "../actions";
+import { getAccounts } from "../../accounting/actions";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Calendar, User, Tag, Receipt, Info, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
@@ -15,7 +16,10 @@ export default async function ExpenseDetailPage({
 }) {
   const { id } = await params;
   const { merchant } = await getAuthContext();
-  const expense = await getExpenseById(id);
+  const [expense, accounts] = await Promise.all([
+    getExpenseById(id),
+    getAccounts()
+  ]);
 
   if (!expense) notFound();
 
@@ -103,7 +107,7 @@ export default async function ExpenseDetailPage({
               </p>
            </div>
 
-           <EditExpenseForm expense={expense} />
+           <EditExpenseForm expense={expense} accounts={accounts} />
         </div>
       </div>
     </div>

@@ -8,3 +8,4 @@ export { createSession, loadMessages, saveMessages, touchSession } from './src/m
 export { extractReceiptData } from "./src/receiptExtractor";
 export { handleEmailInput } from './src/email-handler'
 export { handleMerchantWhatsApp } from './src/whatsapp-handler'
+export { extractQuotationData } from "./src/quotationExtractor";

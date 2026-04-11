@@ -47,6 +47,7 @@ export function EInvoiceSettings({ config: initial, merchantId }: {
     client_id:            initial?.client_id            ?? '',
     client_secret:         initial?.client_secret        ?? '',
     env:                  initial?.env                  ?? 'sandbox',
+    issue_mode:           initial?.issue_mode           ?? 'individual',
   })
 
   const [showId,     setShowId]     = useState(false)
@@ -76,6 +77,7 @@ export function EInvoiceSettings({ config: initial, merchantId }: {
         client_id:            form.client_id.trim(),
         client_secret:        form.client_secret.trim(),
         env:                  form.env,
+        issue_mode:           form.issue_mode,
         updated_at:           new Date().toISOString(),
       }, { onConflict: 'merchant_id' })
 
@@ -127,6 +129,55 @@ export function EInvoiceSettings({ config: initial, merchantId }: {
             </button>
           ))}
         </div>
+      </Section>
+
+      {/* ── Submission Strategy ────────────────────────────────────────── */}
+      <Section title="Submission Strategy" subtitle="Choose how your e-invoices are reported to LHDN.">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button
+            onClick={() => set('issue_mode', 'individual')}
+            className={cn(
+              "p-5 rounded-2xl border-2 text-left transition-all",
+              form.issue_mode === 'individual' 
+                ? "border-blue-600 bg-blue-50/50 ring-4 ring-blue-50" 
+                : "border-gray-100 opacity-60 grayscale hover:grayscale-0"
+            )}
+          >
+            <div className="flex justify-between items-start">
+               <span className="font-black text-gray-900">Individual Submission</span>
+               {form.issue_mode === 'individual' && <CheckCircle2 className="text-blue-600" size={20} />}
+            </div>
+            <p className="text-xs text-gray-400 font-medium mt-2 leading-relaxed">
+              Every sale is submitted to LHDN immediately. Required for B2B transactions.
+            </p>
+          </button>
+
+          <button
+            onClick={() => set('issue_mode', 'consolidated')}
+            className={cn(
+              "p-5 rounded-2xl border-2 text-left transition-all",
+              form.issue_mode === 'consolidated' 
+                ? "border-purple-600 bg-purple-50/50 ring-4 ring-purple-50" 
+                : "border-gray-100 opacity-60 grayscale hover:grayscale-0"
+            )}
+          >
+             <div className="flex justify-between items-start">
+               <span className="font-black text-gray-900">Consolidated Batch</span>
+               {form.issue_mode === 'consolidated' && <CheckCircle2 className="text-purple-600" size={20} />}
+            </div>
+            <p className="text-xs text-gray-400 font-medium mt-2 leading-relaxed">
+              Sales are batched and submitted monthly. Recommended for high-volume retail.
+            </p>
+          </button>
+        </div>
+        {form.issue_mode === 'consolidated' && (
+           <div className="flex items-start gap-3 p-4 bg-orange-50 rounded-2xl border border-orange-100">
+             <AlertCircle className="text-orange-500 shrink-0 mt-0.5" size={16} />
+             <p className="text-[10px] text-orange-800 font-bold leading-relaxed uppercase tracking-tighter">
+               Note: You must still issue an individual e-invoice if a customer requests one within 30 days of purchase.
+             </p>
+           </div>
+        )}
       </Section>
 
       {/* ── Business Details ───────────────────────────────────────────── */}
